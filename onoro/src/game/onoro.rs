@@ -3,6 +3,7 @@ use crate::hex_pos::{HexPos16, HexPos32};
 use super::{
   onoro_state::OnoroState,
   packed_idx::{IdxOffset, PackedIdx},
+  packed_score::PackedScore,
   score::Score,
 };
 
@@ -18,9 +19,7 @@ pub struct Onoro<const N: usize> {
   /// pawns, the others are white. Filled from lowest to highest index as the
   /// first phase proceeds.
   pawn_poses: [PackedIdx; N],
-  state: OnoroState,
-  /// Optional: can store the game score here to save space.
-  score: Score,
+  score: PackedScore<OnoroState>,
   // Sum of all HexPos's of pieces on the board
   sum_of_mass: HexPos16,
   hash: u64,
