@@ -3,9 +3,7 @@ use std::fmt::Display;
 use crate::{finite::Finite, group::Group, monoid::Monoid, ordinal::Ordinal, semigroup::Semigroup};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Cyclic<const N: u16> {
-  ord: u16,
-}
+pub struct Cyclic<const N: u16>(pub u16);
 
 impl<const N: u16> Finite for Cyclic<N> {
   const SIZE: usize = N as usize;
@@ -13,39 +11,35 @@ impl<const N: u16> Finite for Cyclic<N> {
 
 impl<const N: u16> Ordinal for Cyclic<N> {
   fn ord(&self) -> usize {
-    self.ord as usize
+    self.0 as usize
   }
 
   fn from_ord(ord: usize) -> Self {
-    Self { ord: ord as u16 }
+    Self(ord as u16)
   }
 }
 
 impl<const N: u16> Semigroup for Cyclic<N> {
   fn op(&self, other: &Self) -> Self {
-    Self {
-      ord: (self.ord + other.ord) % N,
-    }
+    Self((self.0 + other.0) % N)
   }
 }
 
 impl<const N: u16> Monoid for Cyclic<N> {
   fn identity() -> Self {
-    Self { ord: 0 }
+    Self(0)
   }
 }
 
 impl<const N: u16> Group for Cyclic<N> {
   fn inverse(&self) -> Self {
-    Self {
-      ord: (N - self.ord) % N,
-    }
+    Self((N - self.0) % N)
   }
 }
 
 impl<const N: u16> Display for Cyclic<N> {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    write!(f, "r{}", self.ord)
+    write!(f, "r{}", self.0)
   }
 }
 
@@ -59,14 +53,14 @@ mod test {
 
   fn permute_all<const N: u16>() {
     for i in 0..N {
-      let a: Cyclic<N> = Cyclic { ord: i };
+      let a: Cyclic<N> = Cyclic(i);
       assert_eq!(a.ord(), i as usize);
       assert_eq!(Cyclic::from_ord(i as usize), a);
 
       for j in 0..N {
-        let b: Cyclic<N> = Cyclic { ord: j };
+        let b: Cyclic<N> = Cyclic(j);
 
-        assert_eq!(a.op(&b), Cyclic { ord: (i + j) % N });
+        assert_eq!(a.op(&b), Cyclic((i + j) % N));
       }
     }
   }

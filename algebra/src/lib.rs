@@ -1,6 +1,6 @@
-mod finite;
-mod group;
-mod monoid;
-mod ordinal;
-mod product;
-mod semigroup;
+pub mod finite;
+pub mod group;
+pub mod monoid;
+pub mod ordinal;
+pub mod product;
+pub mod semigroup;

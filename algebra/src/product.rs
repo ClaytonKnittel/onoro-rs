@@ -1,9 +1,25 @@
+use std::fmt::Display;
+
 use crate::{finite::Finite, group::Group, monoid::Monoid, ordinal::Ordinal, semigroup::Semigroup};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-struct DirectProduct<L, R> {
+pub struct DirectProduct<L, R> {
   left: L,
   right: R,
+}
+
+impl<L, R> DirectProduct<L, R> {
+  pub const fn new(left: L, right: R) -> Self {
+    Self { left, right }
+  }
+
+  pub const fn left(&self) -> &L {
+    &self.left
+  }
+
+  pub const fn right(&self) -> &R {
+    &self.right
+  }
 }
 
 impl<L, R> Finite for DirectProduct<L, R>
@@ -72,6 +88,17 @@ where
   }
 }
 
+impl<L, R> Display for DirectProduct<L, R>
+where
+  L: Display,
+  R: Display,
+{
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    // TODO: make only outermost DirectProduct use parens
+    write!(f, "({}, {})", self.left, self.right)
+  }
+}
+
 #[macro_export]
 macro_rules! direct_product_type {
   ($g:ty) => {
@@ -88,7 +115,7 @@ macro_rules! direct_product {
     $g
   };
   ($l:expr, $($rs:expr),+) => {
-    $crate::product::DirectProduct { left: $l, right: direct_product!($($rs),+) }
+    $crate::product::DirectProduct::new($l, direct_product!($($rs),+))
   }
 }
 
