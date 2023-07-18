@@ -1,3 +1,4 @@
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct OnoroState {
   /// Layout of data:
   /// [0..3]: turn
@@ -37,6 +38,11 @@ impl OnoroState {
   pub fn hashed(&self) -> bool {
     let (_, _, _, hashed) = Self::unpack(self.data);
     hashed
+  }
+
+  pub fn set_hashed(&mut self, hashed: bool) {
+    let (turn, black_turn, finished, _) = Self::unpack(self.data);
+    self.data = Self::pack(turn, black_turn, finished, hashed);
   }
 
   fn pack(turn: u32, black_turn: bool, finished: bool, hashed: bool) -> u8 {

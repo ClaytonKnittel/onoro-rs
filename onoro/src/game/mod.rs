@@ -1,4 +1,5 @@
 mod canonicalize;
+mod hex_pos;
 mod r#move;
 mod onoro;
 mod onoro_state;

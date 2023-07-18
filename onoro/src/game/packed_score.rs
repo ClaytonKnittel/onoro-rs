@@ -2,7 +2,7 @@ use std::fmt::{Debug, Display};
 
 use super::score::Score;
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PackedScore<P> {
   /// Third entry is extra data that is packed inside the score struct to save
   /// memory. This should have size 1 for score to be minimally sized.

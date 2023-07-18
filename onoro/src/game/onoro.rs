@@ -1,6 +1,5 @@
-use crate::hex_pos::{HexPos16, HexPos32};
-
 use super::{
+  hex_pos::{HexPos16, HexPos32},
   onoro_state::OnoroState,
   packed_idx::{IdxOffset, PackedIdx},
   packed_score::PackedScore,
@@ -14,6 +13,7 @@ pub enum TileState {
 }
 
 /// An Onoro game state with `N / 2` pawns per player.
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Onoro<const N: usize> {
   /// Array of indexes of pawn positions. Odd entries (even index) are black
   /// pawns, the others are white. Filled from lowest to highest index as the
@@ -35,6 +35,14 @@ impl<const N: usize> Onoro<N> {
     }
   }
 
+  fn onoro_state(&self) -> &OnoroState {
+    self.score.packed_data()
+  }
+
+  fn mut_onoro_state(&mut self) -> &mut OnoroState {
+    self.score.mut_packed_data()
+  }
+
   /// Returns the width of the game board. This is also the upper bound on the
   /// x and y coordinate values in PackedIdx.
   pub const fn board_width() -> usize {
@@ -53,6 +61,36 @@ impl<const N: usize> Onoro<N> {
   /// Returns the size of the symm state table, in terms of number of elements.
   pub const fn symm_state_table_size() -> usize {
     Self::symm_state_table_width() * Self::symm_state_table_width()
+  }
+
+  /// Sets the pawn at index `i` to `pos`. This will mutate the state of the
+  /// game.
+  pub fn make_move(&mut self, i: usize, pos: PackedIdx) {
+    let mut com_offset: HexPos32 = pos.into();
+
+    let prev_idx = self.pawn_poses[i];
+    if prev_idx != PackedIdx::null() {
+      com_offset -= prev_idx.into();
+    }
+
+    self.pawn_poses[i] = pos;
+    // The amount to shift the whole board by. This will keep pawns off the
+    // outer perimeter.
+    let shift = Self::calc_move_shift(&pos);
+    // Only shift the pawns if we have to, to avoid extra memory
+    // reading/writing.
+    if shift != IdxOffset::identity() {
+      self.pawn_poses.iter_mut().for_each(|pos| {
+        if *pos != PackedIdx::null() {
+          *pos += shift;
+        }
+      });
+    }
+
+    self.sum_of_mass += com_offset.into();
+    self.mut_onoro_state().set_hashed(false);
+
+    // Check for a win
   }
 
   /// Given the position of a newly placed/moved pawn, returns the offset to

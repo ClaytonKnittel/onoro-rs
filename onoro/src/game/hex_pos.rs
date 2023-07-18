@@ -3,6 +3,8 @@ use num_traits::Signed;
 
 use crate::groups::{C2, D3, D6, K4};
 
+use super::packed_idx::PackedIdx;
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct HexPos<I: Signed> {
   x: I,
@@ -238,6 +240,42 @@ where
   }
 }
 
+impl From<PackedIdx> for HexPos16 {
+  fn from(value: PackedIdx) -> Self {
+    Self {
+      x: value.x() as i16,
+      y: value.y() as i16,
+    }
+  }
+}
+
+impl From<PackedIdx> for HexPos32 {
+  fn from(value: PackedIdx) -> Self {
+    Self {
+      x: value.x() as i32,
+      y: value.y() as i32,
+    }
+  }
+}
+
+impl From<HexPos16> for HexPos32 {
+  fn from(value: HexPos16) -> Self {
+    Self {
+      x: value.x as i32,
+      y: value.y as i32,
+    }
+  }
+}
+
+impl From<HexPos32> for HexPos16 {
+  fn from(value: HexPos32) -> Self {
+    Self {
+      x: value.x as i16,
+      y: value.y as i16,
+    }
+  }
+}
+
 impl<I: Signed> std::ops::Add for HexPos<I> {
   type Output = Self;
 
@@ -256,5 +294,26 @@ where
   fn add_assign(&mut self, rhs: Self) {
     self.x += rhs.x;
     self.y += rhs.y;
+  }
+}
+
+impl<I: Signed> std::ops::Sub for HexPos<I> {
+  type Output = Self;
+
+  fn sub(self, rhs: Self) -> Self::Output {
+    Self {
+      x: self.x - rhs.x,
+      y: self.y - rhs.y,
+    }
+  }
+}
+
+impl<I: Signed> std::ops::SubAssign for HexPos<I>
+where
+  I: std::ops::SubAssign,
+{
+  fn sub_assign(&mut self, rhs: Self) {
+    self.x -= rhs.x;
+    self.y -= rhs.y;
   }
 }

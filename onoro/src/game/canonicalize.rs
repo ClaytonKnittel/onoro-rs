@@ -3,9 +3,10 @@ use arrayvec::ArrayVec;
 
 use crate::{
   groups::{SymmetryClass, D6},
-  hex_pos::HexPos32,
   util::{max_u32, min_u32, unreachable},
 };
+
+use super::hex_pos::HexPos32;
 
 /// Describes the layout of the game state, and provides enough information to
 /// canonicalize the state for hash computation.
