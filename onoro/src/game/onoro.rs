@@ -26,6 +26,15 @@ pub struct Onoro<const N: usize> {
 }
 
 impl<const N: usize> Onoro<N> {
+  pub fn new() -> Self {
+    Self {
+      pawn_poses: [PackedIdx::null(); N],
+      score: PackedScore::new(Score::tie(0), OnoroState::new()),
+      sum_of_mass: HexPos16::origin(),
+      hash: 0,
+    }
+  }
+
   /// Returns the width of the game board. This is also the upper bound on the
   /// x and y coordinate values in PackedIdx.
   pub const fn board_width() -> usize {
