@@ -248,3 +248,13 @@ impl<I: Signed> std::ops::Add for HexPos<I> {
     }
   }
 }
+
+impl<I: Signed> std::ops::AddAssign for HexPos<I>
+where
+  I: std::ops::AddAssign,
+{
+  fn add_assign(&mut self, rhs: Self) {
+    self.x += rhs.x;
+    self.y += rhs.y;
+  }
+}

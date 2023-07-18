@@ -263,6 +263,8 @@ const fn symm_state_class(x: u32, y: u32, n_pawns: u32) -> SymmetryClass {
 /// that it does not matter which of the 4 group operations we choose to apply
 /// to the game state when canonicalizing if the center of mass lies on an e,
 /// since they are symmetries of each other in this K4 group.
+///
+/// TODO: make this const
 pub fn gen_symm_state_table<const N: u32, const N_SQUARED: usize>(
 ) -> [BoardSymmetryState; N_SQUARED] {
   let mut table: ArrayVec<BoardSymmetryState, N_SQUARED> = ArrayVec::new();

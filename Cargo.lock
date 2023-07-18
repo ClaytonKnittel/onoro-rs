@@ -7,12 +7,6 @@ name = "algebra"
 version = "0.1.0"
 
 [[package]]
-name = "array-macro"
-version = "2.1.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "457661fa6716c30b73d7c41400a8a78780d20523b83a9441dabec28e93f27cf4"
-
-[[package]]
 name = "arrayvec"
 version = "0.7.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -61,7 +55,6 @@ name = "onoro"
 version = "0.1.0"
 dependencies = [
  "algebra",
- "array-macro",
  "arrayvec",
  "num-traits",
  "rand",
