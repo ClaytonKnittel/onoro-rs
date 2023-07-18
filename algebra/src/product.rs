@@ -71,3 +71,66 @@ where
     }
   }
 }
+
+#[macro_export]
+macro_rules! direct_product_type {
+  ($g:ty) => {
+    $g
+  };
+  ($l:ty, $($rs:ty),+) => {
+    $crate::product::DirectProduct<$l, direct_product_type!($($rs),+)>
+  }
+}
+
+#[macro_export]
+macro_rules! direct_product {
+  ($g:expr) => {
+    $g
+  };
+  ($l:expr, $($rs:expr),+) => {
+    $crate::product::DirectProduct { left: $l, right: direct_product!($($rs),+) }
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use crate::{
+    group::{Cyclic, Dihedral},
+    monoid::Monoid,
+    ordinal::Ordinal,
+    semigroup::Semigroup,
+  };
+
+  #[test]
+  fn test_macro() {
+    type G = direct_product_type!(Dihedral<7>, Cyclic<2>);
+    let mut e1: G = direct_product!(Dihedral::Rot(1), Cyclic::from_ord(1));
+    let op = e1.clone();
+
+    // Should require 13 rotations to get to the identity.
+    for _ in 0..13 {
+      assert_ne!(e1, G::identity());
+      e1 = e1.op(&op);
+    }
+    assert_eq!(e1, G::identity());
+  }
+
+  #[test]
+  fn test_macro_large() {
+    type G = direct_product_type!(Dihedral<7>, Cyclic<11>, Cyclic<3>, Dihedral<5>);
+    let mut e1: G = direct_product!(
+      Dihedral::Rot(3),
+      Cyclic::from_ord(4),
+      Cyclic::from_ord(2),
+      Dihedral::Rfl(0)
+    );
+    let op = e1.clone();
+
+    // Should require 7 * 11 * 3 * 2 - 1 = 461 rotations to get to the identity.
+    for _ in 0..461 {
+      assert_ne!(e1, G::identity());
+      e1 = e1.op(&op);
+    }
+    assert_eq!(e1, G::identity());
+  }
+}
