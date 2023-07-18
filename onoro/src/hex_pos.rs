@@ -9,10 +9,17 @@ pub struct HexPos<I: Signed> {
   y: I,
 }
 
+pub type HexPos32 = HexPos<i32>;
+pub type HexPos16 = HexPos<i16>;
+
 impl<I> HexPos<I>
 where
   I: Copy + PartialOrd + Signed,
 {
+  pub const fn new(x: I, y: I) -> Self {
+    Self { x, y }
+  }
+
   pub fn origin() -> Self {
     Self {
       x: I::zero(),
