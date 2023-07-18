@@ -1,7 +1,7 @@
 use algebra::group::Cyclic;
 use num_traits::Signed;
 
-use crate::hash::groups::{C2, D3, D6, K4};
+use crate::groups::{C2, D3, D6, K4};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct HexPos<I: Signed> {
