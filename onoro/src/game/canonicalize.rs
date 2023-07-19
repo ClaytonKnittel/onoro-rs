@@ -1,15 +1,14 @@
-use arrayvec::ArrayVec;
-
 use crate::{
   groups::{SymmetryClass, D6},
   util::{max_u32, min_u32, unreachable},
 };
+use algebra::monoid::Monoid;
 
 use super::hex_pos::HexPosOffset;
 
 /// Describes the layout of the game state, and provides enough information to
 /// canonicalize the state for hash computation.
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct BoardSymmetryState {
   /// The group operation to perform on the board before calculating the hash.
   /// This is used to align board states on all symmetry axes which the board
@@ -25,6 +24,16 @@ pub struct BoardSymmetryState {
   /// The offset to apply when calculating the integer-coordinate, symmetry
   /// invariant "center of mass"
   center_offset: HexPosOffset,
+}
+
+impl BoardSymmetryState {
+  const fn blank() -> Self {
+    Self {
+      op: D6::const_identity(),
+      symm_class: SymmetryClass::C,
+      center_offset: HexPosOffset::origin(),
+    }
+  }
 }
 
 enum COMOffset {
@@ -263,23 +272,23 @@ const fn symm_state_class(x: u32, y: u32, n_pawns: u32) -> SymmetryClass {
 /// that it does not matter which of the 4 group operations we choose to apply
 /// to the game state when canonicalizing if the center of mass lies on an e,
 /// since they are symmetries of each other in this K4 group.
-///
-/// TODO: make this const
-pub fn gen_symm_state_table<const N: u32, const N_SQUARED: usize>(
-) -> [BoardSymmetryState; N_SQUARED] {
-  let mut table: ArrayVec<BoardSymmetryState, N_SQUARED> = ArrayVec::new();
+pub const fn gen_symm_state_table<const N: usize, const N2: usize>() -> [BoardSymmetryState; N2] {
+  // Populate the table with dummy values for `BoardSymmetryState`, which will
+  // be overwritten below. This is because const initialization of arrays is
+  // clunky in rust.
+  let mut table: [BoardSymmetryState; N2] = [BoardSymmetryState::blank(); N2];
 
   let mut y = 0;
   while y < N {
     let mut x = 0;
     while x < N {
-      let op = symm_state_op(x, y, N);
+      let op = symm_state_op(x as u32, y as u32, N as u32);
       let offset = board_symm_state_op_to_com_offset(&op);
-      table.push(BoardSymmetryState {
+      table[x + y * N] = BoardSymmetryState {
         op,
-        symm_class: symm_state_class(x, y, N),
+        symm_class: symm_state_class(x as u32, y as u32, N as u32),
         center_offset: com_offset_to_hex_pos(offset),
-      });
+      };
 
       y += 1;
     }
@@ -287,5 +296,5 @@ pub fn gen_symm_state_table<const N: u32, const N_SQUARED: usize>(
     x += 1;
   }
 
-  table.into_inner().unwrap()
+  table
 }

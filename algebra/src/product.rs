@@ -2,7 +2,7 @@ use std::fmt::Display;
 
 use crate::{finite::Finite, group::Group, monoid::Monoid, ordinal::Ordinal, semigroup::Semigroup};
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct DirectProduct<L, R> {
   left: L,
   right: R,

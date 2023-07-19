@@ -2,10 +2,18 @@ use std::fmt::Display;
 
 use crate::{finite::Finite, group::Group, monoid::Monoid, ordinal::Ordinal, semigroup::Semigroup};
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Dihedral<const N: u16> {
   Rot(u16),
   Rfl(u16),
+}
+
+impl<const N: u16> Dihedral<N> {
+  /// While const traits are nightly-only, define const versions of the trait
+  /// impls manually.
+  pub const fn const_identity() -> Self {
+    Self::Rot(0)
+  }
 }
 
 impl<const N: u16> Finite for Dihedral<N> {

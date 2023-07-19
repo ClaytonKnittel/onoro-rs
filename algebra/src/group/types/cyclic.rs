@@ -2,7 +2,7 @@ use std::fmt::Display;
 
 use crate::{finite::Finite, group::Group, monoid::Monoid, ordinal::Ordinal, semigroup::Semigroup};
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Cyclic<const N: u16>(pub u16);
 
 impl<const N: u16> Finite for Cyclic<N> {

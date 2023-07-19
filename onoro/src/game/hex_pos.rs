@@ -172,7 +172,7 @@ impl HexPosOffset {
     Self { x, y }
   }
 
-  pub fn origin() -> Self {
+  pub const fn origin() -> Self {
     Self { x: 0, y: 0 }
   }
 
