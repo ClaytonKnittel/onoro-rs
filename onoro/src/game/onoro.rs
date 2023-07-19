@@ -81,7 +81,7 @@ impl<const N: usize> Onoro<N> {
         PawnColor::Black => 0,
         PawnColor::White => 1,
       },
-      one_color: false,
+      one_color: true,
     }
   }
 
