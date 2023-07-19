@@ -1,9 +1,9 @@
 use std::{cmp, fmt::Display};
 
-use crate::util::broadcast_u8_to_u64;
+use crate::{make_onoro_error, util::broadcast_u8_to_u64};
 
 use super::{
-  error::OnoroResult,
+  error::{OnoroError, OnoroResult},
   hex_pos::{HexPos16, HexPos32},
   onoro_state::OnoroState,
   packed_idx::{IdxOffset, PackedIdx},
@@ -318,6 +318,95 @@ impl<const N: usize> Onoro<N> {
   }
 
   pub fn validate(&self) -> OnoroResult<()> {
+    let mut n_b_pawns = 0u32;
+    let mut n_w_pawns = 0u32;
+    let mut sum_of_mass = HexPos32::origin();
+
+    // UnionFind<uint32_t> uf(getBoardSize());
+
+    for pawn in self.pawns() {
+      sum_of_mass += pawn.pos.into();
+
+      match pawn.color {
+        PawnColor::Black => {
+          n_b_pawns += 1;
+        }
+        PawnColor::White => {
+          n_w_pawns += 1;
+        }
+      };
+
+      match (self.get_tile(pawn.pos), &pawn.color) {
+        (TileState::Black, PawnColor::Black) => {}
+        (TileState::White, PawnColor::White) => {}
+        (TileState::Empty, _) => {
+          return Err(make_onoro_error!(
+            "Unexpected empty tile found with `get_tile` at `pawn.pos` ({}) from pawn returned by iterator.",
+            pawn
+          ));
+        }
+        (get_tile_color, _) => {
+          return Err(make_onoro_error!(
+            "Mismatched tile colors for iterator pawn ({}), `get_tile` returns color {:?} at this position",
+            pawn,
+            get_tile_color
+          ));
+        }
+      }
+
+      // TODO: union find for contiguous group of pawns.
+    }
+
+    if n_b_pawns + n_w_pawns != self.pawns_in_play() {
+      return Err(make_onoro_error!(
+        "Expected {} pawns in play, but found {}",
+        self.pawns_in_play(),
+        n_b_pawns + n_w_pawns
+      ));
+    }
+
+    if self.in_phase1() && self.onoro_state().black_turn() as u32 != (self.onoro_state().turn() & 1)
+    {
+      return Err(make_onoro_error!(
+        "Expected black turn to be {}, but was {}",
+        self.onoro_state().turn() & 1,
+        self.onoro_state().black_turn()
+      ));
+    }
+
+    if n_b_pawns
+      != n_w_pawns
+        + if self.onoro_state().black_turn() {
+          0
+        } else {
+          1
+        }
+    {
+      return Err(make_onoro_error!(
+        "Expected {} black pawns and {} white pawns, but found {} and {}",
+        (self.pawns_in_play() + 1) / 2,
+        self.pawns_in_play() / 2,
+        n_b_pawns,
+        n_w_pawns
+      ));
+    }
+
+    if HexPos16::from(sum_of_mass) != self.sum_of_mass {
+      return Err(make_onoro_error!(
+        "Sum of mass not correct: expect {}, but have {}\n",
+        sum_of_mass,
+        self.sum_of_mass
+      ));
+    }
+
+    // uint32_t n_empty_tiles = getBoardSize() - nPawnsInPlay();
+    // uint32_t n_pawn_groups = uf.GetNumGroups() - n_empty_tiles;
+
+    // if (n_pawn_groups != 1) {
+    //   printf("Expected 1 contiguous pawn group, but found %u\n", n_pawn_groups);
+    //   return false;
+    // }
+
     Ok(())
   }
 }
