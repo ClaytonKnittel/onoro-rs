@@ -1,5 +1,7 @@
 use std::num::Wrapping;
 
+use super::hex_pos::{HexPos, HexPos16, HexPos32};
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct PackedIdx {
   bytes: Wrapping<u8>,
@@ -123,6 +125,18 @@ impl std::ops::Add for IdxOffset {
 impl std::ops::AddAssign for IdxOffset {
   fn add_assign(&mut self, rhs: IdxOffset) {
     self.bytes += rhs.bytes
+  }
+}
+
+impl From<HexPos16> for PackedIdx {
+  fn from(value: HexPos16) -> Self {
+    Self::new(value.x() as u32, value.y() as u32)
+  }
+}
+
+impl From<HexPos32> for PackedIdx {
+  fn from(value: HexPos32) -> Self {
+    Self::new(value.x() as u32, value.y() as u32)
   }
 }
 

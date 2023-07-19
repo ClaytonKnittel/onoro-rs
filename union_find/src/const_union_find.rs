@@ -105,4 +105,18 @@ mod tests {
     assert!(uf.find(8) == 8);
     assert!(uf.find(9) == 9);
   }
+
+  #[test]
+  fn test_long_chain() {
+    let mut uf = ConstUnionFind::<256>::new();
+
+    for i in 0..255 {
+      uf.union(i, i + 1);
+    }
+
+    let root_id = uf.find(0);
+    for i in 1..256 {
+      assert_eq!(uf.find(i), root_id);
+    }
+  }
 }

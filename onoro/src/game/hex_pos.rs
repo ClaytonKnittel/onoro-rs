@@ -39,6 +39,33 @@ where
     self.y
   }
 
+  /// Returns an iterator over all neighbors of this `HexPos`.
+  pub fn each_neighbor(&self) -> impl Iterator<Item = Self> {
+    [
+      self + &HexPos::new(-I::one(), -I::one()),
+      self + &HexPos::new(I::zero(), -I::one()),
+      self + &HexPos::new(-I::one(), I::zero()),
+      self + &HexPos::new(I::one(), I::zero()),
+      self + &HexPos::new(I::zero(), I::one()),
+      self + &HexPos::new(I::one(), I::one()),
+    ]
+    .into_iter()
+  }
+
+  /// Returns an iterator over the top-left neighbors of this `HexPos`. This has
+  /// the property that for any two hex poses `p1` and `p2`, if `p1` is a top
+  /// left neighbor of `p2`, `p2` is not a top left neighbor of `p1`, and for
+  /// any two neighboring hex poses `p1` and `p2`, one of `p1` and `p2` are the
+  /// top left neighbor of the other.
+  pub fn each_top_left_neighbor(&self) -> impl Iterator<Item = Self> {
+    [
+      self + &HexPos::new(-I::one(), -I::one()),
+      self + &HexPos::new(I::zero(), -I::one()),
+      self + &HexPos::new(-I::one(), I::zero()),
+    ]
+    .into_iter()
+  }
+
   /// Returns the sectant this point lies in, treating (0, 0) as the origin. The
   /// first sectant (0) is only the origin tile. The second (1) is every hex
   /// with (x >= 0, y >= 0, y < x). The third sectant (2) is the second sectant
@@ -297,6 +324,17 @@ impl<I: Signed> std::ops::Add for HexPos<I> {
   }
 }
 
+impl<I: Signed + Clone> std::ops::Add for &HexPos<I> {
+  type Output = HexPos<I>;
+
+  fn add(self, rhs: Self) -> Self::Output {
+    HexPos::<I> {
+      x: self.x.clone() + rhs.x.clone(),
+      y: self.y.clone() + rhs.y.clone(),
+    }
+  }
+}
+
 impl<I: Signed> std::ops::AddAssign for HexPos<I>
 where
   I: std::ops::AddAssign,
@@ -314,6 +352,17 @@ impl<I: Signed> std::ops::Sub for HexPos<I> {
     Self {
       x: self.x - rhs.x,
       y: self.y - rhs.y,
+    }
+  }
+}
+
+impl<I: Signed + Clone> std::ops::Sub for &HexPos<I> {
+  type Output = HexPos<I>;
+
+  fn sub(self, rhs: Self) -> Self::Output {
+    HexPos::<I> {
+      x: self.x.clone() - rhs.x.clone(),
+      y: self.y.clone() - rhs.y.clone(),
     }
   }
 }

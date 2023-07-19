@@ -1,10 +1,13 @@
 use std::{cmp, fmt::Display};
 
+use num_traits::Signed;
+use union_find::ConstUnionFind;
+
 use crate::{make_onoro_error, util::broadcast_u8_to_u64};
 
 use super::{
   error::{OnoroError, OnoroResult},
-  hex_pos::{HexPos16, HexPos32},
+  hex_pos::{HexPos, HexPos16, HexPos32},
   onoro_state::OnoroState,
   packed_idx::{IdxOffset, PackedIdx},
   packed_score::PackedScore,
@@ -20,8 +23,13 @@ pub enum TileState {
 }
 
 /// An Onoro game state with `N / 2` pawns per player.
+///
+/// Note: both `N`, the total number of pawns in the game, and `N2`, the square
+/// of `N`, must be provided. This is due to a limitation in the rust compiler,
+/// generic const expressions are still experimental. See:
+/// https://github.com/rust-lang/rust/issues/76560.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Onoro<const N: usize> {
+pub struct Onoro<const N: usize, const N2: usize> {
   /// Array of indexes of pawn positions. Odd entries (even index) are black
   /// pawns, the others are white. Filled from lowest to highest index as the
   /// first phase proceeds.
@@ -32,7 +40,7 @@ pub struct Onoro<const N: usize> {
   hash: u64,
 }
 
-impl<const N: usize> Onoro<N> {
+impl<const N: usize, const N2: usize> Onoro<N, N2> {
   /// Don't publicly expose the constructor, since it produces an invalid board
   /// state. Any constructor returning an owned instance of `Onoro` _must_ make
   /// at least one move after initializing an `Onoro` with this function.
@@ -62,11 +70,15 @@ impl<const N: usize> Onoro<N> {
     game
   }
 
+  pub const fn hex_pos_ord(pos: &HexPos32) -> usize {
+    pos.x() as usize + (pos.y() as usize) * N
+  }
+
   pub fn pawns_in_play(&self) -> u32 {
     self.onoro_state().turn() + 1
   }
 
-  pub fn pawns<'a>(&'a self) -> PawnIterator<'a, N> {
+  pub fn pawns<'a>(&'a self) -> PawnIterator<'a, N, N2> {
     PawnIterator {
       onoro: self,
       pawn_idx: 0,
@@ -74,7 +86,7 @@ impl<const N: usize> Onoro<N> {
     }
   }
 
-  pub fn color_pawns<'a>(&'a self, color: PawnColor) -> PawnIterator<'a, N> {
+  pub fn color_pawns<'a>(&'a self, color: PawnColor) -> PawnIterator<'a, N, N2> {
     PawnIterator {
       onoro: self,
       pawn_idx: match color {
@@ -322,7 +334,7 @@ impl<const N: usize> Onoro<N> {
     let mut n_w_pawns = 0u32;
     let mut sum_of_mass = HexPos32::origin();
 
-    // UnionFind<uint32_t> uf(getBoardSize());
+    let mut uf = ConstUnionFind::<N2>::new();
 
     for pawn in self.pawns() {
       sum_of_mass += pawn.pos.into();
@@ -355,6 +367,16 @@ impl<const N: usize> Onoro<N> {
       }
 
       // TODO: union find for contiguous group of pawns.
+      HexPos32::from(pawn.pos)
+        .each_top_left_neighbor()
+        .for_each(|neighbor_pos| {
+          if self.get_tile(neighbor_pos.into()) != TileState::Empty {
+            uf.union(
+              Self::hex_pos_ord(&HexPos32::from(pawn.pos)),
+              Self::hex_pos_ord(&neighbor_pos),
+            );
+          }
+        });
     }
 
     if n_b_pawns + n_w_pawns != self.pawns_in_play() {
@@ -393,25 +415,27 @@ impl<const N: usize> Onoro<N> {
 
     if HexPos16::from(sum_of_mass) != self.sum_of_mass {
       return Err(make_onoro_error!(
-        "Sum of mass not correct: expect {}, but have {}\n",
+        "Sum of mass not correct: expect {}, but have {}",
         sum_of_mass,
         self.sum_of_mass
       ));
     }
 
-    // uint32_t n_empty_tiles = getBoardSize() - nPawnsInPlay();
-    // uint32_t n_pawn_groups = uf.GetNumGroups() - n_empty_tiles;
+    let empty_tiles = Self::board_size() - self.pawns_in_play() as usize;
+    let pawn_groups = uf.unique_sets() - empty_tiles;
 
-    // if (n_pawn_groups != 1) {
-    //   printf("Expected 1 contiguous pawn group, but found %u\n", n_pawn_groups);
-    //   return false;
-    // }
+    if pawn_groups != 1 {
+      return Err(make_onoro_error!(
+        "Expected 1 contiguous pawn group, but found {}",
+        pawn_groups
+      ));
+    }
 
     Ok(())
   }
 }
 
-impl<const N: usize> Display for Onoro<N> {
+impl<const N: usize, const N2: usize> Display for Onoro<N, N2> {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     if self.onoro_state().black_turn() {
       write!(f, "black:\n")?;
@@ -472,15 +496,15 @@ impl Display for Pawn {
   }
 }
 
-pub struct PawnIterator<'a, const N: usize> {
-  onoro: &'a Onoro<N>,
+pub struct PawnIterator<'a, const N: usize, const N2: usize> {
+  onoro: &'a Onoro<N, N2>,
   pawn_idx: usize,
   /// If true, only iterates over pawns of one color, otherwise iterating over
   /// all pawns.
   one_color: bool,
 }
 
-impl<'a, const N: usize> Iterator for PawnIterator<'a, N> {
+impl<'a, const N: usize, const N2: usize> Iterator for PawnIterator<'a, N, N2> {
   type Item = Pawn;
 
   fn next(&mut self) -> Option<Self::Item> {
