@@ -81,6 +81,20 @@ impl<const N: usize, const N2: usize> Onoro<N, N2> {
     HexPos::new((ord % N) as u32, (ord / N) as u32)
   }
 
+  /// If the game is finished, returns `Some(<player color who won>)`, or `None`
+  /// if the game is not over yet.
+  pub fn finished(&self) -> Option<PawnColor> {
+    if self.onoro_state().finished() {
+      if self.onoro_state().black_turn() {
+        Some(PawnColor::White)
+      } else {
+        Some(PawnColor::Black)
+      }
+    } else {
+      None
+    }
+  }
+
   pub fn pawns_in_play(&self) -> u32 {
     self.onoro_state().turn() + 1
   }
@@ -166,6 +180,34 @@ impl<const N: usize, const N2: usize> Onoro<N, N2> {
       }
     }
     unsafe { self.make_move_unchecked(m) }
+  }
+
+  /// Iterates over all available moves, calling `callback` with each move
+  /// passed as the first parameter, and a reference to the current `Onoro` as
+  /// the second.
+  pub fn for_each_move<F>(&self, callback: F)
+  where
+    F: FnMut(Move, &Self) -> (),
+  {
+    if self.in_phase1() {
+      self.for_each_move_p1(callback)
+    } else {
+      self.for_each_move_p2(callback)
+    }
+  }
+
+  fn for_each_move_p1<F>(&self, callback: F)
+  where
+    F: FnMut(Move, &Self) -> (),
+  {
+    todo!();
+  }
+
+  fn for_each_move_p2<F>(&self, callback: F)
+  where
+    F: FnMut(Move, &Self) -> (),
+  {
+    todo!();
   }
 
   /// Sets the pawn at index `i` to `pos`. This will mutate the state of the
