@@ -1,4 +1,4 @@
-use std::cmp;
+use std::{cmp, fmt::Display};
 
 use crate::util::broadcast_u8_to_u64;
 
@@ -224,5 +224,40 @@ impl<const N: usize> Onoro<N> {
     }
 
     return TileState::Empty;
+  }
+}
+
+impl<const N: usize> Display for Onoro<N> {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    if self.onoro_state().black_turn() {
+      write!(f, "black:\n")?;
+    } else {
+      write!(f, "white:\n")?;
+    }
+
+    for y in (0..Self::board_width()).rev() {
+      write!(f, "{: <width$}", "", width = Self::board_width() - y - 1)?;
+      for x in 0..Self::board_width() {
+        write!(
+          f,
+          "{}",
+          match self.get_tile(PackedIdx::new(x as u32, y as u32)) {
+            TileState::Black => "B",
+            TileState::White => "W",
+            TileState::Empty => ".",
+          }
+        )?;
+
+        if x < Self::board_width() - 1 {
+          write!(f, " ")?;
+        }
+      }
+
+      if y > 0 {
+        write!(f, "\n")?;
+      }
+    }
+
+    Ok(())
   }
 }
