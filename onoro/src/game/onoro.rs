@@ -70,8 +70,15 @@ impl<const N: usize, const N2: usize> Onoro<N, N2> {
     game
   }
 
+  /// Converts a `HexPos` to an ordinal, which is a unique mapping from valid
+  /// `HexPos`s on the board to the range 0..N2.
   pub const fn hex_pos_ord(pos: &HexPos32) -> usize {
     pos.x() as usize + (pos.y() as usize) * N
+  }
+
+  /// The inverse of `self.hex_pos_ord`.
+  pub const fn ord_to_hex_pos(ord: usize) -> HexPos32 {
+    HexPos32::new((ord % N) as i32, (ord / N) as i32)
   }
 
   pub fn pawns_in_play(&self) -> u32 {
