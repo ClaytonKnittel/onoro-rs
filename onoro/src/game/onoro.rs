@@ -3,13 +3,16 @@ use std::{cmp, fmt::Display};
 use crate::util::broadcast_u8_to_u64;
 
 use super::{
+  error::OnoroResult,
   hex_pos::{HexPos16, HexPos32},
   onoro_state::OnoroState,
   packed_idx::{IdxOffset, PackedIdx},
   packed_score::PackedScore,
+  r#move::Move,
   score::Score,
 };
 
+#[derive(Debug, PartialEq, Eq)]
 pub enum TileState {
   Empty,
   Black,
@@ -30,13 +33,60 @@ pub struct Onoro<const N: usize> {
 }
 
 impl<const N: usize> Onoro<N> {
-  pub fn new() -> Self {
+  /// Don't publicly expose the constructor, since it produces an invalid board
+  /// state. Any constructor returning an owned instance of `Onoro` _must_ make
+  /// at least one move after initializing an `Onoro` with this function.
+  fn new() -> Self {
     Self {
       pawn_poses: [PackedIdx::null(); N],
       score: PackedScore::new(Score::tie(0), OnoroState::new()),
       sum_of_mass: HexPos16::origin(),
       hash: 0,
     }
+  }
+
+  pub fn default_start() -> Self {
+    let mid_idx = ((Self::board_width() - 1) / 2) as u32;
+    let mut game = Self::new();
+    unsafe {
+      game.make_move_unchecked(Move::Phase1Move {
+        to: PackedIdx::new(mid_idx, mid_idx),
+      });
+    }
+    game.make_move(Move::Phase1Move {
+      to: PackedIdx::new(mid_idx + 1, mid_idx + 1),
+    });
+    game.make_move(Move::Phase1Move {
+      to: PackedIdx::new(mid_idx + 1, mid_idx),
+    });
+    game
+  }
+
+  pub fn pawns_in_play(&self) -> u32 {
+    self.onoro_state().turn() + 1
+  }
+
+  pub fn pawns<'a>(&'a self) -> PawnIterator<'a, N> {
+    PawnIterator {
+      onoro: self,
+      pawn_idx: 0,
+      one_color: false,
+    }
+  }
+
+  pub fn color_pawns<'a>(&'a self, color: PawnColor) -> PawnIterator<'a, N> {
+    PawnIterator {
+      onoro: self,
+      pawn_idx: match color {
+        PawnColor::Black => 0,
+        PawnColor::White => 1,
+      },
+      one_color: false,
+    }
+  }
+
+  pub fn score(&self) -> Score {
+    self.score.score()
   }
 
   fn onoro_state(&self) -> &OnoroState {
@@ -67,9 +117,44 @@ impl<const N: usize> Onoro<N> {
     Self::symm_state_table_width() * Self::symm_state_table_width()
   }
 
+  pub fn in_phase1(&self) -> bool {
+    self.onoro_state().turn() < 0xf
+  }
+
+  unsafe fn make_move_unchecked(&mut self, m: Move) {
+    match m {
+      Move::Phase1Move { to } => {
+        // Increment the turn first, so self.onoro_state().turn() is 0 for turn
+        // 1.
+        self.mut_onoro_state().inc_turn();
+        let pawn_idx = self.onoro_state().turn() as usize;
+        self.set_tile(pawn_idx, to);
+      }
+      Move::Phase2Move { to, from_idx } => {
+        self.set_tile(from_idx as usize, to);
+        self.mut_onoro_state().swap_player_turn();
+      }
+    }
+  }
+
+  pub fn make_move(&mut self, m: Move) {
+    match m {
+      Move::Phase1Move { to: _ } => {
+        debug_assert!(self.in_phase1());
+      }
+      Move::Phase2Move { to: _, from_idx: _ } => {
+        debug_assert!(!self.in_phase1());
+      }
+    }
+    unsafe { self.make_move_unchecked(m) }
+  }
+
   /// Sets the pawn at index `i` to `pos`. This will mutate the state of the
   /// game.
-  pub fn set_tile(&mut self, i: usize, pos: PackedIdx) {
+  ///
+  /// Important: this will not update `self.onoro_state().turn()` or
+  /// `self.onoro_state().black_turn()`, the caller is responsible for doing so.
+  fn set_tile(&mut self, i: usize, pos: PackedIdx) {
     let mut com_offset: HexPos32 = pos.into();
 
     let prev_idx = self.pawn_poses[i];
@@ -165,7 +250,12 @@ impl<const N: usize> Onoro<N> {
   /// i.e. the color of the piece on that tile, or `Empty` if no piece is there.
   ///
   /// TODO: perf benchmark this against `get_tile`.
+  #[cfg(test)]
   fn get_tile_slow(&self, idx: PackedIdx) -> TileState {
+    if idx == PackedIdx::null() {
+      return TileState::Empty;
+    }
+
     match self
       .pawn_poses
       .iter()
@@ -199,7 +289,8 @@ impl<const N: usize> Onoro<N> {
     for i in 0..N / 8 {
       let xor_search = mask ^ unsafe { *pawn_poses_ptr.offset(i as isize) };
 
-      let zero_mask = (xor_search - 0x0101010101010101u64) & !xor_search & 0x8080808080808080u64;
+      let zero_mask =
+        (xor_search.wrapping_sub(0x0101010101010101u64)) & !xor_search & 0x8080808080808080u64;
       if zero_mask != 0 {
         let set_bit_idx = zero_mask.trailing_zeros();
         // Find the parity of `set_bit_idx` / 8. Black has the even indices,
@@ -224,6 +315,10 @@ impl<const N: usize> Onoro<N> {
     }
 
     return TileState::Empty;
+  }
+
+  pub fn validate(&self) -> OnoroResult<()> {
+    Ok(())
   }
 }
 
@@ -259,5 +354,65 @@ impl<const N: usize> Display for Onoro<N> {
     }
 
     Ok(())
+  }
+}
+
+pub enum PawnColor {
+  Black,
+  White,
+}
+
+pub struct Pawn {
+  pub pos: PackedIdx,
+  pub color: PawnColor,
+}
+
+pub struct PawnIterator<'a, const N: usize> {
+  onoro: &'a Onoro<N>,
+  pawn_idx: usize,
+  /// If true, only iterates over pawns of one color, otherwise iterating over
+  /// all pawns.
+  one_color: bool,
+}
+
+impl<'a, const N: usize> Iterator for PawnIterator<'a, N> {
+  type Item = Pawn;
+
+  fn next(&mut self) -> Option<Self::Item> {
+    if self.pawn_idx >= self.onoro.pawns_in_play() as usize {
+      return None;
+    }
+
+    let pawn = Pawn {
+      pos: self.onoro.pawn_poses[self.pawn_idx],
+      color: if self.pawn_idx % 2 == 0 {
+        PawnColor::Black
+      } else {
+        PawnColor::White
+      },
+    };
+    self.pawn_idx += if self.one_color { 2 } else { 1 };
+
+    Some(pawn)
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use crate::{game::packed_idx::PackedIdx, Onoro};
+
+  #[test]
+  fn test_get_tile() {
+    type Onoro8 = Onoro<8>;
+    let onoro = Onoro8::default_start();
+
+    for y in 0..Onoro8::board_width() {
+      for x in 0..Onoro8::board_width() {
+        assert_eq!(
+          onoro.get_tile(PackedIdx::new(x as u32, y as u32)),
+          onoro.get_tile_slow(PackedIdx::new(x as u32, y as u32))
+        );
+      }
+    }
   }
 }

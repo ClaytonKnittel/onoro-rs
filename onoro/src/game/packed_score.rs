@@ -10,19 +10,19 @@ pub struct PackedScore<P> {
 }
 
 impl<P> PackedScore<P> {
-  pub fn new(score: Score, packed_data: P) -> Self {
+  pub const fn new(score: Score, packed_data: P) -> Self {
     Self {
       data: (score.data.0, score.data.1, packed_data),
     }
   }
 
-  pub fn score(&self) -> Score {
+  pub const fn score(&self) -> Score {
     Score {
       data: (self.data.0, self.data.1),
     }
   }
 
-  pub fn packed_data(&self) -> &P {
+  pub const fn packed_data(&self) -> &P {
     &self.data.2
   }
 

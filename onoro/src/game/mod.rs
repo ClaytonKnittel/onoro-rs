@@ -1,4 +1,5 @@
 mod canonicalize;
+mod error;
 mod hex_pos;
 mod r#move;
 mod onoro;

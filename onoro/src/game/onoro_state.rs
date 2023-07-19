@@ -14,23 +14,40 @@ pub struct OnoroState {
 }
 
 impl OnoroState {
-  pub fn new() -> Self {
+  pub const fn new() -> Self {
+    // Initialize turn to 0xf, so that after the first pawn is placed, it will
+    // become 0.
     Self {
-      data: Self::pack(0, true, false, false),
+      data: Self::pack(0xf, true, false, false),
     }
   }
 
-  pub fn turn(&self) -> u32 {
+  pub const fn turn(&self) -> u32 {
     let (turn, _, _, _) = Self::unpack(self.data);
     turn
   }
 
-  pub fn black_turn(&self) -> bool {
+  /// Increment the turn and swap which player's turn it is. This should be used
+  /// only in phase 1, where the turn count increments.
+  pub fn inc_turn(&mut self) {
+    let (turn, black_turn, finished, hashed) = Self::unpack(self.data);
+    self.data = Self::pack((turn + 1) & 0xf, !black_turn, finished, hashed);
+  }
+
+  pub const fn black_turn(&self) -> bool {
     let (_, black_turn, _, _) = Self::unpack(self.data);
     black_turn
   }
 
-  pub fn finished(&self) -> bool {
+  /// Only swap which player's turn it is. This should be used in phase 2, when
+  /// the turn stops incrementing.
+  pub fn swap_player_turn(&mut self) {
+    let (turn, black_turn, finished, hashed) = Self::unpack(self.data);
+    debug_assert_eq!(turn, 0xf);
+    self.data = Self::pack(turn, !black_turn, finished, hashed);
+  }
+
+  pub const fn finished(&self) -> bool {
     let (_, _, finished, _) = Self::unpack(self.data);
     finished
   }
@@ -40,7 +57,7 @@ impl OnoroState {
     self.data = Self::pack(turn, black_turn, finished, hashed);
   }
 
-  pub fn hashed(&self) -> bool {
+  pub const fn hashed(&self) -> bool {
     let (_, _, _, hashed) = Self::unpack(self.data);
     hashed
   }
@@ -50,7 +67,7 @@ impl OnoroState {
     self.data = Self::pack(turn, black_turn, finished, hashed);
   }
 
-  fn pack(turn: u32, black_turn: bool, finished: bool, hashed: bool) -> u8 {
+  const fn pack(turn: u32, black_turn: bool, finished: bool, hashed: bool) -> u8 {
     debug_assert!(turn < 0x10);
 
     (turn
@@ -59,7 +76,7 @@ impl OnoroState {
       | if hashed { 0x40 } else { 0 }) as u8
   }
 
-  fn unpack(data: u8) -> (u32, bool, bool, bool) {
+  const fn unpack(data: u8) -> (u32, bool, bool, bool) {
     let turn = (data & 0x0f) as u32;
     let black_turn = (data & 0x10) != 0;
     let finished = (data & 0x20) != 0;

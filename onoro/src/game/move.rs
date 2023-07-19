@@ -10,6 +10,6 @@ pub enum Move {
     /// Position to move the pawn to.
     to: PackedIdx,
     /// Position in pawn_poses array to move pawn from.
-    from: u32,
+    from_idx: u32,
   },
 }
