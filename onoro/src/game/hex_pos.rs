@@ -5,7 +5,7 @@ use crate::groups::{C2, D3, D6, K4};
 
 use super::packed_idx::PackedIdx;
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct HexPos<I: Signed> {
   x: I,
   y: I,
@@ -27,6 +27,14 @@ where
       x: I::zero(),
       y: I::zero(),
     }
+  }
+
+  pub const fn x(&self) -> I {
+    self.x
+  }
+
+  pub const fn y(&self) -> I {
+    self.y
   }
 
   /// Returns the sectant this point lies in, treating (0, 0) as the origin. The

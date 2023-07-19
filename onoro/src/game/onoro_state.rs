@@ -35,6 +35,11 @@ impl OnoroState {
     finished
   }
 
+  pub fn set_finished(&mut self, finished: bool) {
+    let (turn, black_turn, _, hashed) = Self::unpack(self.data);
+    self.data = Self::pack(turn, black_turn, finished, hashed);
+  }
+
   pub fn hashed(&self) -> bool {
     let (_, _, _, hashed) = Self::unpack(self.data);
     hashed

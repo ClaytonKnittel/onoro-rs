@@ -1,4 +1,3 @@
-use algebra::monoid::Monoid;
 use arrayvec::ArrayVec;
 
 use crate::{

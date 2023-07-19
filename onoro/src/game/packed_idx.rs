@@ -30,6 +30,15 @@ impl PackedIdx {
     ((self.bytes.0 as u32) >> 4) & 0x0fu32
   }
 
+  /// Returns the underlying representation of the `PackedIdx` as a `u8`.
+  ///
+  /// This function is unsafe because this representation should normally be
+  /// opaque to anything external to this class, but it can be used for more
+  /// efficient tile occupancy checking in the game state.
+  pub const unsafe fn bytes(&self) -> u8 {
+    self.bytes.0
+  }
+
   pub const unsafe fn unsafe_add(&self, other: &PackedIdx) -> PackedIdx {
     // Assume no overflow in x or y
     PackedIdx {
@@ -114,5 +123,57 @@ impl std::ops::Add for IdxOffset {
 impl std::ops::AddAssign for IdxOffset {
   fn add_assign(&mut self, rhs: IdxOffset) {
     self.bytes += rhs.bytes
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::{IdxOffset, PackedIdx};
+
+  #[test]
+  fn test_add_x() {
+    let pos = PackedIdx::new(3, 7);
+    let offset = IdxOffset::by_x(1);
+    assert_eq!(pos + offset, PackedIdx::new(4, 7));
+  }
+
+  #[test]
+  fn test_add_negative_x() {
+    let pos = PackedIdx::new(3, 7);
+    let offset = IdxOffset::by_x(-1);
+    assert_eq!(pos + offset, PackedIdx::new(2, 7));
+  }
+
+  #[test]
+  fn test_add_y() {
+    let pos = PackedIdx::new(3, 7);
+    let offset = IdxOffset::by_y(1);
+    assert_eq!(pos + offset, PackedIdx::new(3, 8));
+  }
+
+  #[test]
+  fn test_add_negative_y() {
+    let pos = PackedIdx::new(3, 7);
+    let offset = IdxOffset::by_y(-1);
+    assert_eq!(pos + offset, PackedIdx::new(3, 6));
+  }
+
+  #[test]
+  fn test_add_two_dim() {
+    let pos = PackedIdx::new(3, 7);
+    let offset = IdxOffset::new(2, 1);
+    assert_eq!(pos + offset, PackedIdx::new(5, 8));
+
+    let pos = PackedIdx::new(3, 7);
+    let offset = IdxOffset::new(2, -1);
+    assert_eq!(pos + offset, PackedIdx::new(5, 6));
+
+    let pos = PackedIdx::new(3, 7);
+    let offset = IdxOffset::new(-2, 1);
+    assert_eq!(pos + offset, PackedIdx::new(1, 8));
+
+    let pos = PackedIdx::new(3, 7);
+    let offset = IdxOffset::new(-2, -1);
+    assert_eq!(pos + offset, PackedIdx::new(1, 6));
   }
 }

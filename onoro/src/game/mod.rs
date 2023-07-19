@@ -7,4 +7,4 @@ mod packed_idx;
 mod packed_score;
 mod score;
 
-pub use onoro::*;
+pub use self::onoro::*;
