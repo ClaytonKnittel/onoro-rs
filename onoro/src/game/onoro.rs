@@ -1,14 +1,14 @@
 use std::{cmp, fmt::Display};
 
-use num_traits::Signed;
 use union_find::ConstUnionFind;
 
 use crate::{make_onoro_error, util::broadcast_u8_to_u64};
 
 use super::{
   error::{OnoroError, OnoroResult},
-  hex_pos::{HexPos, HexPos16, HexPos32},
+  hex_pos::{HexPos, HexPosOffset},
   onoro_state::OnoroState,
+  packed_hex_pos::PackedHexPos,
   packed_idx::{IdxOffset, PackedIdx},
   packed_score::PackedScore,
   r#move::Move,
@@ -36,7 +36,7 @@ pub struct Onoro<const N: usize, const N2: usize> {
   pawn_poses: [PackedIdx; N],
   score: PackedScore<OnoroState>,
   // Sum of all HexPos's of pieces on the board
-  sum_of_mass: HexPos16,
+  sum_of_mass: PackedHexPos,
   hash: u64,
 }
 
@@ -48,7 +48,7 @@ impl<const N: usize, const N2: usize> Onoro<N, N2> {
     Self {
       pawn_poses: [PackedIdx::null(); N],
       score: PackedScore::new(Score::tie(0), OnoroState::new()),
-      sum_of_mass: HexPos16::origin(),
+      sum_of_mass: HexPos::zero().into(),
       hash: 0,
     }
   }
@@ -72,13 +72,13 @@ impl<const N: usize, const N2: usize> Onoro<N, N2> {
 
   /// Converts a `HexPos` to an ordinal, which is a unique mapping from valid
   /// `HexPos`s on the board to the range 0..N2.
-  pub const fn hex_pos_ord(pos: &HexPos32) -> usize {
+  pub const fn hex_pos_ord(pos: &HexPos) -> usize {
     pos.x() as usize + (pos.y() as usize) * N
   }
 
   /// The inverse of `self.hex_pos_ord`.
-  pub const fn ord_to_hex_pos(ord: usize) -> HexPos32 {
-    HexPos32::new((ord % N) as i32, (ord / N) as i32)
+  pub const fn ord_to_hex_pos(ord: usize) -> HexPos {
+    HexPos::new((ord % N) as u32, (ord / N) as u32)
   }
 
   pub fn pawns_in_play(&self) -> u32 {
@@ -174,7 +174,7 @@ impl<const N: usize, const N2: usize> Onoro<N, N2> {
   /// Important: this will not update `self.onoro_state().turn()` or
   /// `self.onoro_state().black_turn()`, the caller is responsible for doing so.
   fn set_tile(&mut self, i: usize, pos: PackedIdx) {
-    let mut com_offset: HexPos32 = pos.into();
+    let mut com_offset: HexPosOffset = pos.into();
 
     let prev_idx = self.pawn_poses[i];
     if prev_idx != PackedIdx::null() {
@@ -195,7 +195,7 @@ impl<const N: usize, const N2: usize> Onoro<N, N2> {
       });
     }
 
-    self.sum_of_mass += com_offset.into();
+    self.sum_of_mass = (HexPos::from(self.sum_of_mass) + com_offset).into();
     self.mut_onoro_state().set_hashed(false);
 
     // Check for a win
@@ -222,7 +222,7 @@ impl<const N: usize, const N2: usize> Onoro<N, N2> {
     offset
   }
 
-  fn check_win(&self, last_move: HexPos32) -> bool {
+  fn check_win(&self, last_move: HexPos) -> bool {
     // Bitvector of positions occupied by pawns of this color along the 3 lines
     // extending out from last_move. Intentionally leave a zero bit between each
     // of the 3 sets so they can't form a continuous string of 1's across
@@ -249,7 +249,7 @@ impl<const N: usize, const N2: usize> Onoro<N, N2> {
       .skip(self.onoro_state().black_turn() as usize)
       .step_by(2)
     {
-      let pos: HexPos32 = self.pawn_poses[i].into();
+      let pos: HexPos = self.pawn_poses[i].into();
       let delta = pos - last_move;
       let dx = delta.x();
       let dy = delta.y();
@@ -339,7 +339,7 @@ impl<const N: usize, const N2: usize> Onoro<N, N2> {
   pub fn validate(&self) -> OnoroResult<()> {
     let mut n_b_pawns = 0u32;
     let mut n_w_pawns = 0u32;
-    let mut sum_of_mass = HexPos32::origin();
+    let mut sum_of_mass = HexPos::zero();
 
     let mut uf = ConstUnionFind::<N2>::new();
 
@@ -373,13 +373,12 @@ impl<const N: usize, const N2: usize> Onoro<N, N2> {
         }
       }
 
-      // TODO: union find for contiguous group of pawns.
-      HexPos32::from(pawn.pos)
+      HexPos::from(pawn.pos)
         .each_top_left_neighbor()
         .for_each(|neighbor_pos| {
           if self.get_tile(neighbor_pos.into()) != TileState::Empty {
             uf.union(
-              Self::hex_pos_ord(&HexPos32::from(pawn.pos)),
+              Self::hex_pos_ord(&HexPos::from(pawn.pos)),
               Self::hex_pos_ord(&neighbor_pos),
             );
           }
@@ -420,7 +419,7 @@ impl<const N: usize, const N2: usize> Onoro<N, N2> {
       ));
     }
 
-    if HexPos16::from(sum_of_mass) != self.sum_of_mass {
+    if sum_of_mass != self.sum_of_mass.into() {
       return Err(make_onoro_error!(
         "Sum of mass not correct: expect {}, but have {}",
         sum_of_mass,
@@ -498,7 +497,7 @@ impl Display for Pawn {
         PawnColor::Black => "black",
         PawnColor::White => "white",
       },
-      HexPos32::from(self.pos)
+      HexPos::from(self.pos)
     )
   }
 }

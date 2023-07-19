@@ -5,7 +5,7 @@ use crate::{
   util::{max_u32, min_u32, unreachable},
 };
 
-use super::hex_pos::HexPos32;
+use super::hex_pos::HexPosOffset;
 
 /// Describes the layout of the game state, and provides enough information to
 /// canonicalize the state for hash computation.
@@ -24,7 +24,7 @@ pub struct BoardSymmetryState {
 
   /// The offset to apply when calculating the integer-coordinate, symmetry
   /// invariant "center of mass"
-  center_offset: HexPos32,
+  center_offset: HexPosOffset,
 }
 
 enum COMOffset {
@@ -64,12 +64,12 @@ const fn board_symm_state_op_to_com_offset(op: &D6) -> COMOffset {
   }
 }
 
-const fn com_offset_to_hex_pos(offset: COMOffset) -> HexPos32 {
+const fn com_offset_to_hex_pos(offset: COMOffset) -> HexPosOffset {
   match offset {
-    COMOffset::X0Y0 => HexPos32::new(0, 0),
-    COMOffset::X1Y0 => HexPos32::new(1, 0),
-    COMOffset::X0Y1 => HexPos32::new(0, 1),
-    COMOffset::X1Y1 => HexPos32::new(1, 1),
+    COMOffset::X0Y0 => HexPosOffset::new(0, 0),
+    COMOffset::X1Y0 => HexPosOffset::new(1, 0),
+    COMOffset::X0Y1 => HexPosOffset::new(0, 1),
+    COMOffset::X1Y1 => HexPosOffset::new(1, 1),
   }
 }
 

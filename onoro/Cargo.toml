@@ -8,6 +8,5 @@ edition = "2021"
 [dependencies]
 algebra = { path = "../algebra" }
 arrayvec = "0.7"
-num-traits = "0.2"
 rand = "0.8"
 union_find = { path = "../union_find" }

@@ -1,53 +1,43 @@
 use std::fmt::Display;
 
 use algebra::group::Cyclic;
-use num_traits::Signed;
 
 use crate::groups::{C2, D3, D6, K4};
 
-use super::packed_idx::PackedIdx;
+use super::{packed_hex_pos::PackedHexPos, packed_idx::PackedIdx};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct HexPos<I: Signed> {
-  x: I,
-  y: I,
+pub struct HexPos {
+  x: u32,
+  y: u32,
 }
 
-pub type HexPos32 = HexPos<i32>;
-pub type HexPos16 = HexPos<i16>;
-
-impl<I> HexPos<I>
-where
-  I: Copy + PartialOrd + Signed,
-{
-  pub const fn new(x: I, y: I) -> Self {
+impl HexPos {
+  pub const fn new(x: u32, y: u32) -> Self {
     Self { x, y }
   }
 
-  pub fn origin() -> Self {
-    Self {
-      x: I::zero(),
-      y: I::zero(),
-    }
+  pub fn zero() -> Self {
+    Self { x: 0, y: 0 }
   }
 
-  pub const fn x(&self) -> I {
+  pub const fn x(&self) -> u32 {
     self.x
   }
 
-  pub const fn y(&self) -> I {
+  pub const fn y(&self) -> u32 {
     self.y
   }
 
   /// Returns an iterator over all neighbors of this `HexPos`.
   pub fn each_neighbor(&self) -> impl Iterator<Item = Self> {
     [
-      self + &HexPos::new(-I::one(), -I::one()),
-      self + &HexPos::new(I::zero(), -I::one()),
-      self + &HexPos::new(-I::one(), I::zero()),
-      self + &HexPos::new(I::one(), I::zero()),
-      self + &HexPos::new(I::zero(), I::one()),
-      self + &HexPos::new(I::one(), I::one()),
+      self + &HexPosOffset::new(-1, -1),
+      self + &HexPosOffset::new(0, -1),
+      self + &HexPosOffset::new(-1, 0),
+      self + &HexPosOffset::new(1, 0),
+      self + &HexPosOffset::new(0, 1),
+      self + &HexPosOffset::new(1, 1),
     ]
     .into_iter()
   }
@@ -59,11 +49,139 @@ where
   /// top left neighbor of the other.
   pub fn each_top_left_neighbor(&self) -> impl Iterator<Item = Self> {
     [
-      self + &HexPos::new(-I::one(), -I::one()),
-      self + &HexPos::new(I::zero(), -I::one()),
-      self + &HexPos::new(-I::one(), I::zero()),
+      self + &HexPosOffset::new(-1, -1),
+      self + &HexPosOffset::new(0, -1),
+      self + &HexPosOffset::new(-1, 0),
     ]
     .into_iter()
+  }
+}
+
+impl From<PackedHexPos> for HexPos {
+  fn from(value: PackedHexPos) -> Self {
+    Self {
+      x: value.x() as u32,
+      y: value.y() as u32,
+    }
+  }
+}
+
+impl From<PackedIdx> for HexPos {
+  fn from(value: PackedIdx) -> Self {
+    Self {
+      x: value.x() as u32,
+      y: value.y() as u32,
+    }
+  }
+}
+
+impl std::ops::Add<HexPosOffset> for HexPos {
+  type Output = Self;
+
+  fn add(self, rhs: HexPosOffset) -> Self::Output {
+    Self {
+      x: (self.x as i32 + rhs.x) as u32,
+      y: (self.y as i32 + rhs.y) as u32,
+    }
+  }
+}
+
+impl std::ops::Add<&HexPosOffset> for &HexPos {
+  type Output = HexPos;
+
+  fn add(self, rhs: &HexPosOffset) -> Self::Output {
+    HexPos {
+      x: (self.x as i32 + rhs.x) as u32,
+      y: (self.y as i32 + rhs.y) as u32,
+    }
+  }
+}
+
+impl std::ops::AddAssign<HexPosOffset> for HexPos {
+  fn add_assign(&mut self, rhs: HexPosOffset) {
+    self.x = (self.x as i32 + rhs.x) as u32;
+    self.y = (self.y as i32 + rhs.y) as u32;
+  }
+}
+
+impl std::ops::Sub for HexPos {
+  type Output = HexPosOffset;
+
+  fn sub(self, rhs: Self) -> Self::Output {
+    HexPosOffset {
+      x: self.x as i32 - rhs.x as i32,
+      y: self.y as i32 - rhs.y as i32,
+    }
+  }
+}
+
+impl std::ops::Sub for &HexPos {
+  type Output = HexPosOffset;
+
+  fn sub(self, rhs: Self) -> Self::Output {
+    HexPosOffset {
+      x: self.x as i32 - rhs.x as i32,
+      y: self.y as i32 - rhs.y as i32,
+    }
+  }
+}
+
+impl std::ops::Sub<HexPosOffset> for HexPos {
+  type Output = HexPos;
+
+  fn sub(self, rhs: HexPosOffset) -> Self::Output {
+    Self {
+      x: (self.x as i32 - rhs.x) as u32,
+      y: (self.y as i32 - rhs.y) as u32,
+    }
+  }
+}
+
+impl std::ops::Sub<&HexPosOffset> for &HexPos {
+  type Output = HexPos;
+
+  fn sub(self, rhs: &HexPosOffset) -> Self::Output {
+    HexPos {
+      x: (self.x as i32 - rhs.x) as u32,
+      y: (self.y as i32 - rhs.y) as u32,
+    }
+  }
+}
+
+impl std::ops::SubAssign<HexPosOffset> for HexPos {
+  fn sub_assign(&mut self, rhs: HexPosOffset) {
+    self.x = (self.x as i32 - rhs.x) as u32;
+    self.y = (self.y as i32 - rhs.y) as u32;
+  }
+}
+
+impl Display for HexPos {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(f, "({}, {})", self.x, self.y)
+  }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct HexPosOffset {
+  x: i32,
+  y: i32,
+}
+
+impl HexPosOffset {
+  pub const fn new(x: i32, y: i32) -> Self {
+    Self { x, y }
+  }
+
+  pub fn origin() -> Self {
+    Self { x: 0, y: 0 }
+  }
+
+  pub const fn x(&self) -> i32 {
+    self.x
+  }
+
+  pub const fn y(&self) -> i32 {
+    self.y
   }
 
   /// Returns the sectant this point lies in, treating (0, 0) as the origin. The
@@ -71,12 +189,12 @@ where
   /// with (x >= 0, y >= 0, y < x). The third sectant (2) is the second sectant
   /// with c_r1 applied, etc. (up to sectant 6)
   pub fn sectant(&self) -> u32 {
-    if self.x == I::zero() && self.y == I::zero() {
+    if self.x == 0 && self.y == 0 {
       0
-    } else if self.y < I::zero() || (self.x < I::zero() && self.y == I::zero()) {
+    } else if self.y < 0 || (self.x < 0 && self.y == 0) {
       if self.x < self.y {
         4
-      } else if self.x < I::zero() {
+      } else if self.x < 0 {
         5
       } else {
         6
@@ -84,7 +202,7 @@ where
     } else {
       if self.y < self.x {
         1
-      } else if self.x > I::zero() {
+      } else if self.x > 0 {
         2
       } else {
         3
@@ -207,7 +325,7 @@ where
 
   fn v_r2(&self) -> Self {
     Self {
-      x: I::one() - self.y,
+      x: 1 - self.y,
       y: self.x - self.y,
     }
   }
@@ -218,7 +336,7 @@ where
 
   fn e_r3(&self) -> Self {
     Self {
-      x: I::one() - self.x,
+      x: 1 - self.x,
       y: -self.y,
     }
   }
@@ -277,16 +395,7 @@ where
   }
 }
 
-impl From<PackedIdx> for HexPos16 {
-  fn from(value: PackedIdx) -> Self {
-    Self {
-      x: value.x() as i16,
-      y: value.y() as i16,
-    }
-  }
-}
-
-impl From<PackedIdx> for HexPos32 {
+impl From<PackedIdx> for HexPosOffset {
   fn from(value: PackedIdx) -> Self {
     Self {
       x: value.x() as i32,
@@ -295,28 +404,10 @@ impl From<PackedIdx> for HexPos32 {
   }
 }
 
-impl From<HexPos16> for HexPos32 {
-  fn from(value: HexPos16) -> Self {
-    Self {
-      x: value.x as i32,
-      y: value.y as i32,
-    }
-  }
-}
-
-impl From<HexPos32> for HexPos16 {
-  fn from(value: HexPos32) -> Self {
-    Self {
-      x: value.x as i16,
-      y: value.y as i16,
-    }
-  }
-}
-
-impl<I: Signed> std::ops::Add for HexPos<I> {
+impl std::ops::Add for HexPosOffset {
   type Output = Self;
 
-  fn add(self, rhs: Self) -> Self::Output {
+  fn add(self, rhs: HexPosOffset) -> Self::Output {
     Self {
       x: self.x + rhs.x,
       y: self.y + rhs.y,
@@ -324,29 +415,48 @@ impl<I: Signed> std::ops::Add for HexPos<I> {
   }
 }
 
-impl<I: Signed + Clone> std::ops::Add for &HexPos<I> {
-  type Output = HexPos<I>;
+impl std::ops::Add for &HexPosOffset {
+  type Output = HexPosOffset;
 
-  fn add(self, rhs: Self) -> Self::Output {
-    HexPos::<I> {
-      x: self.x.clone() + rhs.x.clone(),
-      y: self.y.clone() + rhs.y.clone(),
+  fn add(self, rhs: &HexPosOffset) -> Self::Output {
+    HexPosOffset {
+      x: self.x + rhs.x,
+      y: self.y + rhs.y,
     }
   }
 }
 
-impl<I: Signed> std::ops::AddAssign for HexPos<I>
-where
-  I: std::ops::AddAssign,
-{
-  fn add_assign(&mut self, rhs: Self) {
+impl std::ops::Add<HexPos> for HexPosOffset {
+  type Output = HexPos;
+
+  fn add(self, rhs: HexPos) -> Self::Output {
+    HexPos {
+      x: (self.x + rhs.x as i32) as u32,
+      y: (self.y + rhs.y as i32) as u32,
+    }
+  }
+}
+
+impl std::ops::Add<&HexPos> for &HexPosOffset {
+  type Output = HexPos;
+
+  fn add(self, rhs: &HexPos) -> Self::Output {
+    HexPos {
+      x: (self.x + rhs.x as i32) as u32,
+      y: (self.y + rhs.y as i32) as u32,
+    }
+  }
+}
+
+impl std::ops::AddAssign for HexPosOffset {
+  fn add_assign(&mut self, rhs: HexPosOffset) {
     self.x += rhs.x;
     self.y += rhs.y;
   }
 }
 
-impl<I: Signed> std::ops::Sub for HexPos<I> {
-  type Output = Self;
+impl std::ops::Sub for HexPosOffset {
+  type Output = HexPosOffset;
 
   fn sub(self, rhs: Self) -> Self::Output {
     Self {
@@ -356,32 +466,20 @@ impl<I: Signed> std::ops::Sub for HexPos<I> {
   }
 }
 
-impl<I: Signed + Clone> std::ops::Sub for &HexPos<I> {
-  type Output = HexPos<I>;
+impl std::ops::Sub for &HexPosOffset {
+  type Output = HexPosOffset;
 
   fn sub(self, rhs: Self) -> Self::Output {
-    HexPos::<I> {
-      x: self.x.clone() - rhs.x.clone(),
-      y: self.y.clone() - rhs.y.clone(),
+    HexPosOffset {
+      x: self.x - rhs.x,
+      y: self.y - rhs.y,
     }
   }
 }
 
-impl<I: Signed> std::ops::SubAssign for HexPos<I>
-where
-  I: std::ops::SubAssign,
-{
-  fn sub_assign(&mut self, rhs: Self) {
+impl std::ops::SubAssign for HexPosOffset {
+  fn sub_assign(&mut self, rhs: HexPosOffset) {
     self.x -= rhs.x;
     self.y -= rhs.y;
-  }
-}
-
-impl<I: Signed> Display for HexPos<I>
-where
-  I: Display,
-{
-  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    write!(f, "({}, {})", self.x, self.y)
   }
 }
