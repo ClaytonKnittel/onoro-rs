@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use algebra::group::Cyclic;
 use num_traits::Signed;
 
@@ -323,5 +325,14 @@ where
   fn sub_assign(&mut self, rhs: Self) {
     self.x -= rhs.x;
     self.y -= rhs.y;
+  }
+}
+
+impl<I: Signed> Display for HexPos<I>
+where
+  I: Display,
+{
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(f, "({}, {})", self.x, self.y)
   }
 }

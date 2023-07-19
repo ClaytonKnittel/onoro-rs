@@ -357,14 +357,30 @@ impl<const N: usize> Display for Onoro<N> {
   }
 }
 
+#[derive(Debug, PartialEq, Eq)]
 pub enum PawnColor {
   Black,
   White,
 }
 
+#[derive(Debug, PartialEq, Eq)]
 pub struct Pawn {
   pub pos: PackedIdx,
   pub color: PawnColor,
+}
+
+impl Display for Pawn {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(
+      f,
+      "{} pawn at {}",
+      match self.color {
+        PawnColor::Black => "black",
+        PawnColor::White => "white",
+      },
+      HexPos32::from(self.pos)
+    )
+  }
 }
 
 pub struct PawnIterator<'a, const N: usize> {

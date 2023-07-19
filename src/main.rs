@@ -6,4 +6,8 @@ fn main() {
   println!("size of game state: {}", std::mem::size_of::<Onoro::<16>>());
 
   println!("{}", game);
+
+  for pawn in game.pawns() {
+    println!("{}", pawn);
+  }
 }
