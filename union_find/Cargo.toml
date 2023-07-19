@@ -1,13 +1,8 @@
 [package]
-name = "onoro"
+name = "union_find"
 version = "0.1.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-algebra = { path = "../algebra" }
-arrayvec = "0.7"
-num-traits = "0.2"
-rand = "0.8"
-union_find = { path = "../union_find" }
