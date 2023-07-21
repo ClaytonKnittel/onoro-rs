@@ -205,6 +205,7 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Onoro<N, N2, AD
   }
 
   pub fn each_p1_move(&self) -> P1MoveIterator<'_, N, N2, ADJ_CNT_SIZE> {
+    debug_assert!(self.in_phase1());
     P1MoveIterator {
       onoro: self,
       pawn_iter: self.pawns(),
@@ -695,7 +696,9 @@ impl<'a, const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Iterator
 
 #[cfg(test)]
 mod tests {
-  use crate::{game::packed_idx::PackedIdx, Onoro8};
+  use crate::packed_idx::PackedIdx;
+
+  use super::Onoro8;
 
   #[test]
   fn test_get_tile() {

@@ -43,6 +43,7 @@ name = "onoro-rs"
 version = "0.1.0"
 dependencies = [
  "onoro",
+ "rand",
 ]
 
 [[package]]

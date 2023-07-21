@@ -24,7 +24,7 @@ impl Display for OnoroError {
 #[macro_export]
 macro_rules! make_onoro_error {
   ($($args:expr),+) => {
-    $crate::game::onoro::OnoroError::new(&format!($($args),+))
+    $crate::onoro::OnoroError::new(&format!($($args),+))
   };
 }
 
