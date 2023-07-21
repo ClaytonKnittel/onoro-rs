@@ -853,7 +853,7 @@ impl<'a, const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Iterator
         let place_to_consider = Onoro::<N, N2, ADJ_CNT_SIZE>::ord_to_hex_pos(next_idx_ord);
         let place_to_consider_idx = PackedIdx::from(place_to_consider);
 
-        // skip this tile if it isn't empty (this will also skip the piece's
+        // Skip this tile if it isn't empty (this will also skip the piece's
         // old location since we haven't removed it, which we want)
         if self.onoro.get_tile(place_to_consider_idx) != TileState::Empty
           || ((pawn_meta.adj_cnt_bitmask >> tb_shift) & TILE_MASK) <= 1
@@ -862,11 +862,18 @@ impl<'a, const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Iterator
           continue;
         }
 
+        // Clear out the neighbor counts for the location being considered
+        // currently, so we don't try it again next loop.
         pawn_meta.adj_cnt_bitmask &= !clr_mask;
 
+        // A count of the number of neighbors with only one other adjacent pawn.
         let mut n_satisfied = 0;
+        // The first group ID of any neighbor from the union find.
         let mut g1 = None;
+        // The second group ID of any neighbor from the union find.
         let mut g2 = None;
+        // The number of distinct groups of pawns adjacent to the place being
+        // considered.
         let mut groups_touching = 0;
         for neighbor in place_to_consider.each_neighbor() {
           if self.onoro.get_tile(neighbor.into()) == TileState::Empty {
@@ -884,6 +891,13 @@ impl<'a, const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Iterator
 
           if neighbor != pawn_meta.pawn_pos.into() {
             let group_id = pawn_meta.uf.find(neighbor_ord);
+            // There can be at most 3 distinct groups of pawns adjacent to this
+            // spot, since there are 6 neighboring tiles, and each tile touches
+            // two other neighbors. The first neighbor will assign its group ID
+            // to `g1`, the second distinct group ID will be assigned to `g2`,
+            // and if a third group ID is seen, it will reassign `g2` to it, but
+            // will also update `groups_touching`. In the end, `groups_touching`
+            // will be correct, which is all that matters.
             if Some(group_id) != g1 {
               if g1.is_none() {
                 g1 = Some(group_id);
