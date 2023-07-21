@@ -15,5 +15,12 @@ fn main() {
     true
   });
 
+  for m in game.each_p1_move() {
+    println!("{m}");
+    let mut new_game = game.clone();
+    new_game.make_move(m);
+    println!("{new_game}");
+  }
+
   game.validate().unwrap();
 }

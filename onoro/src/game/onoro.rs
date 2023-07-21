@@ -204,6 +204,15 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Onoro<N, N2, AD
     unsafe { self.make_move_unchecked(m) }
   }
 
+  pub fn each_p1_move(&self) -> P1MoveIterator<'_, N, N2, ADJ_CNT_SIZE> {
+    P1MoveIterator {
+      onoro: self,
+      pawn_iter: self.pawns(),
+      neighbor_iter: None,
+      tmp_board: [0; ADJ_CNT_SIZE],
+    }
+  }
+
   /// Iterates over all available moves, calling `callback` with each move
   /// passed to the callback.
   ///
@@ -634,6 +643,53 @@ impl<'a, const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Iterator
     self.pawn_idx += if self.one_color { 2 } else { 1 };
 
     Some(pawn)
+  }
+}
+
+pub struct P1MoveIterator<'a, const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> {
+  onoro: &'a Onoro<N, N2, ADJ_CNT_SIZE>,
+  pawn_iter: PawnIterator<'a, N, N2, ADJ_CNT_SIZE>,
+  neighbor_iter: Option<std::array::IntoIter<HexPos, 6>>,
+
+  /// Bitvector of 2-bit numbers per tile in the whole game board. Each number
+  /// is the number of neighbors a pawn has, capping out at 2.
+  tmp_board: [u64; ADJ_CNT_SIZE],
+}
+
+impl<'a, const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Iterator
+  for P1MoveIterator<'a, N, N2, ADJ_CNT_SIZE>
+{
+  type Item = Move;
+
+  fn next(&mut self) -> Option<Self::Item> {
+    loop {
+      if let Some(neighbor) = self.neighbor_iter.as_mut().and_then(|iter| iter.next()) {
+        if self.onoro.get_tile(neighbor.into()) != TileState::Empty {
+          continue;
+        }
+
+        let ord = Onoro::<N, N2, ADJ_CNT_SIZE>::hex_pos_ord(&neighbor);
+        let tb_shift = TILE_BITS * (ord % (64 / TILE_BITS));
+        let tbb = self.tmp_board[ord / (64 / TILE_BITS)];
+        let mask = TILE_MASK << tb_shift;
+        let full_mask = MIN_NEIGHBORS_PER_PAWN << tb_shift;
+
+        if (tbb & mask) != full_mask {
+          let tbb = tbb + (1u64 << tb_shift);
+          self.tmp_board[ord / (64 / TILE_BITS)] = tbb;
+
+          if (tbb & mask) == full_mask {
+            return Some(Move::Phase1Move {
+              to: neighbor.into(),
+            });
+          }
+        }
+      } else if let Some(pawn) = self.pawn_iter.next() {
+        self.neighbor_iter = Some(HexPos::from(pawn.pos).each_neighbor());
+      } else {
+        return None;
+      }
+    }
   }
 }
 
