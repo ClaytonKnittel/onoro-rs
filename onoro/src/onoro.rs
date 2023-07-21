@@ -152,6 +152,15 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Onoro<N, N2, AD
     self.score.mut_packed_data()
   }
 
+  /// The color of the current player as a `PawnColor`.
+  pub fn player_color(&self) -> PawnColor {
+    if self.onoro_state().black_turn() {
+      PawnColor::Black
+    } else {
+      PawnColor::White
+    }
+  }
+
   /// Returns the width of the game board. This is also the upper bound on the
   /// x and y coordinate values in PackedIdx.
   pub const fn board_width() -> usize {
@@ -210,8 +219,13 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Onoro<N, N2, AD
       onoro: self,
       pawn_iter: self.pawns(),
       neighbor_iter: None,
-      tmp_board: [0; ADJ_CNT_SIZE],
+      adjacency_counts: [0; ADJ_CNT_SIZE],
     }
+  }
+
+  pub fn each_p2_move(&self) -> P2MoveIterator<'_, N, N2, ADJ_CNT_SIZE> {
+    debug_assert!(!self.in_phase1());
+    P2MoveIterator::new(self)
   }
 
   /// Adds a new pawn to the game board at index `i`, without checking what was
@@ -557,6 +571,7 @@ pub enum PawnColor {
 pub struct Pawn {
   pub pos: PackedIdx,
   pub color: PawnColor,
+  board_idx: u8,
 }
 
 impl Display for Pawn {
@@ -598,6 +613,7 @@ impl<'a, const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Iterator
       } else {
         PawnColor::White
       },
+      board_idx: self.pawn_idx as u8,
     };
     self.pawn_idx += if self.one_color { 2 } else { 1 };
 
@@ -612,7 +628,7 @@ pub struct P1MoveIterator<'a, const N: usize, const N2: usize, const ADJ_CNT_SIZ
 
   /// Bitvector of 2-bit numbers per tile in the whole game board. Each number
   /// is the number of neighbors a pawn has, capping out at 2.
-  tmp_board: [u64; ADJ_CNT_SIZE],
+  adjacency_counts: [u64; ADJ_CNT_SIZE],
 }
 
 impl<'a, const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Iterator
@@ -629,14 +645,16 @@ impl<'a, const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Iterator
 
         let ord = Onoro::<N, N2, ADJ_CNT_SIZE>::hex_pos_ord(&neighbor);
         let tb_shift = TILE_BITS * (ord % (64 / TILE_BITS));
-        let tbb = unsafe { *self.tmp_board.get_unchecked(ord / (64 / TILE_BITS)) };
+        let tbb = unsafe { *self.adjacency_counts.get_unchecked(ord / (64 / TILE_BITS)) };
         let mask = TILE_MASK << tb_shift;
-        let full_mask = MIN_NEIGHBORS_PER_PAWN << tb_shift;
+        let full_mask = (MIN_NEIGHBORS_PER_PAWN + 1) << tb_shift;
 
         if (tbb & mask) != full_mask {
           let tbb = tbb + (1u64 << tb_shift);
           unsafe {
-            *self.tmp_board.get_unchecked_mut(ord / (64 / TILE_BITS)) = tbb;
+            *self
+              .adjacency_counts
+              .get_unchecked_mut(ord / (64 / TILE_BITS)) = tbb;
           }
 
           if (tbb & mask) == full_mask {
@@ -647,6 +665,246 @@ impl<'a, const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Iterator
         }
       } else if let Some(pawn) = self.pawn_iter.next() {
         self.neighbor_iter = Some(HexPos::from(pawn.pos).each_neighbor());
+      } else {
+        return None;
+      }
+    }
+  }
+}
+
+struct P2PawnMeta<const N2: usize> {
+  uf: ConstUnionFind<N2>,
+  /// The index of the pawn being considered in `onoro.pawn_poses`.
+  pawn_idx: usize,
+  /// The position of the pawn being considered on the board.
+  pawn_pos: PackedIdx,
+  /// The number of neighbors with only one neighbor after this pawn is removed.
+  /// After placing this pawn, there must be exactly `neighbors_to_satisfy`
+  /// neighbors with one other neighbor, otherwise the move would have left some
+  /// pawns stranded with only one neighbor.
+  neighbors_to_satisfy: u32,
+  /// The number of disjoint groups of pawns after removing this pawn.
+  pawn_groups: u32,
+  /// The index after the index into `adjacency_counts` that `adj_cnt_bitmask`
+  /// was read from.
+  adj_cnt_idx: usize,
+  /// A local copy of `adjacency_counts[adj_cnt_idx - 1]`, which is cleared out as
+  /// locations to place the pawn are considered.
+  adj_cnt_bitmask: u64,
+}
+
+pub struct P2MoveIterator<'a, const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> {
+  onoro: &'a Onoro<N, N2, ADJ_CNT_SIZE>,
+  /// The current pawn that is being considered for moving. Only iterates over
+  /// the pawns of the current player.
+  pawn_iter: PawnIterator<'a, N, N2, ADJ_CNT_SIZE>,
+  pawn_meta: Option<P2PawnMeta<N2>>,
+
+  /// Bitvector of 2-bit numbers per tile in the whole game board. Each number
+  /// is the number of neighbors a pawn has, capping out at 2.
+  adjacency_counts: [u64; ADJ_CNT_SIZE],
+}
+
+impl<'a, const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize>
+  P2MoveIterator<'a, N, N2, ADJ_CNT_SIZE>
+{
+  fn new(onoro: &'a Onoro<N, N2, ADJ_CNT_SIZE>) -> Self {
+    Self {
+      onoro,
+      pawn_iter: onoro.color_pawns(onoro.player_color()),
+      pawn_meta: None,
+      adjacency_counts: [0; ADJ_CNT_SIZE],
+    }
+    .populate_neighbor_counts()
+  }
+
+  fn populate_neighbor_counts(mut self) -> Self {
+    for pawn in self.onoro.pawns() {
+      for neighbor in HexPos::from(pawn.pos).each_neighbor() {
+        let ord = Onoro::<N, N2, ADJ_CNT_SIZE>::hex_pos_ord(&neighbor);
+        let tb_shift = TILE_BITS * (ord % (64 / TILE_BITS));
+        let tbb = unsafe { *self.adjacency_counts.get_unchecked(ord / (64 / TILE_BITS)) };
+        let mask = TILE_MASK << tb_shift;
+        let full_mask = (MIN_NEIGHBORS_PER_PAWN + 1) << tb_shift;
+
+        if (tbb & mask) != full_mask {
+          let tbb = tbb + (1u64 << tb_shift);
+          unsafe {
+            *self
+              .adjacency_counts
+              .get_unchecked_mut(ord / (64 / TILE_BITS)) = tbb;
+          }
+        }
+      }
+    }
+    self
+  }
+
+  /// Prepares the iterator to consider all possible moves of the pawn at
+  /// `pawn_pos`. Will update `self` with `Some` `pawn_meta`, and will decrease
+  /// the adjacency count of all neighboring pawns of the one at `pawn_pos`.
+  fn prepare_move_pawn(&mut self, pawn_idx: usize, pawn_pos: PackedIdx) {
+    let mut uf = ConstUnionFind::new();
+    let pawn_hex_pos: HexPos = pawn_pos.into();
+
+    // Calculate the number of disjoint pawn groups after removing the pawn at
+    // next_idx
+    for pawn in self.onoro.pawns() {
+      // Skip ourselves.
+      if pawn.pos == pawn_pos {
+        continue;
+      }
+      let pawn_ord = Onoro::<N, N2, ADJ_CNT_SIZE>::hex_pos_ord(&pawn.pos.into());
+
+      for neighbor in HexPos::from(pawn.pos).each_top_left_neighbor() {
+        if self.onoro.get_tile(neighbor.into()) != TileState::Empty && pawn_hex_pos != neighbor {
+          uf.union(
+            pawn_ord,
+            Onoro::<N, N2, ADJ_CNT_SIZE>::hex_pos_ord(&neighbor),
+          );
+        }
+      }
+    }
+
+    let empty_tiles =
+      Onoro::<N, N2, ADJ_CNT_SIZE>::board_size() as u32 - self.onoro.pawns_in_play();
+    // Note: the pawn we are moving is its own group.
+    let pawn_groups = uf.unique_sets() as u32 - empty_tiles - 1;
+
+    // number of neighbors with 1 neighbor after removing this piece
+    let mut neighbors_to_satisfy = 0;
+    // decrease neighbor count of all neighbors
+    for neighbor in HexPos::from(pawn_pos).each_neighbor() {
+      let neighbor_ord = Onoro::<N, N2, ADJ_CNT_SIZE>::hex_pos_ord(&neighbor);
+      let tb_idx = neighbor_ord / (64 / TILE_BITS);
+      let tb_shift = TILE_BITS * (neighbor_ord % (64 / TILE_BITS));
+
+      unsafe {
+        *self.adjacency_counts.get_unchecked_mut(tb_idx) -= 1u64 << tb_shift;
+      }
+      // If this neighbor has only one neighbor itself now, and it isn't empty,
+      // we have to place our pawn next to it.
+      if ((unsafe { *self.adjacency_counts.get_unchecked(tb_idx) } >> tb_shift) & TILE_MASK) == 1
+        && self.onoro.get_tile(neighbor.into()) != TileState::Empty
+      {
+        neighbors_to_satisfy += 1;
+      }
+    }
+
+    self.pawn_meta = Some(P2PawnMeta {
+      uf,
+      pawn_idx,
+      pawn_pos,
+      neighbors_to_satisfy,
+      pawn_groups,
+      adj_cnt_idx: 0,
+      adj_cnt_bitmask: 0,
+    });
+  }
+
+  /// Cleans up the mutated data in `self` from `prepare_move_pawn`.
+  fn cleanup_pawn_visit(&mut self, pawn_pos: PackedIdx) {
+    for neighbor in HexPos::from(pawn_pos).each_neighbor() {
+      let neighbor_ord = Onoro::<N, N2, ADJ_CNT_SIZE>::hex_pos_ord(&neighbor);
+      let tb_idx = neighbor_ord / (64 / TILE_BITS);
+      let tb_shift = TILE_BITS * (neighbor_ord % (64 / TILE_BITS));
+
+      unsafe {
+        *self.adjacency_counts.get_unchecked_mut(tb_idx) += 1u64 << tb_shift;
+      }
+    }
+
+    self.pawn_meta = None;
+  }
+}
+
+impl<'a, const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Iterator
+  for P2MoveIterator<'a, N, N2, ADJ_CNT_SIZE>
+{
+  type Item = Move;
+
+  fn next(&mut self) -> Option<Self::Item> {
+    loop {
+      if let Some(pawn_meta) = &mut self.pawn_meta {
+        // If the adjacency counts mask is empty, we have run out of candidate
+        // positions.
+        if pawn_meta.adj_cnt_bitmask == 0 {
+          if pawn_meta.adj_cnt_idx == ADJ_CNT_SIZE {
+            // The whole board has been checked, move onto the next pawn.
+            let pawn_pos = pawn_meta.pawn_pos;
+            self.cleanup_pawn_visit(pawn_pos);
+          } else {
+            // Fetch the next array of positions from `adjacency_counts`.
+            pawn_meta.adj_cnt_bitmask = self.adjacency_counts[pawn_meta.adj_cnt_idx];
+            pawn_meta.adj_cnt_idx += 1;
+          }
+          continue;
+        }
+
+        // Find the next tile in adjacency_counts that isn't zero.
+        let adjacency_counts_idx_off = (pawn_meta.adj_cnt_idx - 1) * (64 / TILE_BITS);
+        let next_idx_ord_off = pawn_meta.adj_cnt_bitmask.trailing_zeros() / TILE_BITS as u32;
+        let tb_shift = next_idx_ord_off * TILE_BITS as u32;
+        let next_idx_ord = next_idx_ord_off as usize + adjacency_counts_idx_off;
+        let clr_mask = TILE_MASK << tb_shift;
+
+        // The tile we are considering placing a pawn at, which may be empty
+        // and/or legal.
+        let place_to_consider = Onoro::<N, N2, ADJ_CNT_SIZE>::ord_to_hex_pos(next_idx_ord);
+        let place_to_consider_idx = PackedIdx::from(place_to_consider);
+
+        // skip this tile if it isn't empty (this will also skip the piece's
+        // old location since we haven't removed it, which we want)
+        if self.onoro.get_tile(place_to_consider_idx) != TileState::Empty
+          || ((pawn_meta.adj_cnt_bitmask >> tb_shift) & TILE_MASK) <= 1
+        {
+          pawn_meta.adj_cnt_bitmask &= !clr_mask;
+          continue;
+        }
+
+        pawn_meta.adj_cnt_bitmask &= !clr_mask;
+
+        let mut n_satisfied = 0;
+        let mut g1 = None;
+        let mut g2 = None;
+        let mut groups_touching = 0;
+        for neighbor in place_to_consider.each_neighbor() {
+          if self.onoro.get_tile(neighbor.into()) == TileState::Empty {
+            continue;
+          }
+          let neighbor_ord = Onoro::<N, N2, ADJ_CNT_SIZE>::hex_pos_ord(&neighbor);
+
+          let tb_idx = neighbor_ord / (64 / TILE_BITS);
+          let tb_shift = TILE_BITS * (neighbor_ord % (64 / TILE_BITS));
+          if ((unsafe { *self.adjacency_counts.get_unchecked(tb_idx) } >> tb_shift) & TILE_MASK)
+            == 1
+          {
+            n_satisfied += 1;
+          }
+
+          if neighbor != pawn_meta.pawn_pos.into() {
+            let group_id = pawn_meta.uf.find(neighbor_ord);
+            if Some(group_id) != g1 {
+              if g1.is_none() {
+                g1 = Some(group_id);
+                groups_touching += 1;
+              } else if Some(group_id) != g2 {
+                g2 = Some(group_id);
+                groups_touching += 1;
+              }
+            }
+          }
+        }
+
+        if n_satisfied == pawn_meta.neighbors_to_satisfy && groups_touching == pawn_meta.pawn_groups
+        {
+          return Some(Move::Phase2Move {
+            to: place_to_consider_idx,
+            from_idx: pawn_meta.pawn_idx as u32,
+          });
+        }
+      } else if let Some(pawn) = self.pawn_iter.next() {
+        self.prepare_move_pawn(pawn.board_idx as usize, pawn.pos);
       } else {
         return None;
       }
