@@ -56,11 +56,11 @@ fn main() {
   //   .build()
   //   .unwrap();
 
-  // to_phase2(&mut game);
+  to_phase2(&mut game);
 
-  // for m in game.each_p2_move() {
-  //   println!("{m}");
-  // }
+  for m in game.each_p2_move() {
+    println!("{m}");
+  }
 
   // let start = Instant::now();
   // let num_states = explore(&game, 10);

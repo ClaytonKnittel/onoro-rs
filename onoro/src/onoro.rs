@@ -647,7 +647,7 @@ impl<'a, const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Iterator
         let tb_shift = TILE_BITS * (ord % (64 / TILE_BITS));
         let tbb = unsafe { *self.adjacency_counts.get_unchecked(ord / (64 / TILE_BITS)) };
         let mask = TILE_MASK << tb_shift;
-        let full_mask = (MIN_NEIGHBORS_PER_PAWN + 1) << tb_shift;
+        let full_mask = MIN_NEIGHBORS_PER_PAWN << tb_shift;
 
         if (tbb & mask) != full_mask {
           let tbb = tbb + (1u64 << tb_shift);
