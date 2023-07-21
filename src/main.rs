@@ -5,20 +5,18 @@ use rand::Rng;
 
 fn validate_moves(onoro: &Onoro16) {
   let mut move_iter = onoro.each_p1_move();
-  onoro.for_each_move(|m| {
+  for m in onoro.each_p1_move() {
     assert_eq!(move_iter.next().unwrap(), m);
-    true
-  });
+  }
   assert!(move_iter.next().is_none());
 }
 
 fn random_move(onoro: &Onoro16) -> Move {
-  onoro.each_p1_move().next().unwrap()
-  // let moves = onoro.each_p1_move().collect::<Vec<_>>();
+  let moves = onoro.each_p1_move().collect::<Vec<_>>();
 
-  // let mut rng = rand::thread_rng();
-  // let n = rng.gen_range(0..moves.len());
-  // moves[n].clone()
+  let mut rng = rand::thread_rng();
+  let n = rng.gen_range(0..moves.len());
+  moves[n].clone()
 }
 
 fn explore(onoro: &Onoro16, depth: u32) -> u64 {
@@ -51,7 +49,7 @@ fn main() {
   //   .unwrap();
 
   let start = Instant::now();
-  let num_states = explore(&game, 11);
+  let num_states = explore(&game, 10);
   let end = Instant::now();
 
   println!("Explored {} game states in {:?}", num_states, end - start);

@@ -183,10 +183,10 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Onoro<N, N2, AD
         // 1.
         self.mut_onoro_state().inc_turn();
         let pawn_idx = self.onoro_state().turn() as usize;
-        self.set_tile(pawn_idx, to);
+        self.place_pawn(pawn_idx, to);
       }
       Move::Phase2Move { to, from_idx } => {
-        self.set_tile(from_idx as usize, to);
+        self.move_pawn(from_idx as usize, to);
         self.mut_onoro_state().swap_player_turn();
       }
     }
@@ -214,87 +214,48 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Onoro<N, N2, AD
     }
   }
 
-  /// Iterates over all available moves, calling `callback` with each move
-  /// passed to the callback.
+  /// Adds a new pawn to the game board at index `i`, without checking what was
+  /// there before or verifying that `i` was the correct place to put the pawn.
+  /// This will mutate the game state to accomodate the change.
   ///
-  /// If the callback returns false, move iteration stops and `for_each_move`
-  /// returns false. If all moves were iterated over and `callback` never
-  /// returned false, then `for_each_move` returns true.
-  pub fn for_each_move<F>(&self, callback: F) -> bool
-  where
-    F: FnMut(Move) -> bool,
-  {
-    if self.in_phase1() {
-      self.for_each_move_p1(callback)
-    } else {
-      self.for_each_move_p2(callback)
-    }
-  }
-
-  fn for_each_move_p1<F>(&self, mut callback: F) -> bool
-  where
-    F: FnMut(Move) -> bool,
-  {
-    debug_assert!(self.in_phase1());
-
-    // Bitvector of 2-bit numbers per tile in the whole game board. Each number
-    // is the number of neighbors a pawn has, capping out at 2.
-    let mut tmp_board = [0u64; ADJ_CNT_SIZE];
-
-    for p in self.pawns() {
-      for neighbor in HexPos::from(p.pos).each_neighbor() {
-        if self.get_tile(neighbor.into()) != TileState::Empty {
-          continue;
-        }
-
-        let ord = Self::hex_pos_ord(&neighbor);
-        let tb_shift = TILE_BITS * (ord % (64 / TILE_BITS));
-        let tbb = tmp_board[ord / (64 / TILE_BITS)];
-        let mask = TILE_MASK << tb_shift;
-        let full_mask = MIN_NEIGHBORS_PER_PAWN << tb_shift;
-
-        if (tbb & mask) != full_mask {
-          let tbb = tbb + (1u64 << tb_shift);
-          tmp_board[ord / (64 / TILE_BITS)] = tbb;
-
-          if (tbb & mask) == full_mask
-            && !callback(Move::Phase1Move {
-              to: neighbor.into(),
-            })
-          {
-            return false;
-          }
-        }
-      }
-    }
-
-    true
-  }
-
-  fn for_each_move_p2<F>(&self, callback: F) -> bool
-  where
-    F: FnMut(Move) -> bool,
-  {
-    debug_assert!(!self.in_phase1());
-    todo!();
-  }
-
-  /// Sets the pawn at index `i` to `pos`. This will mutate the state of the
-  /// game.
-  ///
-  /// Important: this will not update `self.onoro_state().turn()` or
+  ///  Important: this will not update `self.onoro_state().turn()` or
   /// `self.onoro_state().black_turn()`, the caller is responsible for doing so.
-  fn set_tile(&mut self, i: usize, pos: PackedIdx) {
+  fn place_pawn(&mut self, i: usize, pos: PackedIdx) {
+    unsafe {
+      *self.pawn_poses.get_unchecked_mut(i) = pos;
+    }
+
+    self.sum_of_mass = (HexPos::from(self.sum_of_mass) + pos.into()).into();
+    self.mut_onoro_state().set_hashed(false);
+    self.adjust_to_new_pawn_and_check_win(pos);
+  }
+
+  /// Moves the pawn at index `i` to pos `pos`, mutating the game state to
+  /// accomodate the change.
+  ///
+  ///  Important: this will not update `self.onoro_state().turn()` or
+  /// `self.onoro_state().black_turn()`, the caller is responsible for doing so.
+  fn move_pawn(&mut self, i: usize, pos: PackedIdx) {
     let mut com_offset: HexPosOffset = pos.into();
 
     let prev_idx = unsafe { *self.pawn_poses.get_unchecked(i) };
-    if prev_idx != PackedIdx::null() {
-      com_offset -= prev_idx.into();
-    }
+    debug_assert_ne!(prev_idx, PackedIdx::null());
+    com_offset -= prev_idx.into();
 
     unsafe {
       *self.pawn_poses.get_unchecked_mut(i) = pos;
     }
+
+    self.sum_of_mass = (HexPos::from(self.sum_of_mass) + com_offset).into();
+    self.mut_onoro_state().set_hashed(false);
+    self.adjust_to_new_pawn_and_check_win(pos);
+  }
+
+  /// Adjust the game state to accomodate a new pawn at position `pos`. This may
+  /// shift all pawns on the board. This will also check if the new pawn has
+  /// caused the current player to win, and set onoro_state().finished if they
+  /// have.
+  fn adjust_to_new_pawn_and_check_win(&mut self, pos: PackedIdx) {
     // The amount to shift the whole board by. This will keep pawns off the
     // outer perimeter.
     let shift = Self::calc_move_shift(&pos);
@@ -307,9 +268,6 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Onoro<N, N2, AD
         }
       });
     }
-
-    self.sum_of_mass = (HexPos::from(self.sum_of_mass) + com_offset).into();
-    self.mut_onoro_state().set_hashed(false);
 
     // Check for a win
     let finished = self.check_win((pos + shift).into());
