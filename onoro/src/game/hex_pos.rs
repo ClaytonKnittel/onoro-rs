@@ -30,7 +30,7 @@ impl HexPos {
   }
 
   /// Returns an iterator over all neighbors of this `HexPos`.
-  pub fn each_neighbor(&self) -> impl Iterator<Item = Self> {
+  pub fn each_neighbor(&self) -> std::array::IntoIter<HexPos, 6> {
     [
       self + &HexPosOffset::new(-1, -1),
       self + &HexPosOffset::new(0, -1),
@@ -69,8 +69,8 @@ impl From<PackedHexPos> for HexPos {
 impl From<PackedIdx> for HexPos {
   fn from(value: PackedIdx) -> Self {
     Self {
-      x: value.x() as u32,
-      y: value.y() as u32,
+      x: value.x(),
+      y: value.y(),
     }
   }
 }
@@ -188,6 +188,7 @@ impl HexPosOffset {
   /// first sectant (0) is only the origin tile. The second (1) is every hex
   /// with (x >= 0, y >= 0, y < x). The third sectant (2) is the second sectant
   /// with c_r1 applied, etc. (up to sectant 6)
+  #[allow(clippy::collapsible_else_if)]
   pub fn sectant(&self) -> u32 {
     if self.x == 0 && self.y == 0 {
       0
@@ -213,7 +214,7 @@ impl HexPosOffset {
   /// The group of symmetries about the midpoint of a hex tile (c)
   pub fn apply_d6_c(&self, op: &D6) -> Self {
     match op {
-      D6::Rot(0) => self.clone(),
+      D6::Rot(0) => *self,
       D6::Rot(1) => self.c_r1(),
       D6::Rot(2) => self.c_r2(),
       D6::Rot(3) => self.c_r3(),
@@ -232,7 +233,7 @@ impl HexPosOffset {
   /// The group of symmetries about the vertex of a hex tile (v)
   pub fn apply_d3_v(&self, op: &D3) -> Self {
     match op {
-      D3::Rot(0) => self.clone(),
+      D3::Rot(0) => *self,
       D3::Rot(1) => self.v_r2(),
       D3::Rot(2) => self.v_r4(),
       D3::Rfl(0) => self.v_s1(),
@@ -246,7 +247,7 @@ impl HexPosOffset {
   /// c_s0 } x { c_r0, e_s3 })
   pub fn apply_k4_e(&self, op: &K4) -> Self {
     match (op.left(), op.right()) {
-      (Cyclic::<2>(0), Cyclic::<2>(0)) => self.clone(),
+      (Cyclic::<2>(0), Cyclic::<2>(0)) => *self,
       (Cyclic::<2>(1), Cyclic::<2>(0)) => self.e_s0(),
       (Cyclic::<2>(0), Cyclic::<2>(1)) => self.e_s3(),
       (Cyclic::<2>(1), Cyclic::<2>(1)) => self.e_r3(),
@@ -258,7 +259,7 @@ impl HexPosOffset {
   /// vertex.
   pub fn apply_c2_cv(&self, op: &C2) -> Self {
     match op {
-      Cyclic::<2>(0) => self.clone(),
+      Cyclic::<2>(0) => *self,
       Cyclic::<2>(1) => self.c_s1(),
       _ => unreachable!(),
     }
@@ -268,7 +269,7 @@ impl HexPosOffset {
   /// midpoint of an edge.
   pub fn apply_c2_ce(&self, op: &C2) -> Self {
     match op {
-      Cyclic::<2>(0) => self.clone(),
+      Cyclic::<2>(0) => *self,
       Cyclic::<2>(1) => self.c_s0(),
       _ => unreachable!(),
     }
@@ -277,7 +278,7 @@ impl HexPosOffset {
   /// The group of symmetries about an edge.
   pub fn apply_c2_ev(&self, op: &C2) -> Self {
     match op {
-      Cyclic::<2>(0) => self.clone(),
+      Cyclic::<2>(0) => *self,
       Cyclic::<2>(1) => self.c_s3(),
       _ => unreachable!(),
     }

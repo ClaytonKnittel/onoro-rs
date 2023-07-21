@@ -2,7 +2,6 @@ use crate::{
   groups::{SymmetryClass, D6},
   util::{max_u32, min_u32, unreachable},
 };
-use algebra::monoid::Monoid;
 
 use super::hex_pos::HexPosOffset;
 
@@ -88,6 +87,7 @@ const fn com_offset_to_hex_pos(offset: COMOffset) -> HexPosOffset {
 /// `n_pawns` is the number of pawns currently in play.
 ///
 /// `(x, y)` are elements of `{0, 1, ... n_pawns-1} x {0, 1, ... n_pawns-1}`
+#[allow(clippy::collapsible_else_if)]
 const fn symm_state_op(x: u32, y: u32, n_pawns: u32) -> D6 {
   // (x2, y2) is (x, y) folded across the line y = x
   let x2 = max_u32(x, y);
@@ -290,10 +290,10 @@ pub const fn gen_symm_state_table<const N: usize, const N2: usize>() -> [BoardSy
         center_offset: com_offset_to_hex_pos(offset),
       };
 
-      y += 1;
+      x += 1;
     }
 
-    x += 1;
+    y += 1;
   }
 
   table

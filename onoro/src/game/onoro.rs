@@ -15,6 +15,28 @@ use super::{
   score::Score,
 };
 
+/// For move generation, the number of bits to use per-tile (for counting
+/// adjacencies).
+const TILE_BITS: usize = 2;
+const TILE_MASK: u64 = (1u64 << TILE_BITS) - 1;
+
+/// The minimum number of neighbors each pawn must have.
+const MIN_NEIGHBORS_PER_PAWN: u64 = 2;
+
+const fn adjacency_count_size(n: usize) -> usize {
+  (n * n * TILE_BITS + 63) / 64
+}
+
+#[macro_export]
+macro_rules! onoro_type {
+  ($n:literal) => {
+    Onoro<$n, { $n * $n }, { adjacency_count_size($n) }>
+  };
+}
+
+pub type Onoro8 = onoro_type!(8);
+pub type Onoro16 = onoro_type!(16);
+
 #[derive(Debug, PartialEq, Eq)]
 pub enum TileState {
   Empty,
@@ -24,12 +46,12 @@ pub enum TileState {
 
 /// An Onoro game state with `N / 2` pawns per player.
 ///
-/// Note: both `N`, the total number of pawns in the game, and `N2`, the square
-/// of `N`, must be provided. This is due to a limitation in the rust compiler,
-/// generic const expressions are still experimental. See:
-/// https://github.com/rust-lang/rust/issues/76560.
+/// Note: All of `N`, the total number of pawns in the game, `N2`, the square of
+/// `N`, and `ADJ_CNT_SIZE`, which depends on `N`, must be provided. This is due
+/// to a limitation in the rust compiler, generic const expressions are still
+/// experimental. See: https://github.com/rust-lang/rust/issues/76560.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Onoro<const N: usize, const N2: usize> {
+pub struct Onoro<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> {
   /// Array of indexes of pawn positions. Odd entries (even index) are black
   /// pawns, the others are white. Filled from lowest to highest index as the
   /// first phase proceeds.
@@ -40,7 +62,7 @@ pub struct Onoro<const N: usize, const N2: usize> {
   hash: u64,
 }
 
-impl<const N: usize, const N2: usize> Onoro<N, N2> {
+impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Onoro<N, N2, ADJ_CNT_SIZE> {
   /// Don't publicly expose the constructor, since it produces an invalid board
   /// state. Any constructor returning an owned instance of `Onoro` _must_ make
   /// at least one move after initializing an `Onoro` with this function.
@@ -99,7 +121,7 @@ impl<const N: usize, const N2: usize> Onoro<N, N2> {
     self.onoro_state().turn() + 1
   }
 
-  pub fn pawns<'a>(&'a self) -> PawnIterator<'a, N, N2> {
+  pub fn pawns(&self) -> PawnIterator<'_, N, N2, ADJ_CNT_SIZE> {
     PawnIterator {
       onoro: self,
       pawn_idx: 0,
@@ -107,7 +129,7 @@ impl<const N: usize, const N2: usize> Onoro<N, N2> {
     }
   }
 
-  pub fn color_pawns<'a>(&'a self, color: PawnColor) -> PawnIterator<'a, N, N2> {
+  pub fn color_pawns(&self, color: PawnColor) -> PawnIterator<'_, N, N2, ADJ_CNT_SIZE> {
     PawnIterator {
       onoro: self,
       pawn_idx: match color {
@@ -183,11 +205,14 @@ impl<const N: usize, const N2: usize> Onoro<N, N2> {
   }
 
   /// Iterates over all available moves, calling `callback` with each move
-  /// passed as the first parameter, and a reference to the current `Onoro` as
-  /// the second.
-  pub fn for_each_move<F>(&self, callback: F)
+  /// passed to the callback.
+  ///
+  /// If the callback returns false, move iteration stops and `for_each_move`
+  /// returns false. If all moves were iterated over and `callback` never
+  /// returned false, then `for_each_move` returns true.
+  pub fn for_each_move<F>(&self, callback: F) -> bool
   where
-    F: FnMut(Move, &Self) -> (),
+    F: FnMut(Move) -> bool,
   {
     if self.in_phase1() {
       self.for_each_move_p1(callback)
@@ -196,17 +221,51 @@ impl<const N: usize, const N2: usize> Onoro<N, N2> {
     }
   }
 
-  fn for_each_move_p1<F>(&self, callback: F)
+  fn for_each_move_p1<F>(&self, mut callback: F) -> bool
   where
-    F: FnMut(Move, &Self) -> (),
+    F: FnMut(Move) -> bool,
   {
-    todo!();
+    debug_assert!(self.in_phase1());
+
+    // Bitvector of 2-bit numbers per tile in the whole game board. Each number
+    // is the number of neighbors a pawn has, capping out at 2.
+    let mut tmp_board = [0u64; ADJ_CNT_SIZE];
+
+    for p in self.pawns() {
+      for neighbor in HexPos::from(p.pos).each_neighbor() {
+        if self.get_tile(neighbor.into()) != TileState::Empty {
+          continue;
+        }
+
+        let ord = Self::hex_pos_ord(&neighbor);
+        let tb_shift = TILE_BITS * (ord % (64 / TILE_BITS));
+        let tbb = tmp_board[ord / (64 / TILE_BITS)];
+        let mask = TILE_MASK << tb_shift;
+        let full_mask = MIN_NEIGHBORS_PER_PAWN << tb_shift;
+
+        if (tbb & mask) != full_mask {
+          let tbb = tbb + (1u64 << tb_shift);
+          tmp_board[ord / (64 / TILE_BITS)] = tbb;
+
+          if (tbb & mask) == full_mask
+            && !callback(Move::Phase1Move {
+              to: neighbor.into(),
+            })
+          {
+            return false;
+          }
+        }
+      }
+    }
+
+    true
   }
 
-  fn for_each_move_p2<F>(&self, callback: F)
+  fn for_each_move_p2<F>(&self, callback: F) -> bool
   where
-    F: FnMut(Move, &Self) -> (),
+    F: FnMut(Move) -> bool,
   {
+    debug_assert!(!self.in_phase1());
     todo!();
   }
 
@@ -348,7 +407,7 @@ impl<const N: usize, const N2: usize> Onoro<N, N2> {
     let mask = broadcast_u8_to_u64(unsafe { idx.bytes() });
 
     for i in 0..N / 8 {
-      let xor_search = mask ^ unsafe { *pawn_poses_ptr.offset(i as isize) };
+      let xor_search = mask ^ unsafe { *pawn_poses_ptr.add(i) };
 
       let zero_mask =
         (xor_search.wrapping_sub(0x0101010101010101u64)) & !xor_search & 0x8080808080808080u64;
@@ -375,7 +434,7 @@ impl<const N: usize, const N2: usize> Onoro<N, N2> {
       }
     }
 
-    return TileState::Empty;
+    TileState::Empty
   }
 
   pub fn validate(&self) -> OnoroResult<()> {
@@ -483,12 +542,14 @@ impl<const N: usize, const N2: usize> Onoro<N, N2> {
   }
 }
 
-impl<const N: usize, const N2: usize> Display for Onoro<N, N2> {
+impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Display
+  for Onoro<N, N2, ADJ_CNT_SIZE>
+{
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     if self.onoro_state().black_turn() {
-      write!(f, "black:\n")?;
+      writeln!(f, "black:")?;
     } else {
-      write!(f, "white:\n")?;
+      writeln!(f, "white:")?;
     }
 
     for y in (0..Self::board_width()).rev() {
@@ -510,7 +571,7 @@ impl<const N: usize, const N2: usize> Display for Onoro<N, N2> {
       }
 
       if y > 0 {
-        write!(f, "\n")?;
+        writeln!(f)?;
       }
     }
 
@@ -544,15 +605,17 @@ impl Display for Pawn {
   }
 }
 
-pub struct PawnIterator<'a, const N: usize, const N2: usize> {
-  onoro: &'a Onoro<N, N2>,
+pub struct PawnIterator<'a, const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> {
+  onoro: &'a Onoro<N, N2, ADJ_CNT_SIZE>,
   pawn_idx: usize,
   /// If true, only iterates over pawns of one color, otherwise iterating over
   /// all pawns.
   one_color: bool,
 }
 
-impl<'a, const N: usize, const N2: usize> Iterator for PawnIterator<'a, N, N2> {
+impl<'a, const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Iterator
+  for PawnIterator<'a, N, N2, ADJ_CNT_SIZE>
+{
   type Item = Pawn;
 
   fn next(&mut self) -> Option<Self::Item> {
@@ -576,11 +639,10 @@ impl<'a, const N: usize, const N2: usize> Iterator for PawnIterator<'a, N, N2> {
 
 #[cfg(test)]
 mod tests {
-  use crate::{game::packed_idx::PackedIdx, Onoro};
+  use crate::{game::packed_idx::PackedIdx, Onoro8};
 
   #[test]
   fn test_get_tile() {
-    type Onoro8 = Onoro<8>;
     let onoro = Onoro8::default_start();
 
     for y in 0..Onoro8::board_width() {
