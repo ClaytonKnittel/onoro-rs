@@ -19,6 +19,14 @@ fn random_move(onoro: &Onoro16) -> Move {
   moves[n].clone()
 }
 
+fn to_phase2(onoro: &mut Onoro16) {
+  while onoro.in_phase1() {
+    println!("{onoro}");
+    let m = random_move(onoro);
+    onoro.make_move(m);
+  }
+}
+
 fn explore(onoro: &Onoro16, depth: u32) -> u64 {
   let mut total_states = 1;
 
@@ -36,7 +44,7 @@ fn explore(onoro: &Onoro16, depth: u32) -> u64 {
 }
 
 fn main() {
-  let game = Onoro16::default_start();
+  let mut game = Onoro16::default_start();
 
   // println!("size of game state: {}", std::mem::size_of::<Onoro16>());
 
@@ -48,15 +56,21 @@ fn main() {
   //   .build()
   //   .unwrap();
 
-  let start = Instant::now();
-  let num_states = explore(&game, 10);
-  let end = Instant::now();
+  // to_phase2(&mut game);
 
-  println!("Explored {} game states in {:?}", num_states, end - start);
-  println!(
-    "{} states/sec",
-    num_states as f64 / (end - start).as_secs_f64()
-  );
+  // for m in game.each_p2_move() {
+  //   println!("{m}");
+  // }
+
+  // let start = Instant::now();
+  // let num_states = explore(&game, 10);
+  // let end = Instant::now();
+
+  // println!("Explored {} game states in {:?}", num_states, end - start);
+  // println!(
+  //   "{} states/sec",
+  //   num_states as f64 / (end - start).as_secs_f64()
+  // );
 
   // for _ in 0..1000000 {
   //   let mut g = game.clone();
