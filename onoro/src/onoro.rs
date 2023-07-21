@@ -287,12 +287,14 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Onoro<N, N2, AD
   fn set_tile(&mut self, i: usize, pos: PackedIdx) {
     let mut com_offset: HexPosOffset = pos.into();
 
-    let prev_idx = self.pawn_poses[i];
+    let prev_idx = unsafe { *self.pawn_poses.get_unchecked(i) };
     if prev_idx != PackedIdx::null() {
       com_offset -= prev_idx.into();
     }
 
-    self.pawn_poses[i] = pos;
+    unsafe {
+      *self.pawn_poses.get_unchecked_mut(i) = pos;
+    }
     // The amount to shift the whole board by. This will keep pawns off the
     // outer perimeter.
     let shift = Self::calc_move_shift(&pos);
@@ -360,7 +362,7 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Onoro<N, N2, AD
       .skip(self.onoro_state().black_turn() as usize)
       .step_by(2)
     {
-      let pos: HexPos = self.pawn_poses[i].into();
+      let pos: HexPos = unsafe { *self.pawn_poses.get_unchecked(i) }.into();
       let delta = pos - last_move;
       let dx = delta.x();
       let dy = delta.y();
@@ -378,8 +380,6 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Onoro<N, N2, AD
 
   /// Given a position on the board, returns the tile state of that position,
   /// i.e. the color of the piece on that tile, or `Empty` if no piece is there.
-  ///
-  /// TODO: perf benchmark this against `get_tile`.
   #[cfg(test)]
   fn get_tile_slow(&self, idx: PackedIdx) -> TileState {
     if idx == PackedIdx::null() {
@@ -435,7 +435,7 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Onoro<N, N2, AD
 
     // only necessary if NPawns not a multiple of eight
     for i in 8 * (N / 8)..N {
-      if self.pawn_poses[i] == idx {
+      if unsafe { *self.pawn_poses.get_unchecked(i) } == idx {
         if i % 2 == 0 {
           return TileState::Black;
         } else {
@@ -634,7 +634,7 @@ impl<'a, const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Iterator
     }
 
     let pawn = Pawn {
-      pos: self.onoro.pawn_poses[self.pawn_idx],
+      pos: unsafe { *self.onoro.pawn_poses.get_unchecked(self.pawn_idx) },
       color: if self.pawn_idx % 2 == 0 {
         PawnColor::Black
       } else {
@@ -671,13 +671,15 @@ impl<'a, const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Iterator
 
         let ord = Onoro::<N, N2, ADJ_CNT_SIZE>::hex_pos_ord(&neighbor);
         let tb_shift = TILE_BITS * (ord % (64 / TILE_BITS));
-        let tbb = self.tmp_board[ord / (64 / TILE_BITS)];
+        let tbb = unsafe { *self.tmp_board.get_unchecked(ord / (64 / TILE_BITS)) };
         let mask = TILE_MASK << tb_shift;
         let full_mask = MIN_NEIGHBORS_PER_PAWN << tb_shift;
 
         if (tbb & mask) != full_mask {
           let tbb = tbb + (1u64 << tb_shift);
-          self.tmp_board[ord / (64 / TILE_BITS)] = tbb;
+          unsafe {
+            *self.tmp_board.get_unchecked_mut(ord / (64 / TILE_BITS)) = tbb;
+          }
 
           if (tbb & mask) == full_mask {
             return Some(Move::Phase1Move {

@@ -7,4 +7,11 @@ edition = "2021"
 
 [dependencies]
 onoro = { path = "./onoro" }
+pprof = { version = "0.11", features = ["flamegraph"] }
 rand = "0.8"
+
+[profile.release]
+opt-level = 3
+debug-assertions = false
+overflow-checks = false
+lto = "fat"
