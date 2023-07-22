@@ -11,6 +11,14 @@ fn validate_moves(onoro: &Onoro16) {
   assert!(move_iter.next().is_none());
 }
 
+fn first_move(onoro: &Onoro16) -> Move {
+  onoro.each_p1_move().next().unwrap()
+}
+
+fn nth_move(onoro: &Onoro16, idx: usize) -> Move {
+  onoro.each_p2_move().nth(idx).unwrap()
+}
+
 fn random_move(onoro: &Onoro16) -> Move {
   let moves = onoro.each_p1_move().collect::<Vec<_>>();
 
@@ -21,9 +29,14 @@ fn random_move(onoro: &Onoro16) -> Move {
 
 fn to_phase2(onoro: &mut Onoro16) {
   while onoro.in_phase1() {
-    println!("{onoro}");
-    let m = random_move(onoro);
-    onoro.make_move(m);
+    for m in onoro.each_p1_move() {
+      let mut o2 = onoro.clone();
+      o2.make_move(m.clone());
+      if o2.finished().is_none() {
+        onoro.make_move(m);
+        break;
+      }
+    }
   }
 }
 
@@ -38,6 +51,22 @@ fn explore(onoro: &Onoro16, depth: u32) -> u64 {
     let mut onoro2 = onoro.clone();
     onoro2.make_move(m);
     total_states += explore(&onoro2, depth - 1);
+  }
+
+  total_states
+}
+
+fn explore_p2(onoro: &Onoro16, depth: u32) -> u64 {
+  let mut total_states = 1;
+
+  if onoro.finished().is_some() || depth == 0 {
+    return total_states;
+  }
+
+  for m in onoro.each_p2_move() {
+    let mut onoro2 = onoro.clone();
+    onoro2.make_move(m);
+    total_states += explore_p2(&onoro2, depth - 1);
   }
 
   total_states
@@ -58,32 +87,15 @@ fn main() {
 
   to_phase2(&mut game);
 
-  for m in game.each_p2_move() {
-    println!("{m}");
-  }
+  let start = Instant::now();
+  let num_states = explore_p2(&game, 5);
+  let end = Instant::now();
 
-  // let start = Instant::now();
-  // let num_states = explore(&game, 10);
-  // let end = Instant::now();
-
-  // println!("Explored {} game states in {:?}", num_states, end - start);
-  // println!(
-  //   "{} states/sec",
-  //   num_states as f64 / (end - start).as_secs_f64()
-  // );
-
-  // for _ in 0..1000000 {
-  //   let mut g = game.clone();
-  //   for _ in 0..13 {
-  //     let m = random_move(&g);
-  //     g.make_move(m);
-  //     // if g.in_phase1() {
-  //     //   validate_moves(&g);
-  //     // }
-  //     // g.validate().unwrap();
-  //   }
-  //   // println!("{g}");
-  // }
+  println!("Explored {} game states in {:?}", num_states, end - start);
+  println!(
+    "{} states/sec",
+    num_states as f64 / (end - start).as_secs_f64()
+  );
 
   // if let Ok(report) = guard.report().build() {
   //   let file = std::fs::File::create("flamegraph.svg").unwrap();

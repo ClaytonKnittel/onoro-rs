@@ -195,8 +195,8 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Onoro<N, N2, AD
         self.place_pawn(pawn_idx, to);
       }
       Move::Phase2Move { to, from_idx } => {
-        self.move_pawn(from_idx as usize, to);
         self.mut_onoro_state().swap_player_turn();
+        self.move_pawn(from_idx as usize, to);
       }
     }
   }
@@ -429,6 +429,17 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Onoro<N, N2, AD
     for pawn in self.pawns() {
       sum_of_mass += pawn.pos.into();
 
+      if pawn.pos.x() == 0
+        || pawn.pos.x() >= N as u32 - 1
+        || pawn.pos.y() == 0
+        || pawn.pos.y() >= N as u32 - 1
+      {
+        return Err(make_onoro_error!(
+          "Pawn with coordinates on border of board: {}",
+          pawn
+        ));
+      }
+
       match pawn.color {
         PawnColor::Black => {
           n_b_pawns += 1;
@@ -487,7 +498,7 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Onoro<N, N2, AD
 
     if n_b_pawns
       != n_w_pawns
-        + if self.onoro_state().black_turn() {
+        + if !self.in_phase1() || self.onoro_state().black_turn() {
           0
         } else {
           1
