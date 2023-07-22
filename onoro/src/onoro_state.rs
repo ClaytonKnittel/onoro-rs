@@ -1,11 +1,13 @@
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct OnoroState {
   /// Layout of data:
+  /// ```text
   /// [0..3]: turn
   /// [4]: black's turn?
   /// [5]: finished?
   /// [6]: hashed?
   /// [7]: unused
+  /// ```
   ///
   /// Note: you can play this game with a max of 8 pawns, and turn count stops
   /// incrementing after the end of phase 1. This allows us to only use 4 bits
