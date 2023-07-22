@@ -1,10 +1,7 @@
 #[derive(Clone, Copy)]
 struct Node {
   /// The index of parent of this node (self if root).
-  parent: usize,
-  /// Size of the tree under this element if this is a root, otherwise this
-  /// value is 0.
-  size: usize,
+  parent: u8,
 }
 
 pub struct ConstUnionFind<const N: usize> {
@@ -14,13 +11,12 @@ pub struct ConstUnionFind<const N: usize> {
 
 impl<const N: usize> ConstUnionFind<N> {
   pub fn new() -> Self {
-    let mut elements = [Node { parent: 0, size: 0 }; N];
-    elements.iter_mut().enumerate().for_each(|(idx, node)| {
-      *node = Node {
-        parent: idx,
-        size: 1,
-      }
-    });
+    debug_assert!(N <= 256);
+    let mut elements = [Node { parent: 0 }; N];
+    elements
+      .iter_mut()
+      .enumerate()
+      .for_each(|(idx, node)| *node = Node { parent: idx as u8 });
 
     Self {
       unique_sets: N,
@@ -32,19 +28,27 @@ impl<const N: usize> ConstUnionFind<N> {
     self.unique_sets
   }
 
+  fn get_node(&self, node_id: usize) -> Node {
+    debug_assert!(node_id < N);
+    unsafe { *self.elements.get_unchecked(node_id) }
+  }
+
   /// Gives id of the root of tree that node is in.
   pub fn find(&mut self, mut node_id: usize) -> usize {
-    let mut node = self.elements[node_id];
+    debug_assert!(node_id < N);
+    let mut node = self.get_node(node_id);
 
-    while node.parent != node_id {
-      let parent = self.elements[node.parent];
+    while node.parent as usize != node_id {
+      let parent = self.get_node(node.parent as usize);
       // Slowly compress tree by assigning node's parent to its grandparent.
-      self.elements[node_id].parent = parent.parent;
+      unsafe {
+        self.elements.get_unchecked_mut(node_id).parent = parent.parent;
+      }
 
       // Next look at the former parent of node, rather than skipping to it's
       // new parent. This will cause a long chain of nodes to be compressed into
       // two equally-sized trees.
-      node_id = node.parent;
+      node_id = node.parent as usize;
       node = parent;
     }
 
@@ -54,21 +58,12 @@ impl<const N: usize> ConstUnionFind<N> {
   /// Unions the two sets that a and b are in (noop if are already in the same
   /// set), returning the new set index of the two nodes.
   pub fn union(&mut self, a_id: usize, b_id: usize) -> usize {
-    let mut a_root_id = self.find(a_id);
+    let a_root_id = self.find(a_id);
     let b_root_id = self.find(b_id);
 
     if a_root_id != b_root_id {
-      let a_root = self.elements[a_root_id];
-      let b_root = self.elements[b_root_id];
-
-      // Attach smaller tree to larger tree.
-      if a_root.size < b_root.size {
-        self.elements[b_root_id].size += a_root.size;
-        self.elements[a_root_id].parent = b_root_id;
-        a_root_id = b_root_id;
-      } else {
-        self.elements[a_root_id].size += b_root.size;
-        self.elements[b_root_id].parent = a_root_id;
+      unsafe {
+        self.elements.get_unchecked_mut(b_root_id).parent = a_root_id as u8;
       }
 
       // Two sets have joined, reducing the number of unique sets by one.
