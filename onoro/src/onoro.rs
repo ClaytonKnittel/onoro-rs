@@ -59,7 +59,6 @@ pub struct Onoro<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> {
   score: PackedScore<OnoroState>,
   // Sum of all HexPos's of pieces on the board
   sum_of_mass: PackedHexPos,
-  hash: u64,
 }
 
 impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Onoro<N, N2, ADJ_CNT_SIZE> {
@@ -71,7 +70,6 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Onoro<N, N2, AD
       pawn_poses: [PackedIdx::null(); N],
       score: PackedScore::new(Score::tie(0), OnoroState::new()),
       sum_of_mass: HexPos::zero().into(),
-      hash: 0,
     }
   }
 
@@ -240,7 +238,6 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Onoro<N, N2, AD
     }
 
     self.sum_of_mass = (HexPos::from(self.sum_of_mass) + pos.into()).into();
-    self.mut_onoro_state().set_hashed(false);
     self.adjust_to_new_pawn_and_check_win(pos);
   }
 
@@ -261,7 +258,6 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Onoro<N, N2, AD
     }
 
     self.sum_of_mass = (HexPos::from(self.sum_of_mass) + com_offset).into();
-    self.mut_onoro_state().set_hashed(false);
     self.adjust_to_new_pawn_and_check_win(pos);
   }
 
