@@ -1,6 +1,8 @@
 use crate::{
   groups::{SymmetryClass, D6},
+  hex_pos::HexPos,
   util::{max_u32, min_u32, unreachable},
+  Onoro,
 };
 
 use super::hex_pos::HexPosOffset;
@@ -12,17 +14,17 @@ pub struct BoardSymmetryState {
   /// The group operation to perform on the board before calculating the hash.
   /// This is used to align board states on all symmetry axes which the board
   /// isn't possibly symmetric about itself.
-  op: D6,
+  pub op: D6,
 
   /// The symmetry class this board state belongs in, which depends on where the
   /// center of mass lies. If the location of the center of mass is symmetric to
   /// itself under some group operations, then those symmetries must be checked
   /// when looking up in the hash table.
-  symm_class: SymmetryClass,
+  pub symm_class: SymmetryClass,
 
   /// The offset to apply when calculating the integer-coordinate, symmetry
   /// invariant "center of mass"
-  center_offset: HexPosOffset,
+  pub center_offset: HexPosOffset,
 }
 
 impl BoardSymmetryState {
@@ -147,7 +149,7 @@ const fn symm_state_op(x: u32, y: u32, n_pawns: u32) -> D6 {
 /// `n_pawns` is the number of pawns currently in play.
 ///
 /// (x, y) are elements of {0, 1, ... n_pawns-1} x {0, 1, ... n_pawns-1}
-const fn symm_state_class(x: u32, y: u32, n_pawns: u32) -> SymmetryClass {
+pub const fn symm_state_class(x: u32, y: u32, n_pawns: u32) -> SymmetryClass {
   // (x2, y2) is (x, y) folded across the line y = x
   let x2 = max_u32(x, y);
   let y2 = min_u32(x, y);
@@ -297,4 +299,27 @@ pub const fn gen_symm_state_table<const N: usize, const N2: usize>() -> [BoardSy
   }
 
   table
+}
+
+pub fn board_symm_state<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize>(
+  onoro: &Onoro<N, N2, ADJ_CNT_SIZE>,
+) -> BoardSymmetryState {
+  let sum_of_mass = onoro.sum_of_mass();
+  let pawns_in_play = onoro.pawns_in_play();
+
+  // TODO: use table for pawns_in_play == N
+  // if pawns_in_play == N as u32 { ... }
+
+  let x = sum_of_mass.x() as u32 % (N as u32);
+  let y = sum_of_mass.y() as u32 % (N as u32);
+
+  let op = symm_state_op(x, y, pawns_in_play);
+  let symm_class = symm_state_class(x, y, pawns_in_play);
+  let center_offset = com_offset_to_hex_pos(board_symm_state_op_to_com_offset(&op));
+
+  BoardSymmetryState {
+    op,
+    symm_class,
+    center_offset,
+  }
 }

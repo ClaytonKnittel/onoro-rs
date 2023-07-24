@@ -3,7 +3,7 @@ use algebra::{
   group::{Cyclic, Dihedral},
 };
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SymmetryClass {
   /// Center of mass lies in the center of a hexagonal tile.
   C,

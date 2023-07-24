@@ -2,7 +2,12 @@ use std::{cmp, fmt::Display};
 
 use union_find::ConstUnionFind;
 
-use crate::{make_onoro_error, util::broadcast_u8_to_u64};
+use crate::{
+  canonicalize::{symm_state_class, BoardSymmetryState},
+  groups::SymmetryClass,
+  make_onoro_error,
+  util::broadcast_u8_to_u64,
+};
 
 use super::{
   error::{OnoroError, OnoroResult},
@@ -17,25 +22,11 @@ use super::{
 
 /// For move generation, the number of bits to use per-tile (for counting
 /// adjacencies).
-const TILE_BITS: usize = 2;
+pub(crate) const TILE_BITS: usize = 2;
 const TILE_MASK: u64 = (1u64 << TILE_BITS) - 1;
 
 /// The minimum number of neighbors each pawn must have.
 const MIN_NEIGHBORS_PER_PAWN: u64 = 2;
-
-const fn adjacency_count_size(n: usize) -> usize {
-  (n * n * TILE_BITS + 63) / 64
-}
-
-#[macro_export]
-macro_rules! onoro_type {
-  ($n:literal) => {
-    Onoro<$n, { $n * $n }, { adjacency_count_size($n) }>
-  };
-}
-
-pub type Onoro8 = onoro_type!(8);
-pub type Onoro16 = onoro_type!(16);
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum TileState {
@@ -157,6 +148,20 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Onoro<N, N2, AD
     } else {
       PawnColor::White
     }
+  }
+
+  pub fn sum_of_mass(&self) -> PackedHexPos {
+    self.sum_of_mass
+  }
+
+  /// Returns the origin tile, which all group operations operate with respect
+  /// to. This is orientation-invariant, meaning for any symmetry of this board
+  /// state, the same origin tile will be chosen.
+  pub fn origin(&self, symm_state: &BoardSymmetryState) -> HexPos {
+    let x = self.sum_of_mass.x() as u32;
+    let y = self.sum_of_mass.y() as u32;
+    let truncated_com = HexPos::new(x / self.pawns_in_play(), y / self.pawns_in_play());
+    truncated_com + symm_state.center_offset
   }
 
   /// Returns the width of the game board. This is also the upper bound on the
@@ -935,9 +940,7 @@ impl<'a, const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Iterator
 
 #[cfg(test)]
 mod tests {
-  use crate::packed_idx::PackedIdx;
-
-  use super::Onoro8;
+  use crate::{onoro_defs::Onoro8, packed_idx::PackedIdx};
 
   #[test]
   fn test_get_tile() {
