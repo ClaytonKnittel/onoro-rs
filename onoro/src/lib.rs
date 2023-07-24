@@ -15,4 +15,5 @@ mod tile_hash;
 mod util;
 
 pub use onoro::*;
+pub use onoro_defs::*;
 pub use r#move::*;
