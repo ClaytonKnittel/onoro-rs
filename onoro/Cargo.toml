@@ -7,5 +7,6 @@ edition = "2021"
 
 [dependencies]
 algebra = { path = "../algebra" }
+const-random = "0.1"
 rand = "0.8"
 union_find = { path = "../union_find" }

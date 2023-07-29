@@ -26,11 +26,15 @@ where
     }
   }
 
-  pub fn color_swap(&mut self) {
+  pub fn cur_player_hash(&self) -> u64 {
+    self.hash
+  }
+
+  pub fn other_player_hash(&self) -> u64 {
     let hl = self.hash & 0x5555_5555_5555_5555;
     let hr = self.hash & 0xaaaa_aaaa_aaaa_aaaa;
 
-    self.hash = (hl << 1) | (hr >> 1);
+    (hl << 1) | (hr >> 1)
   }
 }
 

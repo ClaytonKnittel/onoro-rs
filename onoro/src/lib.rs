@@ -1,6 +1,7 @@
 mod canonicalize;
 mod error;
 mod groups;
+mod hash;
 mod hex_pos;
 mod r#move;
 mod onoro;

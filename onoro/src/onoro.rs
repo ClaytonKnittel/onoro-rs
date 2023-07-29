@@ -2,12 +2,7 @@ use std::{cmp, fmt::Display};
 
 use union_find::ConstUnionFind;
 
-use crate::{
-  canonicalize::{symm_state_class, BoardSymmetryState},
-  groups::SymmetryClass,
-  make_onoro_error,
-  util::broadcast_u8_to_u64,
-};
+use crate::{canonicalize::BoardSymmetryState, make_onoro_error, util::broadcast_u8_to_u64};
 
 use super::{
   error::{OnoroError, OnoroResult},
