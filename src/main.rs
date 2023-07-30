@@ -85,17 +85,17 @@ fn main() {
   //   .build()
   //   .unwrap();
 
-  to_phase2(&mut game);
+  // to_phase2(&mut game);
 
-  let start = Instant::now();
-  let num_states = explore_p2(&game, 5);
-  let end = Instant::now();
+  // let start = Instant::now();
+  // let num_states = explore_p2(&game, 5);
+  // let end = Instant::now();
 
-  println!("Explored {} game states in {:?}", num_states, end - start);
-  println!(
-    "{} states/sec",
-    num_states as f64 / (end - start).as_secs_f64()
-  );
+  // println!("Explored {} game states in {:?}", num_states, end - start);
+  // println!(
+  //   "{} states/sec",
+  //   num_states as f64 / (end - start).as_secs_f64()
+  // );
 
   // if let Ok(report) = guard.report().build() {
   //   let file = std::fs::File::create("flamegraph.svg").unwrap();

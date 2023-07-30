@@ -14,6 +14,15 @@ impl<const N: u16> Dihedral<N> {
   pub const fn const_identity() -> Self {
     Self::Rot(0)
   }
+
+  pub const fn const_op(&self, rhs: &Self) -> Self {
+    match (*self, *rhs) {
+      (Self::Rot(i), Self::Rot(j)) => Self::Rot((i + j) % N),
+      (Self::Rot(i), Self::Rfl(j)) => Self::Rfl((i + j) % N),
+      (Self::Rfl(i), Self::Rot(j)) => Self::Rfl((N + i - j) % N),
+      (Self::Rfl(i), Self::Rfl(j)) => Self::Rot((N + i - j) % N),
+    }
+  }
 }
 
 impl<const N: u16> Finite for Dihedral<N> {
@@ -38,13 +47,8 @@ impl<const N: u16> Ordinal for Dihedral<N> {
 }
 
 impl<const N: u16> Semigroup for Dihedral<N> {
-  fn op(&self, other: &Self) -> Self {
-    match (self, other) {
-      (Self::Rot(i), Self::Rot(j)) => Self::Rot((i + j) % N),
-      (Self::Rot(i), Self::Rfl(j)) => Self::Rfl((i + j) % N),
-      (Self::Rfl(i), Self::Rot(j)) => Self::Rfl((N + i - j) % N),
-      (Self::Rfl(i), Self::Rfl(j)) => Self::Rot((N + i - j) % N),
-    }
+  fn op(&self, rhs: &Self) -> Self {
+    self.const_op(rhs)
   }
 }
 
@@ -77,7 +81,7 @@ mod test {
   use super::*;
 
   fn for_each<const N: u16>() -> impl Iterator<Item = Dihedral<N>> {
-    (0..(Dihedral::<N>::size())).map(|i| Dihedral::<N>::from_ord(i))
+    (0..(Dihedral::<N>::size())).map(Dihedral::<N>::from_ord)
   }
 
   fn permute_all<const N: u16>() {

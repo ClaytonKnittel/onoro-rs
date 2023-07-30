@@ -2,7 +2,10 @@ use std::{cmp, fmt::Display};
 
 use union_find::ConstUnionFind;
 
-use crate::{canonicalize::BoardSymmetryState, make_onoro_error, util::broadcast_u8_to_u64};
+use crate::{
+  canonicalize::BoardSymmetryState, groups::D6, hash::HashTable, make_onoro_error,
+  util::broadcast_u8_to_u64,
+};
 
 use super::{
   error::{OnoroError, OnoroResult},
@@ -60,6 +63,9 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Onoro<N, N2, AD
   }
 
   pub fn default_start() -> Self {
+    const tbl: HashTable<1, 1, D6> = HashTable::new_c();
+    println!("Table:\n{tbl:?}");
+
     let mid_idx = ((Self::board_width() - 1) / 2) as u32;
     let mut game = Self::new();
     unsafe {

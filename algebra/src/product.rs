@@ -1,6 +1,12 @@
 use std::fmt::Display;
 
-use crate::{finite::Finite, group::Group, monoid::Monoid, ordinal::Ordinal, semigroup::Semigroup};
+use crate::{
+  finite::Finite,
+  group::{Cyclic, Group},
+  monoid::Monoid,
+  ordinal::Ordinal,
+  semigroup::Semigroup,
+};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct DirectProduct<L, R> {
@@ -19,6 +25,15 @@ impl<L, R> DirectProduct<L, R> {
 
   pub const fn right(&self) -> &R {
     &self.right
+  }
+}
+
+impl DirectProduct<Cyclic<2>, Cyclic<2>> {
+  pub const fn const_op(&self, rhs: &Self) -> Self {
+    Self {
+      left: self.left.const_op(&rhs.left),
+      right: self.right.const_op(&rhs.right),
+    }
   }
 }
 

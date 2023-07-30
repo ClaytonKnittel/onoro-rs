@@ -5,6 +5,12 @@ use crate::{finite::Finite, group::Group, monoid::Monoid, ordinal::Ordinal, semi
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Cyclic<const N: u16>(pub u16);
 
+impl<const N: u16> Cyclic<N> {
+  pub const fn const_op(&self, rhs: &Self) -> Self {
+    Self((self.0 + rhs.0) % N)
+  }
+}
+
 impl<const N: u16> Finite for Cyclic<N> {
   const SIZE: usize = N as usize;
 }
@@ -20,8 +26,8 @@ impl<const N: u16> Ordinal for Cyclic<N> {
 }
 
 impl<const N: u16> Semigroup for Cyclic<N> {
-  fn op(&self, other: &Self) -> Self {
-    Self((self.0 + other.0) % N)
+  fn op(&self, rhs: &Self) -> Self {
+    self.const_op(rhs)
   }
 }
 

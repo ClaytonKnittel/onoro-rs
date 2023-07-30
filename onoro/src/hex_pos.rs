@@ -55,6 +55,38 @@ impl HexPos {
     ]
     .into_iter()
   }
+
+  pub const fn clone_const(&self) -> Self {
+    Self {
+      x: self.x,
+      y: self.y,
+    }
+  }
+
+  pub const fn eq_cnst(&self, rhs: &Self) -> bool {
+    self.x == rhs.x && self.y == rhs.y
+  }
+
+  pub const fn add_offset(&self, rhs: &HexPosOffset) -> Self {
+    Self {
+      x: (self.x as i32 + rhs.x) as u32,
+      y: (self.y as i32 + rhs.y) as u32,
+    }
+  }
+
+  pub const fn sub_hex(&self, rhs: &Self) -> HexPosOffset {
+    HexPosOffset {
+      x: self.x as i32 - rhs.x as i32,
+      y: self.y as i32 - rhs.y as i32,
+    }
+  }
+
+  pub const fn sub_offset(&self, rhs: &HexPosOffset) -> Self {
+    Self {
+      x: (self.x as i32 - rhs.x) as u32,
+      y: (self.y as i32 - rhs.y) as u32,
+    }
+  }
 }
 
 impl From<PackedHexPos> for HexPos {
@@ -79,10 +111,7 @@ impl std::ops::Add<HexPosOffset> for HexPos {
   type Output = Self;
 
   fn add(self, rhs: HexPosOffset) -> Self::Output {
-    Self {
-      x: (self.x as i32 + rhs.x) as u32,
-      y: (self.y as i32 + rhs.y) as u32,
-    }
+    self.add_offset(&rhs)
   }
 }
 
@@ -90,17 +119,13 @@ impl std::ops::Add<&HexPosOffset> for &HexPos {
   type Output = HexPos;
 
   fn add(self, rhs: &HexPosOffset) -> Self::Output {
-    HexPos {
-      x: (self.x as i32 + rhs.x) as u32,
-      y: (self.y as i32 + rhs.y) as u32,
-    }
+    self.add_offset(rhs)
   }
 }
 
 impl std::ops::AddAssign<HexPosOffset> for HexPos {
   fn add_assign(&mut self, rhs: HexPosOffset) {
-    self.x = (self.x as i32 + rhs.x) as u32;
-    self.y = (self.y as i32 + rhs.y) as u32;
+    *self = self.add_offset(&rhs);
   }
 }
 
@@ -108,10 +133,7 @@ impl std::ops::Sub for HexPos {
   type Output = HexPosOffset;
 
   fn sub(self, rhs: Self) -> Self::Output {
-    HexPosOffset {
-      x: self.x as i32 - rhs.x as i32,
-      y: self.y as i32 - rhs.y as i32,
-    }
+    self.sub_hex(&rhs)
   }
 }
 
@@ -119,10 +141,7 @@ impl std::ops::Sub for &HexPos {
   type Output = HexPosOffset;
 
   fn sub(self, rhs: Self) -> Self::Output {
-    HexPosOffset {
-      x: self.x as i32 - rhs.x as i32,
-      y: self.y as i32 - rhs.y as i32,
-    }
+    self.sub_hex(rhs)
   }
 }
 
@@ -130,10 +149,7 @@ impl std::ops::Sub<HexPosOffset> for HexPos {
   type Output = HexPos;
 
   fn sub(self, rhs: HexPosOffset) -> Self::Output {
-    Self {
-      x: (self.x as i32 - rhs.x) as u32,
-      y: (self.y as i32 - rhs.y) as u32,
-    }
+    self.sub_offset(&rhs)
   }
 }
 
@@ -141,17 +157,13 @@ impl std::ops::Sub<&HexPosOffset> for &HexPos {
   type Output = HexPos;
 
   fn sub(self, rhs: &HexPosOffset) -> Self::Output {
-    HexPos {
-      x: (self.x as i32 - rhs.x) as u32,
-      y: (self.y as i32 - rhs.y) as u32,
-    }
+    self.sub_offset(rhs)
   }
 }
 
 impl std::ops::SubAssign<HexPosOffset> for HexPos {
   fn sub_assign(&mut self, rhs: HexPosOffset) {
-    self.x = (self.x as i32 - rhs.x) as u32;
-    self.y = (self.y as i32 - rhs.y) as u32;
+    *self = self.sub_offset(&rhs);
   }
 }
 
@@ -189,7 +201,7 @@ impl HexPosOffset {
   /// with (x >= 0, y >= 0, y < x). The third sectant (2) is the second sectant
   /// with c_r1 applied, etc. (up to sectant 6)
   #[allow(clippy::collapsible_else_if)]
-  pub fn sectant(&self) -> u32 {
+  pub const fn sectant(&self) -> u32 {
     if self.x == 0 && self.y == 0 {
       0
     } else if self.y < 0 || (self.x < 0 && self.y == 0) {
@@ -212,7 +224,7 @@ impl HexPosOffset {
   }
 
   /// The group of symmetries about the midpoint of a hex tile (c)
-  pub fn apply_d6_c(&self, op: &D6) -> Self {
+  pub const fn apply_d6_c(&self, op: &D6) -> Self {
     match op {
       D6::Rot(0) => *self,
       D6::Rot(1) => self.c_r1(),
@@ -231,7 +243,7 @@ impl HexPosOffset {
   }
 
   /// The group of symmetries about the vertex of a hex tile (v)
-  pub fn apply_d3_v(&self, op: &D3) -> Self {
+  pub const fn apply_d3_v(&self, op: &D3) -> Self {
     match op {
       D3::Rot(0) => *self,
       D3::Rot(1) => self.v_r2(),
@@ -245,7 +257,7 @@ impl HexPosOffset {
 
   /// The group of symmetries about the center of an edge (e) (C2 x C2 = { c_r0,
   /// c_s0 } x { c_r0, e_s3 })
-  pub fn apply_k4_e(&self, op: &K4) -> Self {
+  pub const fn apply_k4_e(&self, op: &K4) -> Self {
     match (op.left(), op.right()) {
       (Cyclic::<2>(0), Cyclic::<2>(0)) => *self,
       (Cyclic::<2>(1), Cyclic::<2>(0)) => self.e_s0(),
@@ -257,7 +269,7 @@ impl HexPosOffset {
 
   /// The group of symmetries about the line from the center of a hex tile to a
   /// vertex.
-  pub fn apply_c2_cv(&self, op: &C2) -> Self {
+  pub const fn apply_c2_cv(&self, op: &C2) -> Self {
     match op {
       Cyclic::<2>(0) => *self,
       Cyclic::<2>(1) => self.c_s1(),
@@ -267,7 +279,7 @@ impl HexPosOffset {
 
   /// The group of symmetries about the line from the center of a hex tile to the
   /// midpoint of an edge.
-  pub fn apply_c2_ce(&self, op: &C2) -> Self {
+  pub const fn apply_c2_ce(&self, op: &C2) -> Self {
     match op {
       Cyclic::<2>(0) => *self,
       Cyclic::<2>(1) => self.c_s0(),
@@ -276,7 +288,7 @@ impl HexPosOffset {
   }
 
   /// The group of symmetries about an edge.
-  pub fn apply_c2_ev(&self, op: &C2) -> Self {
+  pub const fn apply_c2_ev(&self, op: &C2) -> Self {
     match op {
       Cyclic::<2>(0) => *self,
       Cyclic::<2>(1) => self.c_s3(),
@@ -301,41 +313,41 @@ impl HexPosOffset {
   /// Note: these algorithms are incompatible with each other, i.e.
   /// p.c_r1().c_r1() != p.v_r2().
 
-  fn c_r1(&self) -> Self {
+  const fn c_r1(&self) -> Self {
     Self {
       x: self.x - self.y,
       y: self.x,
     }
   }
 
-  fn c_r2(&self) -> Self {
+  const fn c_r2(&self) -> Self {
     self.c_r1().c_r1()
   }
 
-  fn c_r3(&self) -> Self {
+  const fn c_r3(&self) -> Self {
     self.c_r2().c_r1()
   }
 
-  fn c_r4(&self) -> Self {
+  const fn c_r4(&self) -> Self {
     self.c_r3().c_r1()
   }
 
-  fn c_r5(&self) -> Self {
+  const fn c_r5(&self) -> Self {
     self.c_r4().c_r1()
   }
 
-  fn v_r2(&self) -> Self {
+  const fn v_r2(&self) -> Self {
     Self {
       x: 1 - self.y,
       y: self.x - self.y,
     }
   }
 
-  fn v_r4(&self) -> Self {
+  const fn v_r4(&self) -> Self {
     self.v_r2().v_r2()
   }
 
-  fn e_r3(&self) -> Self {
+  const fn e_r3(&self) -> Self {
     Self {
       x: 1 - self.x,
       y: -self.y,
@@ -348,51 +360,83 @@ impl HexPosOffset {
   ///  - v: the top right vertex of the origin hex
   ///  - e: the center of the right edge of the origin hex
 
-  fn c_s0(&self) -> Self {
+  const fn c_s0(&self) -> Self {
     Self {
       x: self.x - self.y,
       y: -self.y,
     }
   }
 
-  fn c_s1(&self) -> Self {
+  const fn c_s1(&self) -> Self {
     self.c_s0().c_r1()
   }
 
-  fn c_s2(&self) -> Self {
+  const fn c_s2(&self) -> Self {
     self.c_s0().c_r2()
   }
 
-  fn c_s3(&self) -> Self {
+  const fn c_s3(&self) -> Self {
     self.c_s0().c_r3()
   }
 
-  fn c_s4(&self) -> Self {
+  const fn c_s4(&self) -> Self {
     self.c_s0().c_r4()
   }
 
-  fn c_s5(&self) -> Self {
+  const fn c_s5(&self) -> Self {
     self.c_s0().c_r5()
   }
 
-  fn v_s1(&self) -> Self {
+  const fn v_s1(&self) -> Self {
     self.c_s1()
   }
 
-  fn v_s3(&self) -> Self {
+  const fn v_s3(&self) -> Self {
     self.v_s1().v_r2()
   }
 
-  fn v_s5(&self) -> Self {
+  const fn v_s5(&self) -> Self {
     self.v_s1().v_r4()
   }
 
-  fn e_s0(&self) -> Self {
+  const fn e_s0(&self) -> Self {
     self.c_s0()
   }
 
-  fn e_s3(&self) -> Self {
+  const fn e_s3(&self) -> Self {
     self.e_s0().e_r3()
+  }
+
+  pub const fn clone_const(&self) -> Self {
+    Self {
+      x: self.x,
+      y: self.y,
+    }
+  }
+
+  pub const fn eq_cnst(&self, rhs: &Self) -> bool {
+    self.x == rhs.x && self.y == rhs.y
+  }
+
+  pub const fn add_offset(&self, rhs: &Self) -> Self {
+    Self {
+      x: self.x + rhs.x,
+      y: self.y + rhs.y,
+    }
+  }
+
+  pub const fn add_hex(&self, rhs: &HexPos) -> HexPos {
+    HexPos {
+      x: (self.x + rhs.x as i32) as u32,
+      y: (self.y + rhs.y as i32) as u32,
+    }
+  }
+
+  pub const fn sub_offset(&self, rhs: &Self) -> Self {
+    Self {
+      x: self.x - rhs.x,
+      y: self.y - rhs.y,
+    }
   }
 }
 
@@ -409,10 +453,7 @@ impl std::ops::Add for HexPosOffset {
   type Output = Self;
 
   fn add(self, rhs: HexPosOffset) -> Self::Output {
-    Self {
-      x: self.x + rhs.x,
-      y: self.y + rhs.y,
-    }
+    self.add_offset(&rhs)
   }
 }
 
@@ -420,10 +461,7 @@ impl std::ops::Add for &HexPosOffset {
   type Output = HexPosOffset;
 
   fn add(self, rhs: &HexPosOffset) -> Self::Output {
-    HexPosOffset {
-      x: self.x + rhs.x,
-      y: self.y + rhs.y,
-    }
+    self.add_offset(rhs)
   }
 }
 
@@ -431,10 +469,7 @@ impl std::ops::Add<HexPos> for HexPosOffset {
   type Output = HexPos;
 
   fn add(self, rhs: HexPos) -> Self::Output {
-    HexPos {
-      x: (self.x + rhs.x as i32) as u32,
-      y: (self.y + rhs.y as i32) as u32,
-    }
+    self.add_hex(&rhs)
   }
 }
 
@@ -442,17 +477,13 @@ impl std::ops::Add<&HexPos> for &HexPosOffset {
   type Output = HexPos;
 
   fn add(self, rhs: &HexPos) -> Self::Output {
-    HexPos {
-      x: (self.x + rhs.x as i32) as u32,
-      y: (self.y + rhs.y as i32) as u32,
-    }
+    self.add_hex(rhs)
   }
 }
 
 impl std::ops::AddAssign for HexPosOffset {
   fn add_assign(&mut self, rhs: HexPosOffset) {
-    self.x += rhs.x;
-    self.y += rhs.y;
+    *self = self.add_offset(&rhs);
   }
 }
 
@@ -460,10 +491,7 @@ impl std::ops::Sub for HexPosOffset {
   type Output = HexPosOffset;
 
   fn sub(self, rhs: Self) -> Self::Output {
-    Self {
-      x: self.x - rhs.x,
-      y: self.y - rhs.y,
-    }
+    self.sub_offset(&rhs)
   }
 }
 
@@ -471,16 +499,12 @@ impl std::ops::Sub for &HexPosOffset {
   type Output = HexPosOffset;
 
   fn sub(self, rhs: Self) -> Self::Output {
-    HexPosOffset {
-      x: self.x - rhs.x,
-      y: self.y - rhs.y,
-    }
+    self.sub_offset(rhs)
   }
 }
 
 impl std::ops::SubAssign for HexPosOffset {
   fn sub_assign(&mut self, rhs: HexPosOffset) {
-    self.x -= rhs.x;
-    self.y -= rhs.y;
+    *self = self.sub_offset(&rhs);
   }
 }
