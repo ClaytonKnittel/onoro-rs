@@ -1,6 +1,5 @@
 use crate::{
   groups::{SymmetryClass, D6},
-  hex_pos::HexPos,
   util::{max_u32, min_u32, unreachable},
   Onoro,
 };

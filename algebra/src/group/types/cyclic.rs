@@ -58,7 +58,7 @@ mod test {
   use super::*;
 
   fn for_each<const N: u16>() -> impl Iterator<Item = Cyclic<N>> {
-    (0..(Cyclic::<N>::size())).map(|i| Cyclic::<N>::from_ord(i))
+    (0..(Cyclic::<N>::size())).map(Cyclic::<N>::from_ord)
   }
 
   fn permute_all<const N: u16>() {

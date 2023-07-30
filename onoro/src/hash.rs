@@ -139,14 +139,14 @@ mod test {
 
   #[test]
   fn test_d6_table() {
-    const d6t: HD6 = HashTable::new_c();
+    const D6T: HD6 = HashTable::new_c();
 
     for i in 0..256 {
       let pos = HD6::ord_to_hex_pos(i) - HD6::center();
 
       let mut s = pos;
       let mut op = D6::identity();
-      let hash = d6t[i];
+      let hash = D6T[i];
 
       for _ in 0..5 {
         s = s.apply_d6_c(&D6::Rot(1));
@@ -155,7 +155,7 @@ mod test {
         let symm_pos = s + HD6::center();
         if HD6::in_bounds(&symm_pos) {
           let ord = HD6::hex_pos_ord(&symm_pos);
-          let symm_hash = d6t[ord];
+          let symm_hash = D6T[ord];
 
           assert_eq!(
             symm_hash,
