@@ -272,7 +272,7 @@ impl TileHash<D3> {
 
   const fn s2(h: u64) -> u64 {
     let b13 = h & 0x0fffff00000fffff;
-    let b2 = h & 0x000000fffff0000;
+    let b2 = h & 0x000000fffff00000;
 
     let b13 = (b13 << 40) | (b13 >> 40);
     b13 | b2

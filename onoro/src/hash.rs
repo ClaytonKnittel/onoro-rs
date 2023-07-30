@@ -4,6 +4,7 @@ use algebra::group::Group;
 use const_random::const_random;
 
 use crate::{
+  const_rand::Xoroshiro128,
   groups::{D3, D6},
   hex_pos::{HexPos, HexPosOffset},
   tile_hash::{TileHash, C_MASK, V_MASK},
@@ -46,6 +47,7 @@ impl<const N: usize, const N2: usize> HashTable<N, N2, D6> {
   /// Generates a hash table for boards with symmetry class C.
   pub const fn new_c() -> Self {
     let mut table = [TileHash::<D6>::uninitialized(); N2];
+    let mut rng = Xoroshiro128::from_seed(&[const_random!(u64), const_random!(u64)]);
 
     let mut i = 0usize;
     'tile_loop: while i < N2 {
@@ -54,7 +56,9 @@ impl<const N: usize, const N2: usize> HashTable<N, N2, D6> {
       // Normalize coordinates to the center.
       let pos = pos.sub_hex(&Self::center());
 
-      let d6b = TileHash::<D6>::new(const_random!(u64) & C_MASK);
+      let (new_rng, h) = rng.next_u64();
+      rng = new_rng;
+      let d6b = TileHash::<D6>::new(h & C_MASK);
 
       if pos.eq_cnst(&HexPosOffset::origin()) {
         table[i] = d6b.make_invariant(&D6::Rot(1)).make_invariant(&D6::Rfl(0));
@@ -124,6 +128,7 @@ impl<const N: usize, const N2: usize> HashTable<N, N2, D3> {
   /// Generates a hash table for boards with symmetry class V.
   pub const fn new_v() -> Self {
     let mut table = [TileHash::<D3>::uninitialized(); N2];
+    let mut rng = Xoroshiro128::from_seed(&[const_random!(u64), const_random!(u64)]);
 
     let mut i = 0usize;
     'tile_loop: while i < N2 {
@@ -132,7 +137,9 @@ impl<const N: usize, const N2: usize> HashTable<N, N2, D3> {
       // Normalize coordinates to the center.
       let pos = pos.sub_hex(&Self::center());
 
-      let d3b = TileHash::<D3>::new(const_random!(u64) & V_MASK);
+      let (new_rng, h) = rng.next_u64();
+      rng = new_rng;
+      let d3b = TileHash::<D3>::new(h & V_MASK);
 
       // Try the 2 rotational symmetries
       let mut s = pos;
@@ -285,13 +292,7 @@ mod test {
           let ord = HD3::hex_pos_ord(&symm_pos);
           let symm_hash = D3T[ord];
 
-          assert_eq!(
-            symm_hash,
-            hash.apply(&op),
-            "Expected equality of:\n  left: {}\n right: {}",
-            symm_hash,
-            hash.apply(&op)
-          );
+          assert_eq!(symm_hash, hash.apply(&op));
         }
       }
 
@@ -300,18 +301,10 @@ mod test {
       for _ in 0..3 {
         let symm_pos = s + HD3::center();
         if HD3::in_bounds(&symm_pos) {
-          println!("Checking {} for {}", op, pos);
           let ord = HD3::hex_pos_ord(&symm_pos);
           let symm_hash = D3T[ord];
 
-          assert_eq!(
-            symm_hash,
-            hash.apply(&op),
-            "Expected equality of:\n  left: {}\n right: {} under {}",
-            symm_hash,
-            hash.apply(&op),
-            op
-          );
+          assert_eq!(symm_hash, hash.apply(&op));
         }
 
         s = s.apply_d3_v(&D3::Rot(1));

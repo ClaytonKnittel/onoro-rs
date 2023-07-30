@@ -1,4 +1,5 @@
 mod canonicalize;
+mod const_rand;
 mod error;
 mod groups;
 mod hash;
