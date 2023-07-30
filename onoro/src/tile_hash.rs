@@ -4,10 +4,10 @@ use algebra::group::{Cyclic, Group};
 
 use super::groups::{C2, D3, D6, K4};
 
-const C_MASK: u64 = 0x0fff_ffff_ffff_ffff;
-const V_MASK: u64 = 0x0fff_ffff_ffff_ffff;
+pub(crate) const C_MASK: u64 = 0x0fff_ffff_ffff_ffff;
+pub(crate) const V_MASK: u64 = 0x0fff_ffff_ffff_ffff;
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct TileHash<G: Group> {
   hash: u64,
   _p: PhantomData<G>,
@@ -42,6 +42,7 @@ where
     (hl << 1) | (hr >> 1)
   }
 
+  /// TODO: if this is unused, make cur/other player hash codes independent.
   pub const fn color_swap(&self) -> Self {
     let hl = self.hash & 0x5555_5555_5555_5555;
     let hr = self.hash & 0xaaaa_aaaa_aaaa_aaaa;

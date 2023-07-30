@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::{fmt::Display, ops::Mul};
 
 use crate::{finite::Finite, group::Group, monoid::Monoid, ordinal::Ordinal, semigroup::Semigroup};
 
@@ -25,6 +25,14 @@ impl<const N: u16> Dihedral<N> {
   }
 }
 
+impl<const N: u16> Mul for Dihedral<N> {
+  type Output = Self;
+
+  fn mul(self, rhs: Self) -> Self::Output {
+    self.const_op(&rhs)
+  }
+}
+
 impl<const N: u16> Finite for Dihedral<N> {
   const SIZE: usize = 2 * (N as usize);
 }
@@ -46,11 +54,7 @@ impl<const N: u16> Ordinal for Dihedral<N> {
   }
 }
 
-impl<const N: u16> Semigroup for Dihedral<N> {
-  fn op(&self, rhs: &Self) -> Self {
-    self.const_op(rhs)
-  }
-}
+impl<const N: u16> Semigroup for Dihedral<N> {}
 
 impl<const N: u16> Monoid for Dihedral<N> {
   fn identity() -> Self {
@@ -104,18 +108,19 @@ mod test {
         if i < N {
           if j < N {
             // r_i * r_j = r_i+j
-            assert_eq!(a.op(&b), Dihedral::Rot((i + j) % N));
+            assert_eq!(a * b, Dihedral::Rot((i + j) % N));
           } else {
             // r_i * s_j = s_i+j
-            assert_eq!(a.op(&b), Dihedral::Rfl((i + j) % N));
+            assert_eq!(a * b, Dihedral::Rfl((i + j) % N));
           }
         } else {
+          #[warn(clippy::collapsible_else_if)]
           if j < N {
             // s_i * r_j = s_i-j
-            assert_eq!(a.op(&b), Dihedral::Rfl((N + i - j) % N));
+            assert_eq!(a * b, Dihedral::Rfl((N + i - j) % N));
           } else {
             // s_i * s_j = r_i-j
-            assert_eq!(a.op(&b), Dihedral::Rot((N + i - j) % N));
+            assert_eq!(a * b, Dihedral::Rot((N + i - j) % N));
           }
         }
       }
@@ -137,8 +142,8 @@ mod test {
     let id = Dihedral::<6>::identity();
 
     for el in for_each::<6>() {
-      assert_eq!(id.op(&el), el);
-      assert_eq!(el.op(&id), el);
+      assert_eq!(id * el, el);
+      assert_eq!(el * id, el);
     }
   }
 
@@ -186,8 +191,8 @@ mod test {
   fn test_invs<const N: u16>() {
     for el in for_each::<N>() {
       let inv = el.inverse();
-      assert_eq!(el.op(&inv), Dihedral::<N>::identity());
-      assert_eq!(inv.op(&el), Dihedral::<N>::identity());
+      assert_eq!(el * inv, Dihedral::<N>::identity());
+      assert_eq!(inv * el, Dihedral::<N>::identity());
     }
   }
 

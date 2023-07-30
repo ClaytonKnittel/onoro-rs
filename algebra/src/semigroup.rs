@@ -1,4 +1,4 @@
+use std::ops::Mul;
+
 /// An algebraic semigroup.
-pub trait Semigroup: PartialEq + Sized {
-  fn op(&self, other: &Self) -> Self;
-}
+pub trait Semigroup: PartialEq + Sized + Mul<Output = Self> {}

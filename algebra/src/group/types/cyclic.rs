@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::{fmt::Display, ops::Mul};
 
 use crate::{finite::Finite, group::Group, monoid::Monoid, ordinal::Ordinal, semigroup::Semigroup};
 
@@ -8,6 +8,14 @@ pub struct Cyclic<const N: u16>(pub u16);
 impl<const N: u16> Cyclic<N> {
   pub const fn const_op(&self, rhs: &Self) -> Self {
     Self((self.0 + rhs.0) % N)
+  }
+}
+
+impl<const N: u16> Mul for Cyclic<N> {
+  type Output = Self;
+
+  fn mul(self, rhs: Self) -> Self::Output {
+    self.const_op(&rhs)
   }
 }
 
@@ -25,11 +33,7 @@ impl<const N: u16> Ordinal for Cyclic<N> {
   }
 }
 
-impl<const N: u16> Semigroup for Cyclic<N> {
-  fn op(&self, rhs: &Self) -> Self {
-    self.const_op(rhs)
-  }
-}
+impl<const N: u16> Semigroup for Cyclic<N> {}
 
 impl<const N: u16> Monoid for Cyclic<N> {
   fn identity() -> Self {
@@ -66,7 +70,7 @@ mod test {
       for j in 0..N {
         let b: Cyclic<N> = Cyclic(j);
 
-        assert_eq!(a.op(&b), Cyclic((i + j) % N));
+        assert_eq!(a * b, Cyclic((i + j) % N));
       }
     }
   }
@@ -86,8 +90,8 @@ mod test {
     let id = Cyclic::<6>::identity();
 
     for el in for_each::<6>() {
-      assert_eq!(id.op(&el), el);
-      assert_eq!(el.op(&id), el);
+      assert_eq!(id * el, el);
+      assert_eq!(el * id, el);
     }
   }
 
@@ -135,8 +139,8 @@ mod test {
   fn test_invs<const N: u16>() {
     for el in for_each::<N>() {
       let inv = el.inverse();
-      assert_eq!(el.op(&inv), Cyclic::<N>::identity());
-      assert_eq!(inv.op(&el), Cyclic::<N>::identity());
+      assert_eq!(el * inv, Cyclic::<N>::identity());
+      assert_eq!(inv * el, Cyclic::<N>::identity());
     }
   }
 

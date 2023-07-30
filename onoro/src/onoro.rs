@@ -63,8 +63,8 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Onoro<N, N2, AD
   }
 
   pub fn default_start() -> Self {
-    const tbl: HashTable<1, 1, D6> = HashTable::new_c();
-    println!("Table:\n{tbl:?}");
+    const tbl: HashTable<2, 4, D6> = HashTable::new_c();
+    println!("Table:\n{tbl:x?}");
 
     let mid_idx = ((Self::board_width() - 1) / 2) as u32;
     let mut game = Self::new();

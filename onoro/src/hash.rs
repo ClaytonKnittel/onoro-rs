@@ -1,10 +1,12 @@
+use std::ops::Index;
+
 use algebra::group::Group;
 use const_random::const_random;
 
 use crate::{
   groups::D6,
   hex_pos::{HexPos, HexPosOffset},
-  tile_hash::TileHash,
+  tile_hash::{TileHash, C_MASK},
 };
 
 #[derive(Debug)]
@@ -52,7 +54,7 @@ impl<const N: usize, const N2: usize> HashTable<N, N2, D6> {
       // Normalize coordinates to the center.
       let pos = pos.sub_hex(&Self::center());
 
-      let d6b = TileHash::<D6>::new(const_random!(u64));
+      let d6b = TileHash::<D6>::new(const_random!(u64) & C_MASK);
 
       if pos.eq_cnst(&HexPosOffset::origin()) {
         table[i] = d6b.make_invariant(&D6::Rot(1)).make_invariant(&D6::Rfl(0));
@@ -112,8 +114,58 @@ impl<const N: usize, const N2: usize> HashTable<N, N2, D6> {
       // Otherwise, if the tile is not self-symmetric and has no symmetries that
       // have already been computed, use the randomly generated hash.
       table[i] = d6b;
+      i += 1;
     }
 
     Self { table }
+  }
+}
+
+impl<const N: usize, const N2: usize, G: Group> Index<usize> for HashTable<N, N2, G> {
+  type Output = TileHash<G>;
+
+  fn index(&self, index: usize) -> &Self::Output {
+    &self.table[index]
+  }
+}
+
+#[cfg(test)]
+mod test {
+  use algebra::monoid::Monoid;
+
+  use crate::{groups::D6, hash::HashTable};
+
+  type HD6 = HashTable<16, 256, D6>;
+
+  #[test]
+  fn test_d6_table() {
+    const d6t: HD6 = HashTable::new_c();
+
+    for i in 0..256 {
+      let pos = HD6::ord_to_hex_pos(i) - HD6::center();
+
+      let mut s = pos;
+      let mut op = D6::identity();
+      let hash = d6t[i];
+
+      for _ in 0..5 {
+        s = s.apply_d6_c(&D6::Rot(1));
+        op = D6::Rot(1) * op;
+
+        let symm_pos = s + HD6::center();
+        if HD6::in_bounds(&symm_pos) {
+          let ord = HD6::hex_pos_ord(&symm_pos);
+          let symm_hash = d6t[ord];
+
+          assert_eq!(
+            symm_hash,
+            hash.apply(&op),
+            "Expected equality of:\n  left: {:x?}\n right: {:x?}",
+            symm_hash,
+            hash.apply(&op)
+          );
+        }
+      }
+    }
   }
 }

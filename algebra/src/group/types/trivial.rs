@@ -1,9 +1,17 @@
-use std::fmt::Display;
+use std::{fmt::Display, ops::Mul};
 
 use crate::{finite::Finite, group::Group, monoid::Monoid, ordinal::Ordinal, semigroup::Semigroup};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Trivial;
+
+impl Mul for Trivial {
+  type Output = Self;
+
+  fn mul(self, rhs: Self) -> Self::Output {
+    Self
+  }
+}
 
 impl Finite for Trivial {
   const SIZE: usize = 1;
@@ -19,11 +27,7 @@ impl Ordinal for Trivial {
   }
 }
 
-impl Semigroup for Trivial {
-  fn op(&self, _other: &Self) -> Self {
-    Self
-  }
-}
+impl Semigroup for Trivial {}
 
 impl Monoid for Trivial {
   fn identity() -> Self {

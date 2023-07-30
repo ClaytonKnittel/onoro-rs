@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::{fmt::Display, ops::Mul};
 
 use crate::{
   finite::Finite,
@@ -37,6 +37,21 @@ impl DirectProduct<Cyclic<2>, Cyclic<2>> {
   }
 }
 
+impl<L, R> Mul for DirectProduct<L, R>
+where
+  L: Semigroup,
+  R: Semigroup,
+{
+  type Output = Self;
+
+  fn mul(self, rhs: Self) -> Self::Output {
+    Self {
+      left: self.left * rhs.left,
+      right: self.right * rhs.right,
+    }
+  }
+}
+
 impl<L, R> Finite for DirectProduct<L, R>
 where
   L: Finite,
@@ -69,12 +84,6 @@ where
   L: Semigroup,
   R: Semigroup,
 {
-  fn op(&self, other: &Self) -> Self {
-    Self {
-      left: self.left.op(&other.left),
-      right: self.right.op(&other.right),
-    }
-  }
 }
 
 impl<L, R> Monoid for DirectProduct<L, R>
@@ -152,7 +161,7 @@ mod tests {
     // Should require 13 rotations to get to the identity.
     for _ in 0..13 {
       assert_ne!(e1, G::identity());
-      e1 = e1.op(&op);
+      e1 = e1 * op;
     }
     assert_eq!(e1, G::identity());
   }
@@ -171,7 +180,7 @@ mod tests {
     // Should require 7 * 11 * 3 * 2 - 1 = 461 rotations to get to the identity.
     for _ in 0..461 {
       assert_ne!(e1, G::identity());
-      e1 = e1.op(&op);
+      e1 = e1 * op;
     }
     assert_eq!(e1, G::identity());
   }
