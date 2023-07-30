@@ -407,13 +407,6 @@ impl HexPosOffset {
     self.e_s0().e_r3()
   }
 
-  pub const fn clone_const(&self) -> Self {
-    Self {
-      x: self.x,
-      y: self.y,
-    }
-  }
-
   pub const fn eq_cnst(&self, rhs: &Self) -> bool {
     self.x == rhs.x && self.y == rhs.y
   }
@@ -506,5 +499,11 @@ impl std::ops::Sub for &HexPosOffset {
 impl std::ops::SubAssign for HexPosOffset {
   fn sub_assign(&mut self, rhs: HexPosOffset) {
     *self = self.sub_offset(&rhs);
+  }
+}
+
+impl Display for HexPosOffset {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(f, "({}, {})", self.x, self.y)
   }
 }

@@ -1,4 +1,4 @@
-use std::marker::PhantomData;
+use std::{fmt::Display, marker::PhantomData};
 
 use algebra::group::{Cyclic, Group};
 
@@ -243,11 +243,11 @@ impl TileHash<D6> {
 
 impl TileHash<D3> {
   const fn r1(h: u64) -> u64 {
-    return ((h << 20) | (h >> 40)) & V_MASK;
+    ((h << 20) | (h >> 40)) & V_MASK
   }
 
   const fn r2(h: u64) -> u64 {
-    return Self::r1(Self::r1(h));
+    Self::r1(Self::r1(h))
   }
 
   const fn s0(h: u64) -> u64 {
@@ -257,7 +257,7 @@ impl TileHash<D3> {
 
     let b2 = b2 << 20;
     let b3 = b3 >> 20;
-    return b1 | b2 | b3;
+    b1 | b2 | b3
   }
 
   const fn s1(h: u64) -> u64 {
@@ -267,7 +267,7 @@ impl TileHash<D3> {
 
     let b1 = b1 << 20;
     let b2 = b2 >> 20;
-    return b1 | b2 | b3;
+    b1 | b2 | b3
   }
 
   const fn s2(h: u64) -> u64 {
@@ -275,7 +275,7 @@ impl TileHash<D3> {
     let b2 = h & 0x000000fffff0000;
 
     let b13 = (b13 << 40) | (b13 >> 40);
-    return b13 | b2;
+    b13 | b2
   }
 
   pub const fn apply(&self, op: &D3) -> Self {
@@ -423,5 +423,56 @@ impl TileHash<C2> {
       }
       _ => unreachable!(),
     })
+  }
+}
+
+impl Display for TileHash<D6> {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(
+      f,
+      "{:#05x} {:#05x} {:#05x} {:#05x} {:#05x} {:#05x}",
+      self.hash & 0x3ff,
+      (self.hash >> 10) & 0x3ff,
+      (self.hash >> 20) & 0x3ff,
+      (self.hash >> 30) & 0x3ff,
+      (self.hash >> 40) & 0x3ff,
+      (self.hash >> 50) & 0x3ff,
+    )
+  }
+}
+
+impl Display for TileHash<D3> {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(
+      f,
+      "{:#07x} {:#07x} {:#07x}",
+      self.hash & 0xfffff,
+      (self.hash >> 20) & 0xfffff,
+      (self.hash >> 40) & 0xfffff,
+    )
+  }
+}
+
+impl Display for TileHash<K4> {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(
+      f,
+      "{:#06x} {:#06x} {:#06x} {:#06x}",
+      self.hash & 0xffff,
+      (self.hash >> 16) & 0xffff,
+      (self.hash >> 32) & 0xffff,
+      (self.hash >> 48) & 0xffff,
+    )
+  }
+}
+
+impl Display for TileHash<C2> {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(
+      f,
+      "{:#010x} {:#010x}",
+      self.hash & 0xffffffff,
+      (self.hash >> 32) & 0xffffffff,
+    )
   }
 }
