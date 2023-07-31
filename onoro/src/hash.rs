@@ -2,7 +2,7 @@ use std::ops::Index;
 
 use algebra::{
   finite::Finite,
-  group::{Cyclic, Group},
+  group::{Cyclic, Group, Trivial},
   ordinal::Ordinal,
 };
 use const_random::const_random;
@@ -318,6 +318,24 @@ impl<const N: usize, const N2: usize> HashTable<N, N2, C2> {
   pub const fn new_ev() -> Self {
     let rng = Xoroshiro128::from_seed(&[const_random!(u64), const_random!(u64)]);
     Self::new_c2(SymmetryClass::EV, rng)
+  }
+}
+
+impl<const N: usize, const N2: usize> HashTable<N, N2, Trivial> {
+  /// Generates a hash table for boards with symmetry class E.
+  pub const fn new_trivial() -> Self {
+    let mut table = [TileHash::<Trivial>::uninitialized(); N2];
+    let mut rng = Xoroshiro128::from_seed(&[const_random!(u64), const_random!(u64)]);
+
+    let mut i = 0usize;
+    while i < N2 {
+      let (new_rng, h) = rng.next_u64();
+      rng = new_rng;
+      table[i] = TileHash::<Trivial>::new(h);
+      i += 1;
+    }
+
+    Self { table }
   }
 }
 
