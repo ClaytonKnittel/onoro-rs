@@ -6,6 +6,7 @@ use super::groups::{C2, D3, D6, K4};
 
 pub(crate) const C_MASK: u64 = 0x0fff_ffff_ffff_ffff;
 pub(crate) const V_MASK: u64 = 0x0fff_ffff_ffff_ffff;
+pub(crate) const E_MASK: u64 = 0xffff_ffff_ffff_ffff;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct TileHash<G: Group> {

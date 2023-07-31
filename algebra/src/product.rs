@@ -35,6 +35,15 @@ impl DirectProduct<Cyclic<2>, Cyclic<2>> {
       right: self.right.const_op(&rhs.right),
     }
   }
+
+  pub const fn const_from_ord(ord: usize) -> Self {
+    let l = ord % Cyclic::<2>::SIZE;
+    let r = ord / Cyclic::<2>::SIZE;
+    Self {
+      left: Cyclic::<2>::const_from_ord(l),
+      right: Cyclic::<2>::const_from_ord(r),
+    }
+  }
 }
 
 impl<L, R> Mul for DirectProduct<L, R>

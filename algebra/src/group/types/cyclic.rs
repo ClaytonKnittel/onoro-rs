@@ -9,6 +9,10 @@ impl<const N: u16> Cyclic<N> {
   pub const fn const_op(&self, rhs: &Self) -> Self {
     Self((self.0 + rhs.0) % N)
   }
+
+  pub const fn const_from_ord(ord: usize) -> Self {
+    Self(ord as u16)
+  }
 }
 
 impl<const N: u16> Mul for Cyclic<N> {

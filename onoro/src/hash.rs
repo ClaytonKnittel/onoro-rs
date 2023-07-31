@@ -1,13 +1,13 @@
 use std::ops::Index;
 
-use algebra::group::Group;
+use algebra::{finite::Finite, group::Group, ordinal::Ordinal};
 use const_random::const_random;
 
 use crate::{
   const_rand::Xoroshiro128,
-  groups::{D3, D6},
+  groups::{D3, D6, K4},
   hex_pos::{HexPos, HexPosOffset},
-  tile_hash::{TileHash, C_MASK, V_MASK},
+  tile_hash::{TileHash, C_MASK, E_MASK, V_MASK},
 };
 
 #[derive(Debug)]
@@ -36,8 +36,7 @@ impl<const N: usize, const N2: usize, G: Group> HashTable<N, N2, G> {
   }
 
   /// Returns true if the hash for `pos` will be computed before `cur_idx`.
-  const fn has_been_computed(pos: &HexPosOffset, cur_idx: usize) -> bool {
-    let pos = pos.add_hex(&Self::center());
+  const fn has_been_computed(pos: &HexPos, cur_idx: usize) -> bool {
     let ord = Self::hex_pos_ord(&pos);
     ord < cur_idx && Self::in_bounds(&pos)
   }
@@ -75,8 +74,9 @@ impl<const N: usize, const N2: usize> HashTable<N, N2, D6> {
         // Accumulate the inverses of the operations we have been doing.
         op = op.const_op(&D6::Rot(5));
 
-        if Self::has_been_computed(&s, i) {
-          let ord = Self::hex_pos_ord(&s.add_hex(&Self::center()));
+        let s_pos = s.add_hex(&Self::center());
+        if Self::has_been_computed(&s_pos, i) {
+          let ord = Self::hex_pos_ord(&s_pos);
           let hash = table[ord];
           // Apply the accumulated group op to transform `s` back to `pos`.
           table[i] = hash.apply(&op);
@@ -99,8 +99,9 @@ impl<const N: usize, const N2: usize> HashTable<N, N2, D6> {
           continue 'tile_loop;
         }
 
-        if Self::has_been_computed(&s, i) {
-          let ord = Self::hex_pos_ord(&s.add_hex(&Self::center()));
+        let s_pos = s.add_hex(&Self::center());
+        if Self::has_been_computed(&s_pos, i) {
+          let ord = Self::hex_pos_ord(&s_pos);
           let hash = table[ord];
           // Apply the accumulated group op to transform `s` back to `pos`.
           table[i] = hash.apply(&op);
@@ -150,8 +151,9 @@ impl<const N: usize, const N2: usize> HashTable<N, N2, D3> {
         // Accumulate the inverses of the operations we have been doing.
         op = op.const_op(&D3::Rot(2));
 
-        if Self::has_been_computed(&s, i) {
-          let ord = Self::hex_pos_ord(&s.add_hex(&Self::center()));
+        let s_pos = s.add_hex(&Self::center());
+        if Self::has_been_computed(&s_pos, i) {
+          let ord = Self::hex_pos_ord(&s_pos);
           let hash = table[ord];
           // Apply the accumulated group op to transform `s` back to `pos`.
           table[i] = hash.apply(&op);
@@ -174,8 +176,9 @@ impl<const N: usize, const N2: usize> HashTable<N, N2, D3> {
           continue 'tile_loop;
         }
 
-        if Self::has_been_computed(&s, i) {
-          let ord = Self::hex_pos_ord(&s.add_hex(&Self::center()));
+        let s_pos = s.add_hex(&Self::center());
+        if Self::has_been_computed(&s_pos, i) {
+          let ord = Self::hex_pos_ord(&s_pos);
           let hash = table[ord];
           // Apply the accumulated group op to transform `s` back to `pos`.
           table[i] = hash.apply(&op);
@@ -199,6 +202,65 @@ impl<const N: usize, const N2: usize> HashTable<N, N2, D3> {
   }
 }
 
+impl<const N: usize, const N2: usize> HashTable<N, N2, K4> {
+  /// Generates a hash table for boards with symmetry class E.
+  pub const fn new_e() -> Self {
+    let mut table = [TileHash::<K4>::uninitialized(); N2];
+    let mut rng = Xoroshiro128::from_seed(&[const_random!(u64), const_random!(u64)]);
+
+    let mut i = 0usize;
+    'tile_loop: while i < N2 {
+      let pos = Self::ord_to_hex_pos(i);
+
+      // Normalize coordinates to the center.
+      let pos = pos.sub_hex(&Self::center());
+
+      let (new_rng, h) = rng.next_u64();
+      rng = new_rng;
+      let k4b = TileHash::<K4>::new(h & E_MASK);
+
+      // Check the 3 symmetries for existing hashes.
+      let mut op_ord = 1;
+      while op_ord < K4::SIZE {
+        let op = K4::const_from_ord(op_ord);
+        op_ord += 1;
+
+        let s_pos = pos.apply_k4_e(&op).add_hex(&Self::center());
+        if Self::has_been_computed(&s_pos, i) {
+          let ord = Self::hex_pos_ord(&s_pos);
+          let hash = table[ord];
+          // Apply the accumulated group op to transform `s` back to `pos`.
+          table[i] = hash.apply(&op);
+          i += 1;
+          continue 'tile_loop;
+        }
+      }
+
+      // Check the 3 symmetries for self-mapping.
+      let mut op_ord = 1;
+      while op_ord < K4::SIZE {
+        let op = K4::const_from_ord(op_ord);
+        op_ord += 1;
+
+        let s = pos.apply_k4_e(&op);
+        if s.eq_cnst(&pos) {
+          // This tile is symmetric to itself under some reflection
+          table[i] = k4b.make_invariant(&op);
+          i += 1;
+          continue 'tile_loop;
+        }
+      }
+
+      // Otherwise, if the tile is not self-symmetric and has no symmetries that
+      // have already been computed, use the randomly generated hash.
+      table[i] = k4b;
+      i += 1;
+    }
+
+    Self { table }
+  }
+}
+
 impl<const N: usize, const N2: usize, G: Group> Index<usize> for HashTable<N, N2, G> {
   type Output = TileHash<G>;
 
@@ -209,15 +271,16 @@ impl<const N: usize, const N2: usize, G: Group> Index<usize> for HashTable<N, N2
 
 #[cfg(test)]
 mod test {
-  use algebra::monoid::Monoid;
+  use algebra::{finite::Finite, monoid::Monoid};
 
   use crate::{
-    groups::{D3, D6},
+    groups::{D3, D6, K4},
     hash::HashTable,
   };
 
   type HD6 = HashTable<16, 256, D6>;
   type HD3 = HashTable<16, 256, D3>;
+  type HK4 = HashTable<16, 256, K4>;
 
   #[test]
   fn test_d6_table() {
@@ -309,6 +372,30 @@ mod test {
 
         s = s.apply_d3_v(&D3::Rot(1));
         op = D3::Rot(1) * op;
+      }
+    }
+  }
+
+  #[test]
+  fn test_k4_table() {
+    const K4T: HK4 = HashTable::new_e();
+
+    for i in 0..256 {
+      let pos = HD3::ord_to_hex_pos(i) - HD3::center();
+      let hash = K4T[i];
+
+      let mut op_ord = 1;
+      while op_ord < K4::SIZE {
+        let op = K4::const_from_ord(op_ord);
+        op_ord += 1;
+
+        let symm_pos = pos.apply_k4_e(&op) + HK4::center();
+        if HK4::in_bounds(&symm_pos) {
+          let ord = HD3::hex_pos_ord(&symm_pos);
+          let symm_hash = K4T[ord];
+
+          assert_eq!(symm_hash, hash.apply(&op));
+        }
       }
     }
   }
