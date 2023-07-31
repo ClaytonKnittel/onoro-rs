@@ -76,6 +76,40 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Onoro<N, N2, AD
     game
   }
 
+  pub fn default_start2() -> Self {
+    let mid_idx = ((Self::board_width() - 1) / 2) as u32;
+    let mut game = Self::new();
+    unsafe {
+      game.make_move_unchecked(Move::Phase1Move {
+        to: PackedIdx::new(mid_idx, mid_idx),
+      });
+    }
+    game.make_move(Move::Phase1Move {
+      to: PackedIdx::new(mid_idx + 1, mid_idx),
+    });
+    game.make_move(Move::Phase1Move {
+      to: PackedIdx::new(mid_idx + 1, mid_idx + 1),
+    });
+    game
+  }
+
+  pub fn default_start3() -> Self {
+    let mid_idx = 3;
+    let mut game = Self::new();
+    unsafe {
+      game.make_move_unchecked(Move::Phase1Move {
+        to: PackedIdx::new(mid_idx, mid_idx),
+      });
+    }
+    game.make_move(Move::Phase1Move {
+      to: PackedIdx::new(mid_idx + 1, mid_idx + 1),
+    });
+    game.make_move(Move::Phase1Move {
+      to: PackedIdx::new(mid_idx + 1, mid_idx),
+    });
+    game
+  }
+
   /// Converts a `HexPos` to an ordinal, which is a unique mapping from valid
   /// `HexPos`s on the board to the range 0..N2.
   pub const fn hex_pos_ord(pos: &HexPos) -> usize {
