@@ -94,7 +94,24 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Onoro<N, N2, AD
   }
 
   pub fn default_start3() -> Self {
-    let mid_idx = 3;
+    let mid_idx = ((Self::board_width() - 1) / 2) as u32;
+    let mut game = Self::new();
+    unsafe {
+      game.make_move_unchecked(Move::Phase1Move {
+        to: PackedIdx::new(mid_idx + 1, mid_idx),
+      });
+    }
+    game.make_move(Move::Phase1Move {
+      to: PackedIdx::new(mid_idx, mid_idx),
+    });
+    game.make_move(Move::Phase1Move {
+      to: PackedIdx::new(mid_idx + 1, mid_idx + 1),
+    });
+    game
+  }
+
+  pub fn default_start4() -> Self {
+    let mid_idx = ((Self::board_width() - 1) / 2) as u32;
     let mut game = Self::new();
     unsafe {
       game.make_move_unchecked(Move::Phase1Move {
@@ -105,7 +122,41 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Onoro<N, N2, AD
       to: PackedIdx::new(mid_idx + 1, mid_idx + 1),
     });
     game.make_move(Move::Phase1Move {
-      to: PackedIdx::new(mid_idx + 1, mid_idx),
+      to: PackedIdx::new(mid_idx, mid_idx + 1),
+    });
+    game
+  }
+
+  pub fn default_start5() -> Self {
+    let mid_idx = ((Self::board_width() - 1) / 2) as u32;
+    let mut game = Self::new();
+    unsafe {
+      game.make_move_unchecked(Move::Phase1Move {
+        to: PackedIdx::new(mid_idx, mid_idx),
+      });
+    }
+    game.make_move(Move::Phase1Move {
+      to: PackedIdx::new(mid_idx, mid_idx + 1),
+    });
+    game.make_move(Move::Phase1Move {
+      to: PackedIdx::new(mid_idx + 1, mid_idx + 1),
+    });
+    game
+  }
+
+  pub fn default_start6() -> Self {
+    let mid_idx = ((Self::board_width() - 1) / 2) as u32;
+    let mut game = Self::new();
+    unsafe {
+      game.make_move_unchecked(Move::Phase1Move {
+        to: PackedIdx::new(mid_idx + 1, mid_idx + 1),
+      });
+    }
+    game.make_move(Move::Phase1Move {
+      to: PackedIdx::new(mid_idx, mid_idx),
+    });
+    game.make_move(Move::Phase1Move {
+      to: PackedIdx::new(mid_idx, mid_idx + 1),
     });
     game
   }

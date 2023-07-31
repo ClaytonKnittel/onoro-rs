@@ -167,7 +167,7 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroView<N, N2
     }
 
     let symm_state1 = board_symm_state(onoro1);
-    let symm_state2 = board_symm_state(onoro1);
+    let symm_state2 = board_symm_state(onoro2);
     let normalizing_op1 = symm_state1.op;
     let denormalizing_op2 = symm_state2.op.inverse();
     let origin1 = onoro1.origin(&symm_state1);

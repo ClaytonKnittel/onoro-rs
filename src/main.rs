@@ -73,15 +73,21 @@ fn explore_p2(onoro: &Onoro16, depth: u32) -> u64 {
 }
 
 fn main() {
+  let v = OnoroView::new(Onoro16::default_start());
+
   for game in vec![
     Onoro16::default_start(),
     Onoro16::default_start2(),
     Onoro16::default_start3(),
+    Onoro16::default_start4(),
+    Onoro16::default_start5(),
+    Onoro16::default_start6(),
   ]
   .into_iter()
   {
     let view = OnoroView::new(game);
     println!("{}", view);
+    println!("{} {}", v == view, view == v);
   }
 
   // let mut game = Onoro16::default_start();
