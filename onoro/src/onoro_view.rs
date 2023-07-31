@@ -51,7 +51,7 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroView<N, N2
     // choose the symmetry with the numerically smallest hash code.
     D6::for_each()
       .map(|op| (hash.apply(&op).hash(), op.ord() as u8))
-      .min_by(|(_op1, hash1), (_op2, hash2)| hash1.cmp(hash2))
+      .min_by(|(hash1, _op1), (hash2, _op2)| hash1.cmp(hash2))
       .unwrap()
   }
 
@@ -66,7 +66,7 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroView<N, N2
     // choose the symmetry with the numerically smallest hash code.
     D3::for_each()
       .map(|op| (hash.apply(&op).hash(), op.ord() as u8))
-      .min_by(|(_op1, hash1), (_op2, hash2)| hash1.cmp(hash2))
+      .min_by(|(hash1, _op1), (hash2, _op2)| hash1.cmp(hash2))
       .unwrap()
   }
 
@@ -81,7 +81,7 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroView<N, N2
     // choose the symmetry with the numerically smallest hash code.
     K4::for_each()
       .map(|op| (hash.apply(&op).hash(), op.ord() as u8))
-      .min_by(|(_op1, hash1), (_op2, hash2)| hash1.cmp(hash2))
+      .min_by(|(hash1, _op1), (hash2, _op2)| hash1.cmp(hash2))
       .unwrap()
   }
 
@@ -96,7 +96,7 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroView<N, N2
     // choose the symmetry with the numerically smallest hash code.
     C2::for_each()
       .map(|op| (hash.apply(&op).hash(), op.ord() as u8))
-      .min_by(|(_op1, hash1), (_op2, hash2)| hash1.cmp(hash2))
+      .min_by(|(hash1, _op1), (hash2, _op2)| hash1.cmp(hash2))
       .unwrap()
   }
 
@@ -111,7 +111,7 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroView<N, N2
     // choose the symmetry with the numerically smallest hash code.
     C2::for_each()
       .map(|op| (hash.apply(&op).hash(), op.ord() as u8))
-      .min_by(|(_op1, hash1), (_op2, hash2)| hash1.cmp(hash2))
+      .min_by(|(hash1, _op1), (hash2, _op2)| hash1.cmp(hash2))
       .unwrap()
   }
 
@@ -126,7 +126,7 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroView<N, N2
     // choose the symmetry with the numerically smallest hash code.
     C2::for_each()
       .map(|op| (hash.apply(&op).hash(), op.ord() as u8))
-      .min_by(|(_op1, hash1), (_op2, hash2)| hash1.cmp(hash2))
+      .min_by(|(hash1, _op1), (hash2, _op2)| hash1.cmp(hash2))
       .unwrap()
   }
 
