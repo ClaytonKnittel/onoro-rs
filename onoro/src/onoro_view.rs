@@ -225,6 +225,11 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> PartialEq
   }
 }
 
+impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Eq
+  for OnoroView<N, N2, ADJ_CNT_SIZE>
+{
+}
+
 impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Display
   for OnoroView<N, N2, ADJ_CNT_SIZE>
 {
