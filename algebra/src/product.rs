@@ -168,14 +168,13 @@ mod tests {
     group::{Cyclic, Dihedral},
     monoid::Monoid,
     ordinal::Ordinal,
-    semigroup::Semigroup,
   };
 
   #[test]
   fn test_macro() {
     type G = direct_product_type!(Dihedral<7>, Cyclic<2>);
     let mut e1: G = direct_product!(Dihedral::Rot(1), Cyclic::from_ord(1));
-    let op = e1.clone();
+    let op = e1;
 
     // Should require 13 rotations to get to the identity.
     for _ in 0..13 {
@@ -194,7 +193,7 @@ mod tests {
       Cyclic::from_ord(2),
       Dihedral::Rfl(0)
     );
-    let op = e1.clone();
+    let op = e1;
 
     // Should require 7 * 11 * 3 * 2 - 1 = 461 rotations to get to the identity.
     for _ in 0..461 {

@@ -335,7 +335,7 @@ impl HashGroup<K4> {
     let b1357 = b & 0x00ff00ff00ff00ff;
     let b2468 = b & 0xff00ff00ff00ff00;
 
-    return (b1357 << 8) | (b2468 >> 8);
+    (b1357 << 8) | (b2468 >> 8)
   }
 
   pub const fn apply(&self, op: &K4) -> Self {

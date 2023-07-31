@@ -3,7 +3,6 @@ use std::ops::Index;
 use algebra::{
   finite::Finite,
   group::{Cyclic, Group, Trivial},
-  ordinal::Ordinal,
 };
 use const_random::const_random;
 
@@ -23,9 +22,9 @@ pub struct HashTable<const N: usize, const N2: usize, G: Group> {
 
 impl<const N: usize, const N2: usize, G: Group> HashTable<N, N2, G> {
   /// Computes the hash of a game state on a given hash table.
-  pub fn hash<const OnoroN: usize, const OnoroN2: usize, const ADJ_CNT_SIZE: usize>(
+  pub fn hash<const ONORO_N: usize, const ONORO_N2: usize, const ADJ_CNT_SIZE: usize>(
     &self,
-    onoro: &Onoro<OnoroN, OnoroN2, ADJ_CNT_SIZE>,
+    onoro: &Onoro<ONORO_N, ONORO_N2, ADJ_CNT_SIZE>,
     symm_state: &BoardSymmetryState,
   ) -> u64 {
     let origin = onoro.origin(symm_state);

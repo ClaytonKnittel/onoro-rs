@@ -171,7 +171,7 @@ pub const fn symm_state_class(x: u32, y: u32, n_pawns: u32) -> SymmetryClass {
   } else if y3 + n_pawns == 2 * x3 || (x2 + y2 == n_pawns && 3 * y2 > n_pawns) {
     SymmetryClass::EV
   } else {
-    SymmetryClass::TRIVIAL
+    SymmetryClass::Trivial
   }
 }
 

@@ -1,8 +1,6 @@
-use algebra::{
-  group::{Dihedral, Group, Trivial},
-  monoid::Monoid,
-  ordinal::Ordinal,
-};
+use std::fmt::Display;
+
+use algebra::{group::Trivial, monoid::Monoid, ordinal::Ordinal};
 
 use crate::{
   canonicalize::{board_symm_state, BoardSymmetryState},
@@ -31,7 +29,7 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroView<N, N2
       SymmetryClass::CV => Self::find_canonical_orientation_c2_cv(&onoro, &symm_state),
       SymmetryClass::CE => Self::find_canonical_orientation_c2_ce(&onoro, &symm_state),
       SymmetryClass::EV => Self::find_canonical_orientation_c2_ev(&onoro, &symm_state),
-      SymmetryClass::TRIVIAL => Self::find_canonical_orientation_trivial(&onoro, &symm_state),
+      SymmetryClass::Trivial => Self::find_canonical_orientation_trivial(&onoro, &symm_state),
     };
 
     Self {
@@ -138,5 +136,27 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroView<N, N2
   ) -> (u64, u8) {
     static TT: HashTable<16, 256, Trivial> = HashTable::new_trivial();
     (TT.hash(onoro, symm_state), Trivial::identity().ord() as u8)
+  }
+}
+
+impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Display
+  for OnoroView<N, N2, ADJ_CNT_SIZE>
+{
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(
+      f,
+      "{}\n{:?}: {} ({:#018x?})",
+      self.onoro,
+      self.symm_class,
+      match self.symm_class {
+        SymmetryClass::C => D6::from_ord(self.op_ord as usize).to_string(),
+        SymmetryClass::V => D3::from_ord(self.op_ord as usize).to_string(),
+        SymmetryClass::E => K4::from_ord(self.op_ord as usize).to_string(),
+        SymmetryClass::CV | SymmetryClass::CE | SymmetryClass::EV =>
+          C2::from_ord(self.op_ord as usize).to_string(),
+        SymmetryClass::Trivial => Trivial::from_ord(self.op_ord as usize).to_string(),
+      },
+      self.hash
+    )
   }
 }

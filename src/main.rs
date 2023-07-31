@@ -76,7 +76,7 @@ fn main() {
   let game = Onoro16::default_start();
   let view = OnoroView::new(game);
 
-  println!("{:?}", view);
+  println!("{}", view);
 
   // println!("size of game state: {}", std::mem::size_of::<Onoro16>());
 

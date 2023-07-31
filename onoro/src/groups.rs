@@ -20,7 +20,7 @@ pub enum SymmetryClass {
   /// Center of mass lies on the edge of a hexagonal tile.
   EV,
   /// Center of mass is none of the above.
-  TRIVIAL,
+  Trivial,
 }
 
 pub type D6 = Dihedral<6>;
