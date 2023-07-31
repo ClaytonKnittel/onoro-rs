@@ -575,9 +575,30 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Display
       writeln!(f, "white:")?;
     }
 
-    for y in (0..Self::board_width()).rev() {
-      write!(f, "{: <width$}", "", width = Self::board_width() - y - 1)?;
-      for x in 0..Self::board_width() {
+    let ((min_x, min_y), (max_x, max_y)) = self.pawns().fold(
+      ((N, N), (0, 0)),
+      |((min_x, min_y), (max_x, max_y)), pawn| {
+        (
+          (
+            min_x.min(pawn.pos.x() as usize),
+            min_y.min(pawn.pos.y() as usize),
+          ),
+          (
+            max_x.max(pawn.pos.x() as usize),
+            max_y.max(pawn.pos.y() as usize),
+          ),
+        )
+      },
+    );
+
+    let min_x = min_x.saturating_sub(1);
+    let min_y = min_y.saturating_sub(1);
+    let max_x = (max_x + 1).min(N - 1);
+    let max_y = (max_y + 1).min(N - 1);
+
+    for y in (min_y..=max_y).rev() {
+      write!(f, "{: <width$}", "", width = max_y - y)?;
+      for x in min_x..=max_x {
         write!(
           f,
           "{}",
@@ -593,7 +614,7 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Display
         }
       }
 
-      if y > 0 {
+      if y > min_y {
         writeln!(f)?;
       }
     }
