@@ -1,11 +1,15 @@
 use std::ops::Index;
 
-use algebra::{finite::Finite, group::Group, ordinal::Ordinal};
+use algebra::{
+  finite::Finite,
+  group::{Cyclic, Group},
+  ordinal::Ordinal,
+};
 use const_random::const_random;
 
 use crate::{
   const_rand::Xoroshiro128,
-  groups::{D3, D6, K4},
+  groups::{SymmetryClass, C2, D3, D6, K4},
   hex_pos::{HexPos, HexPosOffset},
   tile_hash::{TileHash, C_MASK, E_MASK, V_MASK},
 };
@@ -74,9 +78,9 @@ impl<const N: usize, const N2: usize> HashTable<N, N2, D6> {
         // Accumulate the inverses of the operations we have been doing.
         op = op.const_op(&D6::Rot(5));
 
-        let s_pos = s.add_hex(&Self::center());
-        if Self::has_been_computed(&s_pos, i) {
-          let ord = Self::hex_pos_ord(&s_pos);
+        let symm_pos = s.add_hex(&Self::center());
+        if Self::has_been_computed(&symm_pos, i) {
+          let ord = Self::hex_pos_ord(&symm_pos);
           let hash = table[ord];
           // Apply the accumulated group op to transform `s` back to `pos`.
           table[i] = hash.apply(&op);
@@ -99,9 +103,9 @@ impl<const N: usize, const N2: usize> HashTable<N, N2, D6> {
           continue 'tile_loop;
         }
 
-        let s_pos = s.add_hex(&Self::center());
-        if Self::has_been_computed(&s_pos, i) {
-          let ord = Self::hex_pos_ord(&s_pos);
+        let symm_pos = s.add_hex(&Self::center());
+        if Self::has_been_computed(&symm_pos, i) {
+          let ord = Self::hex_pos_ord(&symm_pos);
           let hash = table[ord];
           // Apply the accumulated group op to transform `s` back to `pos`.
           table[i] = hash.apply(&op);
@@ -151,9 +155,9 @@ impl<const N: usize, const N2: usize> HashTable<N, N2, D3> {
         // Accumulate the inverses of the operations we have been doing.
         op = op.const_op(&D3::Rot(2));
 
-        let s_pos = s.add_hex(&Self::center());
-        if Self::has_been_computed(&s_pos, i) {
-          let ord = Self::hex_pos_ord(&s_pos);
+        let symm_pos = s.add_hex(&Self::center());
+        if Self::has_been_computed(&symm_pos, i) {
+          let ord = Self::hex_pos_ord(&symm_pos);
           let hash = table[ord];
           // Apply the accumulated group op to transform `s` back to `pos`.
           table[i] = hash.apply(&op);
@@ -176,9 +180,9 @@ impl<const N: usize, const N2: usize> HashTable<N, N2, D3> {
           continue 'tile_loop;
         }
 
-        let s_pos = s.add_hex(&Self::center());
-        if Self::has_been_computed(&s_pos, i) {
-          let ord = Self::hex_pos_ord(&s_pos);
+        let symm_pos = s.add_hex(&Self::center());
+        if Self::has_been_computed(&symm_pos, i) {
+          let ord = Self::hex_pos_ord(&symm_pos);
           let hash = table[ord];
           // Apply the accumulated group op to transform `s` back to `pos`.
           table[i] = hash.apply(&op);
@@ -225,9 +229,9 @@ impl<const N: usize, const N2: usize> HashTable<N, N2, K4> {
         let op = K4::const_from_ord(op_ord);
         op_ord += 1;
 
-        let s_pos = pos.apply_k4_e(&op).add_hex(&Self::center());
-        if Self::has_been_computed(&s_pos, i) {
-          let ord = Self::hex_pos_ord(&s_pos);
+        let symm_pos = pos.apply_k4_e(&op).add_hex(&Self::center());
+        if Self::has_been_computed(&symm_pos, i) {
+          let ord = Self::hex_pos_ord(&symm_pos);
           let hash = table[ord];
           // Apply the accumulated group op to transform `s` back to `pos`.
           table[i] = hash.apply(&op);
@@ -261,6 +265,62 @@ impl<const N: usize, const N2: usize> HashTable<N, N2, K4> {
   }
 }
 
+impl<const N: usize, const N2: usize> HashTable<N, N2, C2> {
+  const fn new_c2(symm_class: SymmetryClass, mut rng: Xoroshiro128) -> Self {
+    let mut table = [TileHash::<C2>::uninitialized(); N2];
+
+    let mut i = 0usize;
+    while i < N2 {
+      let pos = Self::ord_to_hex_pos(i);
+
+      // Normalize coordinates to the center.
+      let pos = pos.sub_hex(&Self::center());
+
+      let (new_rng, h) = rng.next_u64();
+      rng = new_rng;
+      let c2b = TileHash::<C2>::new(h & E_MASK);
+
+      // check the symmetry for existing hashes/self-mapping
+      let s = match symm_class {
+        SymmetryClass::CV => pos.apply_c2_cv(&Cyclic(1)),
+        SymmetryClass::CE => pos.apply_c2_ce(&Cyclic(1)),
+        SymmetryClass::EV => pos.apply_c2_ev(&Cyclic(1)),
+        _ => panic!("Can only generate C2 hash table from symm_class CV, CE, or EV."),
+      };
+      let symm_pos = s.add_hex(&Self::center());
+      if s.eq_cnst(&pos) {
+        table[i] = c2b.make_invariant(&Cyclic(1));
+      } else if Self::has_been_computed(&symm_pos, i) {
+        let ord = Self::hex_pos_ord(&symm_pos);
+        let hash = table[ord];
+        // Apply the accumulated group op to transform `s` back to `pos`.
+        table[i] = hash.apply(&Cyclic(1));
+      } else {
+        table[i] = c2b;
+      }
+
+      i += 1;
+    }
+
+    Self { table }
+  }
+
+  pub const fn new_cv() -> Self {
+    let rng = Xoroshiro128::from_seed(&[const_random!(u64), const_random!(u64)]);
+    Self::new_c2(SymmetryClass::CV, rng)
+  }
+
+  pub const fn new_ce() -> Self {
+    let rng = Xoroshiro128::from_seed(&[const_random!(u64), const_random!(u64)]);
+    Self::new_c2(SymmetryClass::CE, rng)
+  }
+
+  pub const fn new_ev() -> Self {
+    let rng = Xoroshiro128::from_seed(&[const_random!(u64), const_random!(u64)]);
+    Self::new_c2(SymmetryClass::EV, rng)
+  }
+}
+
 impl<const N: usize, const N2: usize, G: Group> Index<usize> for HashTable<N, N2, G> {
   type Output = TileHash<G>;
 
@@ -271,16 +331,17 @@ impl<const N: usize, const N2: usize, G: Group> Index<usize> for HashTable<N, N2
 
 #[cfg(test)]
 mod test {
-  use algebra::{finite::Finite, monoid::Monoid};
+  use algebra::{finite::Finite, group::Cyclic, monoid::Monoid};
 
   use crate::{
-    groups::{D3, D6, K4},
+    groups::{C2, D3, D6, K4},
     hash::HashTable,
   };
 
   type HD6 = HashTable<16, 256, D6>;
   type HD3 = HashTable<16, 256, D3>;
   type HK4 = HashTable<16, 256, K4>;
+  type HC2 = HashTable<16, 256, C2>;
 
   #[test]
   fn test_d6_table() {
@@ -381,7 +442,7 @@ mod test {
     const K4T: HK4 = HashTable::new_e();
 
     for i in 0..256 {
-      let pos = HD3::ord_to_hex_pos(i) - HD3::center();
+      let pos = HK4::ord_to_hex_pos(i) - HK4::center();
       let hash = K4T[i];
 
       let mut op_ord = 1;
@@ -396,6 +457,60 @@ mod test {
 
           assert_eq!(symm_hash, hash.apply(&op));
         }
+      }
+    }
+  }
+
+  #[test]
+  fn test_c2_cv_table() {
+    const C2T: HC2 = HashTable::new_cv();
+
+    for i in 0..256 {
+      let pos = HC2::ord_to_hex_pos(i) - HC2::center();
+      let hash = C2T[i];
+
+      let symm_pos = pos.apply_c2_cv(&Cyclic(1)) + HC2::center();
+      if HC2::in_bounds(&symm_pos) {
+        let ord = HC2::hex_pos_ord(&symm_pos);
+        let symm_hash = C2T[ord];
+
+        assert_eq!(symm_hash, hash.apply(&Cyclic(1)));
+      }
+    }
+  }
+
+  #[test]
+  fn test_c2_ce_table() {
+    const C2T: HC2 = HashTable::new_ce();
+
+    for i in 0..256 {
+      let pos = HC2::ord_to_hex_pos(i) - HC2::center();
+      let hash = C2T[i];
+
+      let symm_pos = pos.apply_c2_ce(&Cyclic(1)) + HC2::center();
+      if HC2::in_bounds(&symm_pos) {
+        let ord = HC2::hex_pos_ord(&symm_pos);
+        let symm_hash = C2T[ord];
+
+        assert_eq!(symm_hash, hash.apply(&Cyclic(1)));
+      }
+    }
+  }
+
+  #[test]
+  fn test_c2_ev_table() {
+    const C2T: HC2 = HashTable::new_ev();
+
+    for i in 0..256 {
+      let pos = HC2::ord_to_hex_pos(i) - HC2::center();
+      let hash = C2T[i];
+
+      let symm_pos = pos.apply_c2_ev(&Cyclic(1)) + HC2::center();
+      if HC2::in_bounds(&symm_pos) {
+        let ord = HC2::hex_pos_ord(&symm_pos);
+        let symm_hash = C2T[ord];
+
+        assert_eq!(symm_hash, hash.apply(&Cyclic(1)));
       }
     }
   }
