@@ -18,4 +18,5 @@ mod util;
 
 pub use crate::onoro::*;
 pub use onoro_defs::*;
+pub use onoro_view::*;
 pub use r#move::*;

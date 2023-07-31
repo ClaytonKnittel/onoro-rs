@@ -23,6 +23,10 @@ impl<const N: u16> Dihedral<N> {
       (Self::Rfl(i), Self::Rfl(j)) => Self::Rot((N + i - j) % N),
     }
   }
+
+  pub fn for_each() -> impl Iterator<Item = Self> {
+    (0..Self::SIZE).map(Self::from_ord)
+  }
 }
 
 impl<const N: u16> Mul for Dihedral<N> {

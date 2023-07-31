@@ -28,6 +28,16 @@ impl<L, R> DirectProduct<L, R> {
   }
 }
 
+impl<L, R> DirectProduct<L, R>
+where
+  L: Ordinal,
+  R: Ordinal,
+{
+  pub fn for_each() -> impl Iterator<Item = Self> {
+    (0..Self::SIZE).map(Self::from_ord)
+  }
+}
+
 impl DirectProduct<Cyclic<2>, Cyclic<2>> {
   pub const fn const_op(&self, rhs: &Self) -> Self {
     Self {

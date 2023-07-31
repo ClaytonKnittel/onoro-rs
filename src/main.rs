@@ -1,6 +1,6 @@
 use std::time::Instant;
 
-use onoro::{Move, Onoro16};
+use onoro::{Move, Onoro16, OnoroView};
 use rand::Rng;
 
 fn validate_moves(onoro: &Onoro16) {
@@ -73,7 +73,10 @@ fn explore_p2(onoro: &Onoro16, depth: u32) -> u64 {
 }
 
 fn main() {
-  let mut game = Onoro16::default_start();
+  let game = Onoro16::default_start();
+  let view = OnoroView::new(game);
+
+  println!("{:?}", view);
 
   // println!("size of game state: {}", std::mem::size_of::<Onoro16>());
 

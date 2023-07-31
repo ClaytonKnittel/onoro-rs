@@ -8,10 +8,12 @@ use algebra::{
 use const_random::const_random;
 
 use crate::{
+  canonicalize::BoardSymmetryState,
   const_rand::Xoroshiro128,
   groups::{SymmetryClass, C2, D3, D6, K4},
   hex_pos::{HexPos, HexPosOffset},
   tile_hash::{TileHash, C_MASK, E_MASK, V_MASK},
+  Onoro,
 };
 
 #[derive(Debug)]
@@ -20,6 +22,38 @@ pub struct HashTable<const N: usize, const N2: usize, G: Group> {
 }
 
 impl<const N: usize, const N2: usize, G: Group> HashTable<N, N2, G> {
+  /// Computes the hash of a game state on a given hash table.
+  pub fn hash<const OnoroN: usize, const OnoroN2: usize, const ADJ_CNT_SIZE: usize>(
+    &self,
+    onoro: &Onoro<OnoroN, OnoroN2, ADJ_CNT_SIZE>,
+    symm_state: &BoardSymmetryState,
+  ) -> u64 {
+    let origin = onoro.origin(symm_state);
+    onoro.pawns().fold(0u64, |hash, pawn| {
+      // The position of the pawn relative to the rotation-invariant origin of
+      // the board.
+      let pos = HexPos::from(pawn.pos) - origin;
+      // The position of the pawn normalized to align board states on all
+      // symmetry axes which the board isn't possibly symmetric about itself.
+      let normalized_pos = pos.apply_d6_c(&symm_state.op);
+      // The position of the pawn in table space, relative to the center of the
+      // hash table.
+      let table_pos = normalized_pos + Self::center();
+      // The index of the tile this pawn is on.
+      let table_idx = Self::hex_pos_ord(&table_pos);
+      let tile_hash = &self[table_idx];
+
+      let pawn_hash = if pawn.color == onoro.player_color() {
+        tile_hash.cur_player_hash()
+      } else {
+        tile_hash.other_player_hash()
+      };
+
+      // Zobrist hashing accumulates all hashes with xor.
+      hash ^ pawn_hash
+    })
+  }
+
   const fn center() -> HexPos {
     HexPos::new((N / 2) as u32, (N / 2) as u32)
   }
@@ -41,8 +75,8 @@ impl<const N: usize, const N2: usize, G: Group> HashTable<N, N2, G> {
 
   /// Returns true if the hash for `pos` will be computed before `cur_idx`.
   const fn has_been_computed(pos: &HexPos, cur_idx: usize) -> bool {
-    let ord = Self::hex_pos_ord(&pos);
-    ord < cur_idx && Self::in_bounds(&pos)
+    let ord = Self::hex_pos_ord(pos);
+    ord < cur_idx && Self::in_bounds(pos)
   }
 }
 
@@ -59,9 +93,10 @@ impl<const N: usize, const N2: usize> HashTable<N, N2, D6> {
       // Normalize coordinates to the center.
       let pos = pos.sub_hex(&Self::center());
 
-      let (new_rng, h) = rng.next_u64();
+      let (new_rng, h_cur) = rng.next_u64();
+      let (new_rng, h_oth) = new_rng.next_u64();
       rng = new_rng;
-      let d6b = TileHash::<D6>::new(h & C_MASK);
+      let d6b = TileHash::<D6>::new(h_cur & C_MASK, h_oth & C_MASK);
 
       if pos.eq_cnst(&HexPosOffset::origin()) {
         table[i] = d6b.make_invariant(&D6::Rot(1)).make_invariant(&D6::Rfl(0));
@@ -142,9 +177,10 @@ impl<const N: usize, const N2: usize> HashTable<N, N2, D3> {
       // Normalize coordinates to the center.
       let pos = pos.sub_hex(&Self::center());
 
-      let (new_rng, h) = rng.next_u64();
+      let (new_rng, h_cur) = rng.next_u64();
+      let (new_rng, h_oth) = new_rng.next_u64();
       rng = new_rng;
-      let d3b = TileHash::<D3>::new(h & V_MASK);
+      let d3b = TileHash::<D3>::new(h_cur & V_MASK, h_oth & V_MASK);
 
       // Try the 2 rotational symmetries
       let mut s = pos;
@@ -219,9 +255,10 @@ impl<const N: usize, const N2: usize> HashTable<N, N2, K4> {
       // Normalize coordinates to the center.
       let pos = pos.sub_hex(&Self::center());
 
-      let (new_rng, h) = rng.next_u64();
+      let (new_rng, h_cur) = rng.next_u64();
+      let (new_rng, h_oth) = new_rng.next_u64();
       rng = new_rng;
-      let k4b = TileHash::<K4>::new(h & E_MASK);
+      let k4b = TileHash::<K4>::new(h_cur & E_MASK, h_oth & E_MASK);
 
       // Check the 3 symmetries for existing hashes.
       let mut op_ord = 1;
@@ -276,9 +313,10 @@ impl<const N: usize, const N2: usize> HashTable<N, N2, C2> {
       // Normalize coordinates to the center.
       let pos = pos.sub_hex(&Self::center());
 
-      let (new_rng, h) = rng.next_u64();
+      let (new_rng, h_cur) = rng.next_u64();
+      let (new_rng, h_oth) = new_rng.next_u64();
       rng = new_rng;
-      let c2b = TileHash::<C2>::new(h & E_MASK);
+      let c2b = TileHash::<C2>::new(h_cur, h_oth);
 
       // check the symmetry for existing hashes/self-mapping
       let s = match symm_class {
@@ -329,9 +367,10 @@ impl<const N: usize, const N2: usize> HashTable<N, N2, Trivial> {
 
     let mut i = 0usize;
     while i < N2 {
-      let (new_rng, h) = rng.next_u64();
+      let (new_rng, h_cur) = rng.next_u64();
+      let (new_rng, h_oth) = new_rng.next_u64();
       rng = new_rng;
-      table[i] = TileHash::<Trivial>::new(h);
+      table[i] = TileHash::<Trivial>::new(h_cur, h_oth);
       i += 1;
     }
 

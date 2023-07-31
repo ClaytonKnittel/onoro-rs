@@ -9,15 +9,12 @@ pub(crate) const V_MASK: u64 = 0x0fff_ffff_ffff_ffff;
 pub(crate) const E_MASK: u64 = 0xffff_ffff_ffff_ffff;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct TileHash<G: Group> {
+pub struct HashGroup<G: Group> {
   hash: u64,
   _p: PhantomData<G>,
 }
 
-impl<G> TileHash<G>
-where
-  G: Group,
-{
+impl<G: Group> HashGroup<G> {
   pub const fn new(hash: u64) -> Self {
     Self {
       hash,
@@ -32,27 +29,12 @@ where
     }
   }
 
-  pub const fn cur_player_hash(&self) -> u64 {
+  pub const fn hash(&self) -> u64 {
     self.hash
-  }
-
-  pub const fn other_player_hash(&self) -> u64 {
-    let hl = self.hash & 0x5555_5555_5555_5555;
-    let hr = self.hash & 0xaaaa_aaaa_aaaa_aaaa;
-
-    (hl << 1) | (hr >> 1)
-  }
-
-  /// TODO: if this is unused, make cur/other player hash codes independent.
-  pub const fn color_swap(&self) -> Self {
-    let hl = self.hash & 0x5555_5555_5555_5555;
-    let hr = self.hash & 0xaaaa_aaaa_aaaa_aaaa;
-
-    Self::new((hl << 1) | (hr >> 1))
   }
 }
 
-impl TileHash<D6> {
+impl HashGroup<D6> {
   const fn r1(h: u64) -> u64 {
     ((h << 10) | (h >> 50)) & C_MASK
   }
@@ -242,7 +224,7 @@ impl TileHash<D6> {
   }
 }
 
-impl TileHash<D3> {
+impl HashGroup<D3> {
   const fn r1(h: u64) -> u64 {
     ((h << 20) | (h >> 40)) & V_MASK
   }
@@ -336,7 +318,7 @@ impl TileHash<D3> {
   }
 }
 
-impl TileHash<K4> {
+impl HashGroup<K4> {
   const fn a(h: u64) -> u64 {
     (h << 32) | (h >> 32)
   }
@@ -397,7 +379,7 @@ impl TileHash<K4> {
   }
 }
 
-impl TileHash<C2> {
+impl HashGroup<C2> {
   const fn a(h: u64) -> u64 {
     (h << 32) | (h >> 32)
   }
@@ -427,7 +409,7 @@ impl TileHash<C2> {
   }
 }
 
-impl Display for TileHash<D6> {
+impl Display for HashGroup<D6> {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     write!(
       f,
@@ -442,7 +424,7 @@ impl Display for TileHash<D6> {
   }
 }
 
-impl Display for TileHash<D3> {
+impl Display for HashGroup<D3> {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     write!(
       f,
@@ -454,7 +436,7 @@ impl Display for TileHash<D3> {
   }
 }
 
-impl Display for TileHash<K4> {
+impl Display for HashGroup<K4> {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     write!(
       f,
@@ -467,7 +449,7 @@ impl Display for TileHash<K4> {
   }
 }
 
-impl Display for TileHash<C2> {
+impl Display for HashGroup<C2> {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     write!(
       f,
@@ -475,5 +457,134 @@ impl Display for TileHash<C2> {
       self.hash & 0xffffffff,
       (self.hash >> 32) & 0xffffffff,
     )
+  }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct TileHash<G: Group> {
+  cur_hash: HashGroup<G>,
+  other_hash: HashGroup<G>,
+  _p: PhantomData<G>,
+}
+
+impl<G> TileHash<G>
+where
+  G: Group,
+{
+  pub const fn new(cur_hash: u64, other_hash: u64) -> Self {
+    Self {
+      cur_hash: HashGroup::new(cur_hash),
+      other_hash: HashGroup::new(other_hash),
+      _p: PhantomData {},
+    }
+  }
+
+  pub const fn uninitialized() -> Self {
+    Self {
+      cur_hash: HashGroup::uninitialized(),
+      other_hash: HashGroup::uninitialized(),
+      _p: PhantomData {},
+    }
+  }
+
+  pub const fn cur_player_hash(&self) -> u64 {
+    self.cur_hash.hash()
+  }
+
+  pub const fn other_player_hash(&self) -> u64 {
+    self.other_hash.hash()
+  }
+
+  /// TODO: if this is unused, make cur/other player hash codes independent.
+  pub const fn color_swap(&self) -> Self {
+    Self::new(self.other_hash.hash(), self.cur_hash.hash())
+  }
+}
+
+impl TileHash<D6> {
+  pub const fn apply(&self, op: &D6) -> Self {
+    Self::new(
+      self.cur_hash.apply(op).hash(),
+      self.other_hash.apply(op).hash(),
+    )
+  }
+
+  pub const fn make_invariant(&self, op: &D6) -> Self {
+    Self::new(
+      self.cur_hash.make_invariant(op).hash(),
+      self.other_hash.make_invariant(op).hash(),
+    )
+  }
+}
+
+impl TileHash<D3> {
+  pub const fn apply(&self, op: &D3) -> Self {
+    Self::new(
+      self.cur_hash.apply(op).hash(),
+      self.other_hash.apply(op).hash(),
+    )
+  }
+
+  pub const fn make_invariant(&self, op: &D3) -> Self {
+    Self::new(
+      self.cur_hash.make_invariant(op).hash(),
+      self.other_hash.make_invariant(op).hash(),
+    )
+  }
+}
+
+impl TileHash<K4> {
+  pub const fn apply(&self, op: &K4) -> Self {
+    Self::new(
+      self.cur_hash.apply(op).hash(),
+      self.other_hash.apply(op).hash(),
+    )
+  }
+
+  pub const fn make_invariant(&self, op: &K4) -> Self {
+    Self::new(
+      self.cur_hash.make_invariant(op).hash(),
+      self.other_hash.make_invariant(op).hash(),
+    )
+  }
+}
+
+impl TileHash<C2> {
+  pub const fn apply(&self, op: &C2) -> Self {
+    Self::new(
+      self.cur_hash.apply(op).hash(),
+      self.other_hash.apply(op).hash(),
+    )
+  }
+
+  pub const fn make_invariant(&self, op: &C2) -> Self {
+    Self::new(
+      self.cur_hash.make_invariant(op).hash(),
+      self.other_hash.make_invariant(op).hash(),
+    )
+  }
+}
+
+impl Display for TileHash<D6> {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(f, "{} |cur/other| {}", self.cur_hash, self.other_hash)
+  }
+}
+
+impl Display for TileHash<D3> {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(f, "{} |cur/other| {}", self.cur_hash, self.other_hash)
+  }
+}
+
+impl Display for TileHash<K4> {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(f, "{} |cur/other| {}", self.cur_hash, self.other_hash)
+  }
+}
+
+impl Display for TileHash<C2> {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(f, "{} |cur/other| {}", self.cur_hash, self.other_hash)
   }
 }
