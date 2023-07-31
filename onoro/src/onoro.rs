@@ -407,7 +407,7 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Onoro<N, N2, AD
 
   /// Given a position on the board, returns the tile state of that position,
   /// i.e. the color of the piece on that tile, or `Empty` if no piece is there.
-  fn get_tile(&self, idx: PackedIdx) -> TileState {
+  pub(crate) fn get_tile(&self, idx: PackedIdx) -> TileState {
     if idx == PackedIdx::null() {
       return TileState::Empty;
     }

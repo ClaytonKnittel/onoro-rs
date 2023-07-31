@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use algebra::group::Cyclic;
+use algebra::group::{Cyclic, Trivial};
 
 use crate::groups::{C2, D3, D6, K4};
 
@@ -294,6 +294,10 @@ impl HexPosOffset {
       Cyclic::<2>(1) => self.c_s3(),
       _ => unreachable!(),
     }
+  }
+
+  pub const fn apply_trivial(&self, op: &Trivial) -> Self {
+    *self
   }
 
   /// Applies the corresponding group operation for the given symmetry class (C,

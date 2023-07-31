@@ -1,15 +1,28 @@
 use std::fmt::Display;
 
-use algebra::{group::Trivial, monoid::Monoid, ordinal::Ordinal};
+use algebra::{
+  group::{Group, Trivial},
+  monoid::Monoid,
+  ordinal::Ordinal,
+};
 
 use crate::{
   canonicalize::{board_symm_state, BoardSymmetryState},
   groups::{SymmetryClass, C2, D3, D6, K4},
   hash::HashTable,
+  hex_pos::{HexPos, HexPosOffset},
   tile_hash::HashGroup,
-  Onoro,
+  Onoro, PawnColor, TileState,
 };
 
+/// Always generate hash tables for the full game. Only a part of the tables
+/// will be used for smaller games.
+type ViewHashTable<G> = HashTable<16, 256, G>;
+
+/// A wrapper over Onoro states that caches the hash of the game state and it's
+/// canonicalizing symmetry operations. These caches values are used for quicker
+/// equality comparison between different Onoro game states which may be in
+/// different orientations.
 #[derive(Debug)]
 pub struct OnoroView<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> {
   onoro: Onoro<N, N2, ADJ_CNT_SIZE>,
@@ -44,7 +57,7 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroView<N, N2
     onoro: &Onoro<N, N2, ADJ_CNT_SIZE>,
     symm_state: &BoardSymmetryState,
   ) -> (u64, u8) {
-    static D6T: HashTable<16, 256, D6> = HashTable::new_c();
+    static D6T: ViewHashTable<D6> = HashTable::new_c();
     let hash = HashGroup::<D6>::new(D6T.hash(onoro, symm_state));
 
     // Try all symmetries of the board state with invariant center of mass,
@@ -59,7 +72,7 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroView<N, N2
     onoro: &Onoro<N, N2, ADJ_CNT_SIZE>,
     symm_state: &BoardSymmetryState,
   ) -> (u64, u8) {
-    static D3T: HashTable<16, 256, D3> = HashTable::new_v();
+    static D3T: ViewHashTable<D3> = HashTable::new_v();
     let hash = HashGroup::<D3>::new(D3T.hash(onoro, symm_state));
 
     // Try all symmetries of the board state with invariant center of mass,
@@ -74,7 +87,7 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroView<N, N2
     onoro: &Onoro<N, N2, ADJ_CNT_SIZE>,
     symm_state: &BoardSymmetryState,
   ) -> (u64, u8) {
-    static K4T: HashTable<16, 256, K4> = HashTable::new_e();
+    static K4T: ViewHashTable<K4> = HashTable::new_e();
     let hash = HashGroup::<K4>::new(K4T.hash(onoro, symm_state));
 
     // Try all symmetries of the board state with invariant center of mass,
@@ -89,7 +102,7 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroView<N, N2
     onoro: &Onoro<N, N2, ADJ_CNT_SIZE>,
     symm_state: &BoardSymmetryState,
   ) -> (u64, u8) {
-    static C2CVT: HashTable<16, 256, C2> = HashTable::new_cv();
+    static C2CVT: ViewHashTable<C2> = HashTable::new_cv();
     let hash = HashGroup::<C2>::new(C2CVT.hash(onoro, symm_state));
 
     // Try all symmetries of the board state with invariant center of mass,
@@ -104,7 +117,7 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroView<N, N2
     onoro: &Onoro<N, N2, ADJ_CNT_SIZE>,
     symm_state: &BoardSymmetryState,
   ) -> (u64, u8) {
-    static C2CET: HashTable<16, 256, C2> = HashTable::new_ce();
+    static C2CET: ViewHashTable<C2> = HashTable::new_ce();
     let hash = HashGroup::<C2>::new(C2CET.hash(onoro, symm_state));
 
     // Try all symmetries of the board state with invariant center of mass,
@@ -119,7 +132,7 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroView<N, N2
     onoro: &Onoro<N, N2, ADJ_CNT_SIZE>,
     symm_state: &BoardSymmetryState,
   ) -> (u64, u8) {
-    static C2EVT: HashTable<16, 256, C2> = HashTable::new_ev();
+    static C2EVT: ViewHashTable<C2> = HashTable::new_ev();
     let hash = HashGroup::<C2>::new(C2EVT.hash(onoro, symm_state));
 
     // Try all symmetries of the board state with invariant center of mass,
@@ -134,8 +147,81 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroView<N, N2
     onoro: &Onoro<N, N2, ADJ_CNT_SIZE>,
     symm_state: &BoardSymmetryState,
   ) -> (u64, u8) {
-    static TT: HashTable<16, 256, Trivial> = HashTable::new_trivial();
+    static TT: ViewHashTable<Trivial> = HashTable::new_trivial();
     (TT.hash(onoro, symm_state), Trivial::identity().ord() as u8)
+  }
+
+  fn cmp_views<G: Group + Ordinal, F>(
+    view1: &OnoroView<N, N2, ADJ_CNT_SIZE>,
+    view2: &OnoroView<N, N2, ADJ_CNT_SIZE>,
+    mut apply_view_transform: F,
+  ) -> bool
+  where
+    F: FnMut(&HexPosOffset, &G) -> HexPosOffset,
+  {
+    let onoro1 = &view1.onoro;
+    let onoro2 = &view2.onoro;
+
+    if onoro1.pawns_in_play() != onoro2.pawns_in_play() {
+      return false;
+    }
+
+    let symm_state1 = board_symm_state(onoro1);
+    let symm_state2 = board_symm_state(onoro1);
+    let normalizing_op1 = symm_state1.op;
+    let denormalizing_op2 = symm_state2.op.inverse();
+    let origin1 = onoro1.origin(&symm_state1);
+    let origin2 = onoro2.origin(&symm_state2);
+
+    let canon_op1 = G::from_ord(view1.op_ord as usize);
+    let canon_op2 = G::from_ord(view2.op_ord as usize);
+    let to_view2 = canon_op2.inverse() * canon_op1;
+
+    let same_color_turn = onoro1.player_color() == onoro2.player_color();
+
+    onoro1.pawns().all(|pawn| {
+      let normalized_pos1 = (HexPos::from(pawn.pos) - origin1).apply_d6_c(&normalizing_op1);
+      let normalized_pos2 = apply_view_transform(&normalized_pos1, &to_view2);
+      let pos2 = normalized_pos2.apply_d6_c(&denormalizing_op2) + origin2;
+
+      match onoro2.get_tile(pos2.into()) {
+        TileState::Black => {
+          if same_color_turn {
+            pawn.color == PawnColor::Black
+          } else {
+            pawn.color == PawnColor::White
+          }
+        }
+        TileState::White => {
+          if same_color_turn {
+            pawn.color == PawnColor::White
+          } else {
+            pawn.color == PawnColor::Black
+          }
+        }
+        TileState::Empty => false,
+      }
+    })
+  }
+}
+
+impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> PartialEq
+  for OnoroView<N, N2, ADJ_CNT_SIZE>
+{
+  fn eq(&self, other: &Self) -> bool {
+    if self.symm_class != other.symm_class {
+      return false;
+    }
+
+    match self.symm_class {
+      SymmetryClass::C => Self::cmp_views(self, other, HexPosOffset::apply_d6_c),
+      SymmetryClass::V => Self::cmp_views(self, other, HexPosOffset::apply_d3_v),
+      SymmetryClass::E => Self::cmp_views(self, other, HexPosOffset::apply_k4_e),
+      SymmetryClass::CV => Self::cmp_views(self, other, HexPosOffset::apply_c2_cv),
+      SymmetryClass::CE => Self::cmp_views(self, other, HexPosOffset::apply_c2_ce),
+      SymmetryClass::EV => Self::cmp_views(self, other, HexPosOffset::apply_c2_ev),
+      SymmetryClass::Trivial => Self::cmp_views(self, other, HexPosOffset::apply_trivial),
+    }
   }
 }
 
