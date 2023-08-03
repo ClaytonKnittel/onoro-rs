@@ -517,9 +517,30 @@ mod tests {
       )
       .unwrap(),
     );
+    let view3 = OnoroView::new(
+      Onoro16::from_board_string(
+        ". . B
+          W B W",
+      )
+      .unwrap(),
+    );
+    let view4 = OnoroView::new(
+      Onoro16::from_board_string(
+        ". . W
+          . B B
+           W . .",
+      )
+      .unwrap(),
+    );
 
     assert_eq!(view1.symm_class, SymmetryClass::CE);
+    assert_eq!(view3.symm_class, SymmetryClass::CE);
 
     assert_eq!(view1, view2);
+    assert_ne!(view1, view3);
+    assert_ne!(view2, view3);
+    assert_ne!(view1, view4);
+    assert_ne!(view2, view4);
+    assert_eq!(view3, view4);
   }
 }
