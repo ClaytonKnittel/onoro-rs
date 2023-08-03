@@ -1,5 +1,6 @@
 use std::{cmp, fmt::Display};
 
+use itertools::interleave;
 use union_find::ConstUnionFind;
 
 use crate::{canonicalize::BoardSymmetryState, make_onoro_error, util::broadcast_u8_to_u64};
@@ -57,6 +58,56 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Onoro<N, N2, AD
       score: PackedScore::new(Score::tie(0), OnoroState::new()),
       sum_of_mass: HexPos::zero().into(),
     }
+  }
+
+  pub fn from_board_string(board_layout: &str) -> Result<Self, String> {
+    let mut black_pawns = Vec::new();
+    let mut while_pawns = Vec::new();
+
+    for (y, line) in board_layout.split('\n').enumerate() {
+      for (x, tile) in line.split_ascii_whitespace().enumerate() {
+        let pos = PackedIdx::from(HexPos::new(x as u32 + 1, (N - y - 2) as u32));
+        match tile {
+          "B" | "b" => black_pawns.push(pos),
+          "W" | "w" => while_pawns.push(pos),
+          "." => {}
+          _ => {
+            return Err(format!("Invalid character in game state string: {tile}"));
+          }
+        }
+      }
+    }
+
+    if black_pawns.len() > N || while_pawns.len() > N {
+      return Err(format!(
+        "Too many pawns in board: {} black and {} white",
+        black_pawns.len(),
+        while_pawns.len()
+      ));
+    }
+
+    if black_pawns.is_empty() {
+      return Err(
+        "Must have at least one black pawn placed, since they are the first player.".into(),
+      );
+    }
+
+    if !((black_pawns.len() - 1)..=black_pawns.len()).contains(&while_pawns.len()) {
+      return Err(format!(
+        "There must be either one fewer or equally many white pawns as there are black. Found {} black and {} white.",
+        black_pawns.len(), while_pawns.len()
+      ));
+    }
+
+    let mut game = Self::new();
+    unsafe {
+      game.make_move_unchecked(Move::Phase1Move { to: black_pawns[0] });
+    }
+    for pos in interleave(while_pawns, black_pawns.into_iter().skip(1)) {
+      game.make_move(Move::Phase1Move { to: pos });
+    }
+
+    Ok(game)
   }
 
   pub fn default_start() -> Self {
