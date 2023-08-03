@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::{fmt::Display, hash::Hash};
 
 use algebra::{
   group::{Group, Trivial},
@@ -209,7 +209,7 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> PartialEq
   for OnoroView<N, N2, ADJ_CNT_SIZE>
 {
   fn eq(&self, other: &Self) -> bool {
-    if self.symm_class != other.symm_class {
+    if self.hash != other.hash || self.symm_class != other.symm_class {
       return false;
     }
 
@@ -228,6 +228,14 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> PartialEq
 impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Eq
   for OnoroView<N, N2, ADJ_CNT_SIZE>
 {
+}
+
+impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Hash
+  for OnoroView<N, N2, ADJ_CNT_SIZE>
+{
+  fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+    state.write_u64(self.hash);
+  }
 }
 
 impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Display
@@ -249,5 +257,131 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Display
       },
       self.hash
     )
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use crate::{Onoro16, OnoroView};
+
+  #[test]
+  #[allow(non_snake_case)]
+  fn test_V_symm_simple() {
+    let view1 = OnoroView::new(
+      Onoro16::from_board_string(
+        ". W
+          B B",
+      )
+      .unwrap(),
+    );
+    let view2 = OnoroView::new(
+      Onoro16::from_board_string(
+        ". B
+          B W",
+      )
+      .unwrap(),
+    );
+
+    assert_eq!(view1, view2);
+  }
+
+  #[test]
+  #[allow(non_snake_case)]
+  fn test_C_symm_simple() {
+    let view1 = OnoroView::new(
+      Onoro16::from_board_string(
+        ". W B
+          B . W
+           W B",
+      )
+      .unwrap(),
+    );
+    let view2 = OnoroView::new(
+      Onoro16::from_board_string(
+        ". B W
+          W . B
+           B W",
+      )
+      .unwrap(),
+    );
+    let view3 = OnoroView::new(
+      Onoro16::from_board_string(
+        ". B W
+          W B B
+           B W",
+      )
+      .unwrap(),
+    );
+    let view4 = OnoroView::new(
+      Onoro16::from_board_string(
+        ". . B
+          W . .
+           . B",
+      )
+      .unwrap(),
+    );
+    let view5 = OnoroView::new(
+      Onoro16::from_board_string(
+        ". B .
+          . . B
+           W .",
+      )
+      .unwrap(),
+    );
+
+    assert_eq!(view1, view2);
+    assert_ne!(view1, view3);
+    assert_ne!(view2, view3);
+    assert_ne!(view1, view4);
+    assert_ne!(view2, view4);
+    assert_ne!(view3, view4);
+    assert_ne!(view1, view5);
+    assert_ne!(view2, view5);
+    assert_ne!(view3, view5);
+    assert_eq!(view4, view5);
+  }
+
+  #[test]
+  #[allow(non_snake_case)]
+  fn test_E_symm_simple() {
+    let view1 = OnoroView::new(
+      Onoro16::from_board_string(
+        ". W B
+          . . .
+           W B",
+      )
+      .unwrap(),
+    );
+    let view2 = OnoroView::new(
+      Onoro16::from_board_string(
+        ". B .
+          W . B
+           . W",
+      )
+      .unwrap(),
+    );
+    let view3 = OnoroView::new(
+      Onoro16::from_board_string(
+        ". W .
+          B . B
+           . W",
+      )
+      .unwrap(),
+    );
+    let view4 = OnoroView::new(
+      Onoro16::from_board_string(
+        ". . W
+          B . B
+           W .",
+      )
+      .unwrap(),
+    );
+
+    assert_eq!(view1, view2);
+    assert_ne!(view1, view3);
+    assert_ne!(view2, view3);
+    assert_ne!(view1, view4);
+    assert_ne!(view2, view4);
+    assert_eq!(view3, view4);
   }
 }
