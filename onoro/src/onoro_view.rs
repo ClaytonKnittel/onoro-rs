@@ -134,11 +134,16 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroView<N, N2
   ) -> (u64, u8) {
     static C2EVT: ViewHashTable<C2> = HashTable::new_ev();
     let hash = HashGroup::<C2>::new(C2EVT.hash(onoro, symm_state));
+    println!("Checking for EV {}", hash);
+    println!("{}", onoro.rotated(symm_state.op));
 
     // Try all symmetries of the board state with invariant center of mass,
     // choose the symmetry with the numerically smallest hash code.
     C2::for_each()
-      .map(|op| (hash.apply(&op).hash(), op.ord() as u8))
+      .map(|op| {
+        println!("Checking op {} ({})", op, hash.apply(&op));
+        (hash.apply(&op).hash(), op.ord() as u8)
+      })
       .min_by(|(hash1, _op1), (hash2, _op2)| hash1.cmp(hash2))
       .unwrap()
   }
@@ -151,7 +156,7 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroView<N, N2
     (TT.hash(onoro, symm_state), Trivial::identity().ord() as u8)
   }
 
-  fn cmp_views<G: Group + Ordinal, F>(
+  fn cmp_views<G: Group + Ordinal + Display, F>(
     view1: &OnoroView<N, N2, ADJ_CNT_SIZE>,
     view2: &OnoroView<N, N2, ADJ_CNT_SIZE>,
     mut apply_view_transform: F,
@@ -179,10 +184,19 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroView<N, N2
 
     let same_color_turn = onoro1.player_color() == onoro2.player_color();
 
+    println!("Checking {symm_state1:?} {normalizing_op1} {origin1} {to_view2} {same_color_turn}");
+    println!("Checking {symm_state2:?} {denormalizing_op2} {origin2}");
+
     onoro1.pawns().all(|pawn| {
       let normalized_pos1 = (HexPos::from(pawn.pos) - origin1).apply_d6_c(&normalizing_op1);
       let normalized_pos2 = apply_view_transform(&normalized_pos1, &to_view2);
       let pos2 = normalized_pos2.apply_d6_c(&denormalizing_op2) + origin2;
+
+      println!(
+        "Checking for {:?} pawn at {pos2} ({:?})",
+        pawn.color,
+        onoro2.get_tile(pos2.into())
+      );
 
       match onoro2.get_tile(pos2.into()) {
         TileState::Black => {
@@ -209,9 +223,9 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> PartialEq
   for OnoroView<N, N2, ADJ_CNT_SIZE>
 {
   fn eq(&self, other: &Self) -> bool {
-    if self.hash != other.hash || self.symm_class != other.symm_class {
-      return false;
-    }
+    // if self.hash != other.hash || self.symm_class != other.symm_class {
+    //   return false;
+    // }
 
     match self.symm_class {
       SymmetryClass::C => Self::cmp_views(self, other, HexPosOffset::apply_d6_c),
@@ -262,7 +276,13 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Display
 
 #[cfg(test)]
 mod tests {
-  use crate::{groups::SymmetryClass, Onoro16, OnoroView};
+  use algebra::group::Cyclic;
+
+  use crate::{
+    groups::{SymmetryClass, C2, D6},
+    hex_pos::HexPos,
+    Onoro16, OnoroView,
+  };
 
   #[test]
   #[allow(non_snake_case)]
@@ -541,6 +561,73 @@ mod tests {
     assert_ne!(view2, view3);
     assert_ne!(view1, view4);
     assert_ne!(view2, view4);
+    assert_eq!(view3, view4);
+  }
+
+  #[test]
+  #[allow(non_snake_case)]
+  fn test_EV_symm_simple() {
+    // let view1 = OnoroView::new(
+    //   Onoro16::from_board_string(
+    //     ". B . B
+    //       . . . .
+    //        . . W .
+    //         B . W .",
+    //   )
+    //   .unwrap(),
+    // );
+    // let view2 = OnoroView::new(
+    //   Onoro16::from_board_string(
+    //     ". . . B
+    //       W W . .
+    //        . . . B
+    //         B . . .",
+    //   )
+    //   .unwrap(),
+    // );
+    let view3 = OnoroView::new(
+      Onoro16::from_board_string(
+        ". . . B
+          . . B .
+           B . . W
+            . . . .
+             W . . .",
+      )
+      .unwrap(),
+    );
+    let view4 = OnoroView::new(
+      Onoro16::from_board_string(
+        ". W . B
+          . . . .
+           . . B .
+            W . B .",
+      )
+      .unwrap(),
+    );
+
+    for pawn in view3.onoro.pawns() {
+      println!("{}", HexPos::from(pawn.pos));
+    }
+    println!();
+    for pawn in view4.onoro.pawns() {
+      println!("{}", HexPos::from(pawn.pos));
+    }
+
+    println!("{}", view3.onoro.rotated(D6::Rfl(3)));
+    println!("{}", view3.onoro.rotated(D6::Rfl(3)).rotated2(Cyclic(1)));
+    println!("{}", view4.onoro.rotated(D6::Rot(2)));
+
+    let view3 = OnoroView::new(view3.onoro.rotated(D6::Rfl(3)));
+    let view4 = OnoroView::new(view4.onoro.rotated(D6::Rot(2)));
+
+    // assert_eq!(view1.symm_class, SymmetryClass::EV);
+    assert_eq!(view3.symm_class, SymmetryClass::EV);
+
+    // assert_eq!(view1, view2);
+    // assert_ne!(view1, view3);
+    // assert_ne!(view2, view3);
+    // assert_ne!(view1, view4);
+    // assert_ne!(view2, view4);
     assert_eq!(view3, view4);
   }
 }

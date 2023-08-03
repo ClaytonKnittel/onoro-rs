@@ -1,9 +1,17 @@
-use std::{cmp, fmt::Display};
+use std::{
+  cmp,
+  fmt::{Debug, Display},
+};
 
 use itertools::interleave;
 use union_find::ConstUnionFind;
 
-use crate::{canonicalize::BoardSymmetryState, make_onoro_error, util::broadcast_u8_to_u64};
+use crate::{
+  canonicalize::{board_symm_state, BoardSymmetryState},
+  groups::{C2, D6},
+  make_onoro_error,
+  util::broadcast_u8_to_u64,
+};
 
 use super::{
   error::{OnoroError, OnoroResult},
@@ -37,7 +45,7 @@ pub enum TileState {
 /// `N`, and `ADJ_CNT_SIZE`, which depends on `N`, must be provided. This is due
 /// to a limitation in the rust compiler, generic const expressions are still
 /// experimental. See: https://github.com/rust-lang/rust/issues/76560.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone)]
 pub struct Onoro<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> {
   /// Array of indexes of pawn positions. Odd entries (even index) are black
   /// pawns, the others are white. Filled from lowest to highest index as the
@@ -209,6 +217,84 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Onoro<N, N2, AD
     game.make_move(Move::Phase1Move {
       to: PackedIdx::new(mid_idx, mid_idx + 1),
     });
+    game
+  }
+
+  /// Constructs an identical Onoro game rotated by `op`.
+  pub fn rotated(&self, op: D6) -> Self {
+    let mut game = Self::new();
+
+    let mut black_pawns = Vec::new();
+    let mut white_pawns = Vec::new();
+    let symm_state = board_symm_state(self);
+    let origin = self.origin(&symm_state);
+    let center = HexPos::new(N as u32 / 2, N as u32 / 2);
+    for pawn in self.pawns() {
+      let pos = HexPos::from(pawn.pos) - origin;
+      let pos = pos.apply_d6_c(&op);
+
+      match pawn.color {
+        PawnColor::Black => {
+          black_pawns.push(pos + center);
+        }
+        PawnColor::White => {
+          white_pawns.push(pos + center);
+        }
+      }
+    }
+
+    unsafe {
+      game.make_move_unchecked(Move::Phase1Move {
+        to: black_pawns[0].into(),
+      });
+    }
+    for pos in interleave(white_pawns, black_pawns.into_iter().skip(1)) {
+      game.make_move(Move::Phase1Move { to: pos.into() })
+    }
+
+    if !self.in_phase1() && !self.onoro_state().black_turn() {
+      game.mut_onoro_state().swap_player_turn();
+    }
+
+    game
+  }
+
+  /// Constructs an identical Onoro game rotated by `op`.
+  pub fn rotated2(&self, op: C2) -> Self {
+    let mut game = Self::new();
+
+    let mut black_pawns = Vec::new();
+    let mut white_pawns = Vec::new();
+    let symm_state = board_symm_state(self);
+    let origin = self.origin(&symm_state);
+    let center = HexPos::new(N as u32 / 2, N as u32 / 2);
+    for pawn in self.pawns() {
+      let pos = HexPos::from(pawn.pos) - origin;
+      let pos = pos.apply_c2_ev(&op);
+
+      match pawn.color {
+        PawnColor::Black => {
+          black_pawns.push(pos + center);
+        }
+        PawnColor::White => {
+          white_pawns.push(pos + center);
+        }
+      }
+    }
+
+    unsafe {
+      game.make_move_unchecked(Move::Phase1Move {
+        to: black_pawns[0].into(),
+      });
+    }
+    for pos in interleave(white_pawns, black_pawns.into_iter().skip(1)) {
+      game.make_move(Move::Phase1Move { to: pos.into() })
+    }
+
+    if !self.in_phase1() && !self.onoro_state().black_turn() {
+      game.mut_onoro_state().swap_player_turn();
+    }
+
     game
   }
 
@@ -664,6 +750,14 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Onoro<N, N2, AD
     }
 
     Ok(())
+  }
+}
+
+impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Debug
+  for Onoro<N, N2, ADJ_CNT_SIZE>
+{
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(f, "{self}")
   }
 }
 
