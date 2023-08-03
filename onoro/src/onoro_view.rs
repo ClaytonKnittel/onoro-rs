@@ -262,7 +262,7 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Display
 
 #[cfg(test)]
 mod tests {
-  use crate::{Onoro16, OnoroView};
+  use crate::{groups::SymmetryClass, Onoro16, OnoroView};
 
   #[test]
   #[allow(non_snake_case)]
@@ -281,6 +281,8 @@ mod tests {
       )
       .unwrap(),
     );
+
+    assert_eq!(view1.symm_class, SymmetryClass::V);
 
     assert_eq!(view1, view2);
   }
@@ -329,6 +331,8 @@ mod tests {
       .unwrap(),
     );
 
+    assert_eq!(view1.symm_class, SymmetryClass::C);
+
     assert_eq!(view1, view2);
     assert_ne!(view1, view3);
     assert_ne!(view2, view3);
@@ -343,7 +347,7 @@ mod tests {
 
   #[test]
   #[allow(non_snake_case)]
-  fn test_E_symm_simple() {
+  fn test_C_symm_2() {
     let view1 = OnoroView::new(
       Onoro16::from_board_string(
         ". W B
@@ -377,11 +381,83 @@ mod tests {
       .unwrap(),
     );
 
+    assert_eq!(view1.symm_class, SymmetryClass::C);
+
     assert_eq!(view1, view2);
     assert_ne!(view1, view3);
     assert_ne!(view2, view3);
     assert_ne!(view1, view4);
     assert_ne!(view2, view4);
     assert_eq!(view3, view4);
+  }
+
+  #[test]
+  #[allow(non_snake_case)]
+  fn test_E_symm_simple() {
+    let view1 = OnoroView::new(
+      Onoro16::from_board_string(
+        ". W . B
+          . . . .
+           W . B .",
+      )
+      .unwrap(),
+    );
+    let view2 = OnoroView::new(
+      Onoro16::from_board_string(
+        ". . B .
+          . . . B
+           W . . .
+            . W . .",
+      )
+      .unwrap(),
+    );
+    let view3 = OnoroView::new(
+      Onoro16::from_board_string(
+        ". . W .
+          . . . B
+           B . . .
+            . W . .",
+      )
+      .unwrap(),
+    );
+    let view4 = OnoroView::new(
+      Onoro16::from_board_string(
+        ". . W .
+          B . . .
+           . . B .
+            W . . .",
+      )
+      .unwrap(),
+    );
+
+    assert_eq!(view1.symm_class, SymmetryClass::E);
+
+    assert_eq!(view1, view2);
+    assert_ne!(view1, view3);
+    assert_ne!(view2, view3);
+    assert_ne!(view1, view4);
+    assert_ne!(view2, view4);
+    assert_eq!(view3, view4);
+  }
+
+  #[test]
+  #[allow(non_snake_case)]
+  fn test_CV_symm_simple() {
+    let view1 = OnoroView::new(
+      Onoro16::from_board_string(
+        ". W B
+          . . .
+           W B",
+      )
+      .unwrap(),
+    );
+    let view2 = OnoroView::new(
+      Onoro16::from_board_string(
+        ". B .
+          W . B
+           . W",
+      )
+      .unwrap(),
+    );
   }
 }

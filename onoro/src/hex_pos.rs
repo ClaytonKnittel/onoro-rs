@@ -296,7 +296,7 @@ impl HexPosOffset {
     }
   }
 
-  pub const fn apply_trivial(&self, op: &Trivial) -> Self {
+  pub const fn apply_trivial(&self, _op: &Trivial) -> Self {
     *self
   }
 
