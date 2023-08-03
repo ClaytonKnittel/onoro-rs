@@ -332,6 +332,8 @@ mod tests {
     );
 
     assert_eq!(view1.symm_class, SymmetryClass::C);
+    assert_eq!(view3.symm_class, SymmetryClass::C);
+    assert_eq!(view4.symm_class, SymmetryClass::C);
 
     assert_eq!(view1, view2);
     assert_ne!(view1, view3);
@@ -352,7 +354,7 @@ mod tests {
       Onoro16::from_board_string(
         ". W B
           . . .
-           W B",
+           W B .",
       )
       .unwrap(),
     );
@@ -360,7 +362,7 @@ mod tests {
       Onoro16::from_board_string(
         ". B .
           W . B
-           . W",
+           . W .",
       )
       .unwrap(),
     );
@@ -368,7 +370,7 @@ mod tests {
       Onoro16::from_board_string(
         ". W .
           B . B
-           . W",
+           . W .",
       )
       .unwrap(),
     );
@@ -376,12 +378,13 @@ mod tests {
       Onoro16::from_board_string(
         ". . W
           B . B
-           W .",
+           W . .",
       )
       .unwrap(),
     );
 
     assert_eq!(view1.symm_class, SymmetryClass::C);
+    assert_eq!(view3.symm_class, SymmetryClass::C);
 
     assert_eq!(view1, view2);
     assert_ne!(view1, view3);
@@ -431,6 +434,7 @@ mod tests {
     );
 
     assert_eq!(view1.symm_class, SymmetryClass::E);
+    assert_eq!(view3.symm_class, SymmetryClass::E);
 
     assert_eq!(view1, view2);
     assert_ne!(view1, view3);
@@ -445,19 +449,77 @@ mod tests {
   fn test_CV_symm_simple() {
     let view1 = OnoroView::new(
       Onoro16::from_board_string(
-        ". W B
-          . . .
-           W B",
+        ". B . .
+          W B . .
+           . . . .
+            . . . W",
       )
       .unwrap(),
     );
     let view2 = OnoroView::new(
       Onoro16::from_board_string(
-        ". B .
-          W . B
+        ". . . W
+          . . . .
+           . . . .
+            . . . .
+             . B . .
+              W B . .",
+      )
+      .unwrap(),
+    );
+    let view3 = OnoroView::new(
+      Onoro16::from_board_string(
+        ". . B B
+          . . W .
+           . . . .
+            . . . .
+             . . . .
+              W . . .",
+      )
+      .unwrap(),
+    );
+    let view4 = OnoroView::new(
+      Onoro16::from_board_string(
+        ". . . . . B
+          . . . . W B
+           . . . . . .
+            W . . . . .",
+      )
+      .unwrap(),
+    );
+
+    assert_eq!(view1.symm_class, SymmetryClass::CV);
+    assert_eq!(view3.symm_class, SymmetryClass::CV);
+
+    assert_eq!(view1, view2);
+    assert_ne!(view1, view3);
+    assert_ne!(view2, view3);
+    assert_ne!(view1, view4);
+    assert_ne!(view2, view4);
+    assert_eq!(view3, view4);
+  }
+
+  #[test]
+  #[allow(non_snake_case)]
+  fn test_CE_symm_simple() {
+    let view1 = OnoroView::new(
+      Onoro16::from_board_string(
+        ". B
+          W B
            . W",
       )
       .unwrap(),
     );
+    let view2 = OnoroView::new(
+      Onoro16::from_board_string(
+        ". W .
+          B B W",
+      )
+      .unwrap(),
+    );
+
+    assert_eq!(view1.symm_class, SymmetryClass::CE);
+
+    assert_eq!(view1, view2);
   }
 }
