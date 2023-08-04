@@ -262,13 +262,7 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Display
 
 #[cfg(test)]
 mod tests {
-  use algebra::group::Cyclic;
-
-  use crate::{
-    groups::{SymmetryClass, D6},
-    hex_pos::HexPos,
-    Onoro16, OnoroView,
-  };
+  use crate::{groups::SymmetryClass, Onoro16, OnoroView};
 
   #[test]
   #[allow(non_snake_case)]
@@ -593,6 +587,58 @@ mod tests {
 
     assert_eq!(view1.symm_class, SymmetryClass::EV);
     assert_eq!(view3.symm_class, SymmetryClass::EV);
+
+    assert_eq!(view1, view2);
+    assert_ne!(view1, view3);
+    assert_ne!(view2, view3);
+    assert_ne!(view1, view4);
+    assert_ne!(view2, view4);
+    assert_eq!(view3, view4);
+  }
+
+  #[test]
+  #[allow(non_snake_case)]
+  fn test_trivial_symm_simple() {
+    let view1 = OnoroView::new(
+      Onoro16::from_board_string(
+        ". B . B
+          . . . .
+           . . W .
+            B W W .",
+      )
+      .unwrap(),
+    );
+    let view2 = OnoroView::new(
+      Onoro16::from_board_string(
+        ". . . B
+          W W . .
+           W . . B
+            B . . .",
+      )
+      .unwrap(),
+    );
+    let view3 = OnoroView::new(
+      Onoro16::from_board_string(
+        ". . . B
+          . . B W
+           B . . W
+            . . . .
+             W . . .",
+      )
+      .unwrap(),
+    );
+    let view4 = OnoroView::new(
+      Onoro16::from_board_string(
+        ". W . B
+          . . . .
+           . . B .
+            W W B .",
+      )
+      .unwrap(),
+    );
+
+    assert_eq!(view1.symm_class, SymmetryClass::Trivial);
+    assert_eq!(view3.symm_class, SymmetryClass::Trivial);
 
     assert_eq!(view1, view2);
     assert_ne!(view1, view3);
