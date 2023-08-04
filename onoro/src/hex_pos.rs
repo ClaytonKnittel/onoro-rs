@@ -291,7 +291,7 @@ impl HexPosOffset {
   pub const fn apply_c2_ev(&self, op: &C2) -> Self {
     match op {
       Cyclic::<2>(0) => *self,
-      Cyclic::<2>(1) => self.c_s3(),
+      Cyclic::<2>(1) => self.e_s3(),
       _ => unreachable!(),
     }
   }
