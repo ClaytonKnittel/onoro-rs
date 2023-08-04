@@ -42,12 +42,6 @@ impl<const N: usize, const N2: usize, G: Group> HashTable<N, N2, G> {
       let table_idx = Self::hex_pos_ord(&table_pos);
       let tile_hash = &self[table_idx];
 
-      println!(
-        "Hash pos: {normalized_pos} ({}) {:?}",
-        normalized_pos.apply_c2_ev(&Cyclic(1)),
-        pawn.color
-      );
-
       let pawn_hash = if pawn.color == onoro.player_color() {
         tile_hash.cur_player_hash()
       } else {
