@@ -10,12 +10,6 @@ impl Xoroshiro128 {
   }
 
   #[inline]
-  pub const fn next_u32(&self) -> (Self, u32) {
-    let (next, rand) = self.next_u64();
-    (next, rand as u32)
-  }
-
-  #[inline]
   pub const fn next_u64(&self) -> (Self, u64) {
     let s0 = self.0[0];
     let s1 = self.0[1];

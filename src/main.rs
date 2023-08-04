@@ -73,28 +73,11 @@ fn explore_p2(onoro: &Onoro16, depth: u32) -> u64 {
 }
 
 fn main() {
-  let v = OnoroView::new(Onoro16::default_start());
+  let mut game = Onoro16::default_start();
 
-  for game in vec![
-    Onoro16::default_start(),
-    Onoro16::default_start2(),
-    Onoro16::default_start3(),
-    Onoro16::default_start4(),
-    Onoro16::default_start5(),
-    Onoro16::default_start6(),
-  ]
-  .into_iter()
-  {
-    let view = OnoroView::new(game);
-    println!("{}", view);
-    println!("{} {}", v == view, view == v);
-  }
+  println!("size of game state: {}", std::mem::size_of::<Onoro16>());
 
-  // let mut game = Onoro16::default_start();
-
-  // println!("size of game state: {}", std::mem::size_of::<Onoro16>());
-
-  // println!("{}", game);
+  println!("{}", game);
 
   // let guard = pprof::ProfilerGuardBuilder::default()
   //   .frequency(1000)
@@ -102,17 +85,17 @@ fn main() {
   //   .build()
   //   .unwrap();
 
-  // to_phase2(&mut game);
+  to_phase2(&mut game);
 
-  // let start = Instant::now();
-  // let num_states = explore_p2(&game, 5);
-  // let end = Instant::now();
+  let start = Instant::now();
+  let num_states = explore_p2(&game, 5);
+  let end = Instant::now();
 
-  // println!("Explored {} game states in {:?}", num_states, end - start);
-  // println!(
-  //   "{} states/sec",
-  //   num_states as f64 / (end - start).as_secs_f64()
-  // );
+  println!("Explored {} game states in {:?}", num_states, end - start);
+  println!(
+    "{} states/sec",
+    num_states as f64 / (end - start).as_secs_f64()
+  );
 
   // if let Ok(report) = guard.report().build() {
   //   let file = std::fs::File::create("flamegraph.svg").unwrap();

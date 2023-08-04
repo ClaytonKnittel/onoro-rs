@@ -494,11 +494,6 @@ where
   pub const fn other_player_hash(&self) -> u64 {
     self.other_hash.hash()
   }
-
-  /// TODO: if this is unused, make cur/other player hash codes independent.
-  pub const fn color_swap(&self) -> Self {
-    Self::new(self.other_hash.hash(), self.cur_hash.hash())
-  }
 }
 
 impl TileHash<D6> {

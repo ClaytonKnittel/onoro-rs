@@ -78,7 +78,7 @@ impl Score {
     let (cur_player_wins1, turn_count_tie1, turn_count_win1) = Self::unpack(self.data);
     let (cur_player_wins2, turn_count_tie2, turn_count_win2) = Self::unpack(other.data);
 
-    let turn_count_win = min_u32((turn_count_win1 as u32) - 1, (turn_count_win2 as u32) - 1) + 1;
+    let turn_count_win = min_u32(turn_count_win1 - 1, turn_count_win2 - 1) + 1;
     let turn_count_tie = max_u32(turn_count_tie1, turn_count_tie2);
     let cur_player_wins = cur_player_wins1 || cur_player_wins2;
 
@@ -120,7 +120,7 @@ impl Score {
       cur_player_wins2
     };
 
-    return tc_win1 > turn_count_tie2 && tc_win2 > turn_count_tie1 && score1 == score2;
+    tc_win1 > turn_count_tie2 && tc_win2 > turn_count_tie1 && score1 == score2
   }
 
   /// True if this score is better than `other` for the current player.
@@ -138,16 +138,14 @@ impl Score {
         // path to losing.
         turn_count_win1 == 0 || cur_player_wins1 || turn_count_win1 > turn_count_win2
       }
+    } else if turn_count_win1 != 0 {
+      // If `other` is a tie and `this` is not, this is only better if it's a
+      // win.
+      cur_player_wins1
     } else {
-      if turn_count_win1 != 0 {
-        // If `other` is a tie and `this` is not, this is only better if it's a
-        // win.
-        cur_player_wins1
-      } else {
-        // If both scores were ties, the better is the score with the shortest
-        // discovered tie depth.
-        turn_count_tie1 < turn_count_tie2
-      }
+      // If both scores were ties, the better is the score with the shortest
+      // discovered tie depth.
+      turn_count_tie1 < turn_count_tie2
     }
   }
 
