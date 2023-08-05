@@ -109,10 +109,10 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Onoro<N, N2, AD
 
     let mut game = Self::new();
     unsafe {
-      game.make_move_unchecked(Move::Phase1Move { to: black_pawns[0] });
+      game.make_move_unchecked(&Move::Phase1Move { to: black_pawns[0] });
     }
     for pos in interleave(while_pawns, black_pawns.into_iter().skip(1)) {
-      game.make_move(Move::Phase1Move { to: pos });
+      game.make_move(&Move::Phase1Move { to: pos });
     }
 
     Ok(game)
@@ -122,14 +122,14 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Onoro<N, N2, AD
     let mid_idx = ((Self::board_width() - 1) / 2) as u32;
     let mut game = Self::new();
     unsafe {
-      game.make_move_unchecked(Move::Phase1Move {
+      game.make_move_unchecked(&Move::Phase1Move {
         to: PackedIdx::new(mid_idx, mid_idx),
       });
     }
-    game.make_move(Move::Phase1Move {
+    game.make_move(&Move::Phase1Move {
       to: PackedIdx::new(mid_idx + 1, mid_idx + 1),
     });
-    game.make_move(Move::Phase1Move {
+    game.make_move(&Move::Phase1Move {
       to: PackedIdx::new(mid_idx + 1, mid_idx),
     });
     game
@@ -159,12 +159,12 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Onoro<N, N2, AD
     }
 
     unsafe {
-      game.make_move_unchecked(Move::Phase1Move {
+      game.make_move_unchecked(&Move::Phase1Move {
         to: black_pawns[0].into(),
       });
     }
     for pos in interleave(white_pawns, black_pawns.into_iter().skip(1)) {
-      game.make_move(Move::Phase1Move { to: pos.into() })
+      game.make_move(&Move::Phase1Move { to: pos.into() })
     }
 
     if !self.in_phase1() && !self.onoro_state().black_turn() {
@@ -198,12 +198,12 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Onoro<N, N2, AD
     }
 
     unsafe {
-      game.make_move_unchecked(Move::Phase1Move {
+      game.make_move_unchecked(&Move::Phase1Move {
         to: black_pawns[0].into(),
       });
     }
     for pos in interleave(white_pawns, black_pawns.into_iter().skip(1)) {
-      game.make_move(Move::Phase1Move { to: pos.into() })
+      game.make_move(&Move::Phase1Move { to: pos.into() })
     }
 
     if !self.in_phase1() && !self.onoro_state().black_turn() {
@@ -320,8 +320,8 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Onoro<N, N2, AD
     self.onoro_state().turn() < 0xf
   }
 
-  unsafe fn make_move_unchecked(&mut self, m: Move) {
-    match m {
+  unsafe fn make_move_unchecked(&mut self, m: &Move) {
+    match *m {
       Move::Phase1Move { to } => {
         // Increment the turn first, so self.onoro_state().turn() is 0 for turn
         // 1.
@@ -336,7 +336,7 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Onoro<N, N2, AD
     }
   }
 
-  pub fn make_move(&mut self, m: Move) {
+  pub fn make_move(&mut self, m: &Move) {
     match m {
       Move::Phase1Move { to: _ } => {
         debug_assert!(self.in_phase1());
@@ -346,6 +346,14 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Onoro<N, N2, AD
       }
     }
     unsafe { self.make_move_unchecked(m) }
+  }
+
+  pub fn each_move(&self) -> MoveIterator<'_, N, N2, ADJ_CNT_SIZE> {
+    if self.in_phase1() {
+      MoveIterator::P1Moves(self.each_p1_move())
+    } else {
+      MoveIterator::P2Moves(self.each_p2_move())
+    }
   }
 
   pub fn each_p1_move(&self) -> P1MoveIterator<'_, N, N2, ADJ_CNT_SIZE> {
@@ -791,6 +799,24 @@ impl<'a, const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Iterator
     self.pawn_idx += if self.one_color { 2 } else { 1 };
 
     Some(pawn)
+  }
+}
+
+pub enum MoveIterator<'a, const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> {
+  P1Moves(P1MoveIterator<'a, N, N2, ADJ_CNT_SIZE>),
+  P2Moves(P2MoveIterator<'a, N, N2, ADJ_CNT_SIZE>),
+}
+
+impl<'a, const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Iterator
+  for MoveIterator<'a, N, N2, ADJ_CNT_SIZE>
+{
+  type Item = Move;
+
+  fn next(&mut self) -> Option<Self::Item> {
+    match self {
+      Self::P1Moves(p1_iter) => p1_iter.next(),
+      Self::P2Moves(p2_iter) => p2_iter.next(),
+    }
   }
 }
 

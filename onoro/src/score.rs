@@ -2,7 +2,14 @@ use std::fmt::{Debug, Display};
 
 use crate::util::{max_u32, min_u32};
 
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ScoreValue {
+  CurrentPlayerWins,
+  OtherPlayerWins,
+  Tie,
+}
+
+#[derive(Clone, Debug)]
 pub struct Score {
   pub(crate) data: (u16, u8),
 }
@@ -38,6 +45,21 @@ impl Score {
     // Mark the current player as winning with turn_count_win_ = 0, which is an
     // impossible state to be in.
     Self::new(true, 0, 0)
+  }
+
+  /// The score of the game given `depth` moves to play.
+  pub fn score_at_depth(&self, depth: u32) -> ScoreValue {
+    if depth <= self.turn_count_tie() {
+      ScoreValue::Tie
+    } else if depth >= self.turn_count_win() {
+      if self.cur_player_wins() {
+        ScoreValue::CurrentPlayerWins
+      } else {
+        ScoreValue::OtherPlayerWins
+      }
+    } else {
+      panic!("Attempted to resolve score at undiscovered depth");
+    }
   }
 
   pub const fn cur_player_wins(&self) -> bool {
