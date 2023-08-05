@@ -1,6 +1,6 @@
 use std::time::Instant;
 
-use onoro::{Move, Onoro16, Score, ScoreValue};
+use onoro::{ColorAttrs, Colored, Move, Onoro16, Score, ScoreValue};
 use rand::Rng;
 
 fn validate_moves(onoro: &Onoro16) {
@@ -31,9 +31,9 @@ fn to_phase2(onoro: &mut Onoro16) {
   while onoro.in_phase1() {
     for m in onoro.each_p1_move() {
       let mut o2 = onoro.clone();
-      o2.make_move(&m);
+      o2.make_move(m);
       if o2.finished().is_none() {
-        onoro.make_move(&m);
+        onoro.make_move(m);
         break;
       }
     }
@@ -49,7 +49,7 @@ fn explore(onoro: &Onoro16, depth: u32) -> u64 {
 
   for m in onoro.each_p1_move() {
     let mut onoro2 = onoro.clone();
-    onoro2.make_move(&m);
+    onoro2.make_move(m);
     total_states += explore(&onoro2, depth - 1);
   }
 
@@ -65,7 +65,7 @@ fn explore_p2(onoro: &Onoro16, depth: u32) -> u64 {
 
   for m in onoro.each_p2_move() {
     let mut onoro2 = onoro.clone();
-    onoro2.make_move(&m);
+    onoro2.make_move(m);
     total_states += explore_p2(&onoro2, depth - 1);
   }
 
@@ -85,7 +85,7 @@ fn find_best_move(onoro: &Onoro16, depth: u32) -> (Option<Score>, Option<Move>) 
   // First, check if any move ends the game.
   for m in onoro.each_move() {
     let mut g = onoro.clone();
-    g.make_move(&m);
+    g.make_move(m);
     if g.finished().is_some() {
       return (Some(Score::win(1)), Some(m));
     }
@@ -93,7 +93,7 @@ fn find_best_move(onoro: &Onoro16, depth: u32) -> (Option<Score>, Option<Move>) 
 
   for m in onoro.each_move() {
     let mut g = onoro.clone();
-    g.make_move(&m);
+    g.make_move(m);
 
     let (score, _) = find_best_move(&g, depth - 1);
     let score = match score {
@@ -139,8 +139,13 @@ fn main() {
   //   .build()
   //   .unwrap();
 
-  let (score, m) = find_best_move(&game, 1);
-  println!("{}, {}", m.unwrap(), score.unwrap());
+  for _ in 0..14 {
+    let (score, m) = find_best_move(&game, 6);
+    println!("{}, {}", m.as_ref().unwrap(), score.unwrap());
+    println!("{}", game.print_with_move(m.unwrap()));
+
+    game.make_move(m.unwrap());
+  }
 
   // to_phase2(&mut game);
   // println!("{game}");

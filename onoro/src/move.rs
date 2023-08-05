@@ -2,7 +2,7 @@ use std::fmt::Display;
 
 use super::{hex_pos::HexPos, packed_idx::PackedIdx};
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Move {
   Phase1Move {
     /// Position to place the pawn at.

@@ -1,4 +1,5 @@
 use std::{
+  borrow::Borrow,
   cmp,
   fmt::{Debug, Display},
 };
@@ -8,9 +9,10 @@ use union_find::ConstUnionFind;
 
 use crate::{
   canonicalize::{board_symm_state, BoardSymmetryState},
-  groups::{C2, D6},
+  groups::D6,
   make_onoro_error,
   util::broadcast_u8_to_u64,
+  Color, Colored,
 };
 
 use super::{
@@ -109,10 +111,10 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Onoro<N, N2, AD
 
     let mut game = Self::new();
     unsafe {
-      game.make_move_unchecked(&Move::Phase1Move { to: black_pawns[0] });
+      game.make_move_unchecked(Move::Phase1Move { to: black_pawns[0] });
     }
     for pos in interleave(while_pawns, black_pawns.into_iter().skip(1)) {
-      game.make_move(&Move::Phase1Move { to: pos });
+      game.make_move(Move::Phase1Move { to: pos });
     }
 
     Ok(game)
@@ -122,14 +124,14 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Onoro<N, N2, AD
     let mid_idx = ((Self::board_width() - 1) / 2) as u32;
     let mut game = Self::new();
     unsafe {
-      game.make_move_unchecked(&Move::Phase1Move {
+      game.make_move_unchecked(Move::Phase1Move {
         to: PackedIdx::new(mid_idx, mid_idx),
       });
     }
-    game.make_move(&Move::Phase1Move {
+    game.make_move(Move::Phase1Move {
       to: PackedIdx::new(mid_idx + 1, mid_idx + 1),
     });
-    game.make_move(&Move::Phase1Move {
+    game.make_move(Move::Phase1Move {
       to: PackedIdx::new(mid_idx + 1, mid_idx),
     });
     game
@@ -159,12 +161,12 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Onoro<N, N2, AD
     }
 
     unsafe {
-      game.make_move_unchecked(&Move::Phase1Move {
+      game.make_move_unchecked(Move::Phase1Move {
         to: black_pawns[0].into(),
       });
     }
     for pos in interleave(white_pawns, black_pawns.into_iter().skip(1)) {
-      game.make_move(&Move::Phase1Move { to: pos.into() })
+      game.make_move(Move::Phase1Move { to: pos.into() })
     }
 
     if !self.in_phase1() && !self.onoro_state().black_turn() {
@@ -174,43 +176,80 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Onoro<N, N2, AD
     game
   }
 
-  /// Constructs an identical Onoro game rotated by `op`.
-  pub fn rotated2(&self, op: C2) -> Self {
-    let mut game = Self::new();
+  pub fn print_with_move(&self, m: Move) -> String {
+    let mut g = self.clone();
+    g.make_move(m);
 
-    let mut black_pawns = Vec::new();
-    let mut white_pawns = Vec::new();
-    let symm_state = board_symm_state(self);
-    let origin = self.origin(&symm_state);
-    let center = HexPos::new(N as u32 / 2, N as u32 / 2);
-    for pawn in self.pawns() {
-      let pos = HexPos::from(pawn.pos) - origin;
-      let pos = pos.apply_c2_ev(&op);
+    let pawn_idx = match m {
+      Move::Phase1Move { to: _ } => self.pawns_in_play(),
+      Move::Phase2Move { to: _, from_idx } => from_idx,
+    };
 
-      match pawn.color {
-        PawnColor::Black => {
-          black_pawns.push(pos + center);
+    let mut res = String::new();
+
+    let ((min_x, min_y), (max_x, max_y)) = g.pawns().fold(
+      ((N, N), (0, 0)),
+      |((min_x, min_y), (max_x, max_y)), pawn| {
+        (
+          (
+            min_x.min(pawn.borrow().pos.x() as usize),
+            min_y.min(pawn.borrow().pos.y() as usize),
+          ),
+          (
+            max_x.max(pawn.borrow().pos.x() as usize),
+            max_y.max(pawn.borrow().pos.y() as usize),
+          ),
+        )
+      },
+    );
+
+    let min_x = min_x.saturating_sub(1);
+    let min_y = min_y.saturating_sub(1);
+    let max_x = (max_x + 1).min(N - 1);
+    let max_y = (max_y + 1).min(N - 1);
+
+    for y in (min_y..=max_y).rev() {
+      res = format!("{res}{: <width$}", "", width = max_y - y);
+      for x in min_x..=max_x {
+        let pos = PackedIdx::new(x as u32, y as u32);
+        let former_pawn_idx = self.get_pawn_idx(pos);
+        let new_pawn_idx = g.get_pawn_idx(pos);
+
+        res = format!(
+          "{res}{}",
+          match g.get_tile(pos) {
+            TileState::Black =>
+              if new_pawn_idx == Some(pawn_idx) {
+                Colored::new("B", Color::Magenta)
+              } else {
+                "B".into()
+              },
+            TileState::White =>
+              if new_pawn_idx == Some(pawn_idx) {
+                Colored::new("W", Color::Magenta)
+              } else {
+                "W".into()
+              },
+            TileState::Empty =>
+              if former_pawn_idx == Some(pawn_idx) {
+                Colored::new(".", Color::Red)
+              } else {
+                ".".into()
+              },
+          }
+        );
+
+        if x < Self::board_width() - 1 {
+          res = format!("{res} ");
         }
-        PawnColor::White => {
-          white_pawns.push(pos + center);
-        }
+      }
+
+      if y > min_y {
+        res = format!("{res}\n");
       }
     }
 
-    unsafe {
-      game.make_move_unchecked(&Move::Phase1Move {
-        to: black_pawns[0].into(),
-      });
-    }
-    for pos in interleave(white_pawns, black_pawns.into_iter().skip(1)) {
-      game.make_move(&Move::Phase1Move { to: pos.into() })
-    }
-
-    if !self.in_phase1() && !self.onoro_state().black_turn() {
-      game.mut_onoro_state().swap_player_turn();
-    }
-
-    game
+    res
   }
 
   /// Converts a `HexPos` to an ordinal, which is a unique mapping from valid
@@ -320,8 +359,8 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Onoro<N, N2, AD
     self.onoro_state().turn() < 0xf
   }
 
-  unsafe fn make_move_unchecked(&mut self, m: &Move) {
-    match *m {
+  unsafe fn make_move_unchecked(&mut self, m: Move) {
+    match m {
       Move::Phase1Move { to } => {
         // Increment the turn first, so self.onoro_state().turn() is 0 for turn
         // 1.
@@ -336,7 +375,7 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Onoro<N, N2, AD
     }
   }
 
-  pub fn make_move(&mut self, m: &Move) {
+  pub fn make_move(&mut self, m: Move) {
     match m {
       Move::Phase1Move { to: _ } => {
         debug_assert!(self.in_phase1());
@@ -516,11 +555,11 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Onoro<N, N2, AD
     }
   }
 
-  /// Given a position on the board, returns the tile state of that position,
-  /// i.e. the color of the piece on that tile, or `Empty` if no piece is there.
-  pub(crate) fn get_tile(&self, idx: PackedIdx) -> TileState {
+  /// Given a position on the board, returns the index of the pawn with that
+  /// position, or `None` if no such pawn exists.
+  fn get_pawn_idx(&self, idx: PackedIdx) -> Option<u32> {
     if idx == PackedIdx::null() {
-      return TileState::Empty;
+      return None;
     }
 
     let pawn_poses_ptr = self.pawn_poses.as_ptr() as *const u64;
@@ -536,28 +575,33 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Onoro<N, N2, AD
         (xor_search.wrapping_sub(0x0101010101010101u64)) & !xor_search & 0x8080808080808080u64;
       if zero_mask != 0 {
         let set_bit_idx = zero_mask.trailing_zeros();
-        // Find the parity of `set_bit_idx` / 8. Black has the even indices,
-        // white has the odd.
-        if (set_bit_idx & 0x8) == 0 {
-          return TileState::Black;
-        } else {
-          return TileState::White;
-        }
+        return Some(8 * i as u32 + (set_bit_idx / 8));
       }
     }
 
-    // only necessary if NPawns not a multiple of eight
+    // Only necessary if N not a multiple of eight.
     for i in 8 * (N / 8)..N {
       if unsafe { *self.pawn_poses.get_unchecked(i) } == idx {
-        if i % 2 == 0 {
-          return TileState::Black;
-        } else {
-          return TileState::White;
-        }
+        return Some(i as u32);
       }
     }
 
-    TileState::Empty
+    None
+  }
+
+  /// Given a position on the board, returns the tile state of that position,
+  /// i.e. the color of the piece on that tile, or `Empty` if no piece is there.
+  pub(crate) fn get_tile(&self, idx: PackedIdx) -> TileState {
+    match self.get_pawn_idx(idx) {
+      Some(i) => {
+        if i % 2 == 0 {
+          TileState::Black
+        } else {
+          TileState::White
+        }
+      }
+      None => TileState::Empty,
+    }
   }
 
   pub fn validate(&self) -> OnoroResult<()> {

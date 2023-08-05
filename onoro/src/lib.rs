@@ -1,4 +1,5 @@
 mod canonicalize;
+mod color_print;
 mod const_rand;
 mod error;
 mod groups;
@@ -17,6 +18,7 @@ mod tile_hash;
 mod util;
 
 pub use crate::onoro::*;
+pub use color_print::*;
 pub use onoro_defs::*;
 pub use onoro_view::*;
 pub use r#move::*;
