@@ -47,6 +47,11 @@ impl Score {
     Self::new(true, 0, 0)
   }
 
+  /// The maximum depth that this score is determined to.
+  pub fn determined_depth(&self) -> u32 {
+    self.turn_count_tie().max(self.turn_count_win())
+  }
+
   /// The score of the game given `depth` moves to play.
   pub fn score_at_depth(&self, depth: u32) -> ScoreValue {
     if depth <= self.turn_count_tie() {
@@ -100,7 +105,11 @@ impl Score {
     let (cur_player_wins1, turn_count_tie1, turn_count_win1) = Self::unpack(self.data);
     let (cur_player_wins2, turn_count_tie2, turn_count_win2) = Self::unpack(other.data);
 
-    let turn_count_win = min_u32(turn_count_win1 - 1, turn_count_win2 - 1) + 1;
+    let turn_count_win = min_u32(
+      turn_count_win1.wrapping_sub(1),
+      turn_count_win2.wrapping_sub(1),
+    )
+    .wrapping_add(1);
     let turn_count_tie = max_u32(turn_count_tie1, turn_count_tie2);
     let cur_player_wins = cur_player_wins1 || cur_player_wins2;
 

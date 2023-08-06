@@ -5,6 +5,7 @@ use rand::Rng;
 
 type OnoroTable = HashSet<Onoro16View>;
 
+#[allow(dead_code)]
 fn validate_moves(onoro: &Onoro16) {
   let mut move_iter = onoro.each_p1_move();
   for m in onoro.each_p1_move() {
@@ -13,22 +14,26 @@ fn validate_moves(onoro: &Onoro16) {
   assert!(move_iter.next().is_none());
 }
 
+#[allow(dead_code)]
 fn first_move(onoro: &Onoro16) -> Move {
   onoro.each_p1_move().next().unwrap()
 }
 
+#[allow(dead_code)]
 fn nth_move(onoro: &Onoro16, idx: usize) -> Move {
   onoro.each_p2_move().nth(idx).unwrap()
 }
 
+#[allow(dead_code)]
 fn random_move(onoro: &Onoro16) -> Move {
   let moves = onoro.each_p1_move().collect::<Vec<_>>();
 
   let mut rng = rand::thread_rng();
   let n = rng.gen_range(0..moves.len());
-  moves[n].clone()
+  moves[n]
 }
 
+#[allow(dead_code)]
 fn to_phase2(onoro: &mut Onoro16) {
   while onoro.in_phase1() {
     for m in onoro.each_p1_move() {
@@ -42,6 +47,7 @@ fn to_phase2(onoro: &mut Onoro16) {
   }
 }
 
+#[allow(dead_code)]
 fn explore(onoro: &Onoro16, depth: u32) -> u64 {
   let mut total_states = 1;
 
@@ -58,6 +64,7 @@ fn explore(onoro: &Onoro16, depth: u32) -> u64 {
   total_states
 }
 
+#[allow(dead_code)]
 fn explore_p2(onoro: &Onoro16, depth: u32) -> u64 {
   let mut total_states = 1;
 
@@ -199,11 +206,11 @@ fn find_best_move_table(
       .unwrap_or_else(|| {
         let (score, _) = find_best_move_table(view.onoro(), table, depth - 1, metrics);
         let score = match score {
-          Some(score) => score.backstep(),
+          Some(score) => score,
           // Consider winning by no legal moves as not winning until after the
           // other player's attempt at making a move, since all game states that
           // don't have 4 in a row of a pawn are considered a tie.
-          None => Score::win(2),
+          None => Score::win(1),
         };
 
         // Update the cached score in case it changed.
@@ -221,6 +228,7 @@ fn find_best_move_table(
     // if can detect win in < 3 moves, don't insert.
     table.replace(view);
 
+    let score = score.backstep();
     match best_score.clone() {
       Some(best_score_val) => {
         if score.better(&best_score_val) {
@@ -260,52 +268,56 @@ fn main() {
   //   .build()
   //   .unwrap();
 
-  // let depth = 10;
+  let depth = 9;
 
-  // for _ in 0..1 {
-  //   let mut metrics1 = Metrics::default();
-  //   let mut metrics2 = Metrics::default();
-  //   let mut table = OnoroTable::new();
+  for _ in 0..1 {
+    let mut metrics = Metrics::default();
+    let mut table = OnoroTable::new();
 
-  //   let start = Instant::now();
-  //   let (score, m) = find_best_move(&game, depth, &mut metrics1);
-  //   let end = Instant::now();
-  //   let m = m.unwrap();
-  //   println!("{}, {}", m, score.unwrap());
-  //   println!("{}", game.print_with_move(m));
-  //   println!(
-  //     "{} states explored, {} leaves",
-  //     metrics1.n_states, metrics1.n_leaves
-  //   );
-  //   println!(
-  //     "{:?}, {} states/sec",
-  //     end - start,
-  //     metrics1.n_states as f64 / (end - start).as_secs_f64()
-  //   );
+    let start = Instant::now();
+    let (score, m) = find_best_move_table(&game, &mut table, depth, &mut metrics);
+    let end = Instant::now();
+    let m = m.unwrap();
+    println!("{}, {}", m, score.unwrap());
+    println!("{}", game.print_with_move(m));
+    println!(
+      "{} states explored, {} hits, {} misses, {} leaves",
+      metrics.n_states, metrics.n_hits, metrics.n_misses, metrics.n_leaves
+    );
+    println!(
+      "{:?}, {} states/sec",
+      end - start,
+      metrics.n_states as f64 / (end - start).as_secs_f64()
+    );
 
-  //   let start = Instant::now();
-  //   let (score, m) = find_best_move_table(&game, &mut table, depth, &mut metrics2);
-  //   let end = Instant::now();
-  //   let m = m.unwrap();
-  //   println!("{}, {}", m, score.unwrap());
-  //   println!("{}", game.print_with_move(m));
-  //   println!(
-  //     "{} states explored, {} hits, {} misses, {} leaves",
-  //     metrics2.n_states, metrics2.n_hits, metrics2.n_misses, metrics2.n_leaves
-  //   );
-  //   println!(
-  //     "{:?}, {} states/sec",
-  //     end - start,
-  //     metrics2.n_states as f64 / (end - start).as_secs_f64()
-  //   );
+    println!("Checking table: {} entries:", table.len());
+    for view in table.iter() {
+      let view_score = view.onoro().score();
+      let (score, _) = find_best_move(
+        view.onoro(),
+        view_score.determined_depth(),
+        &mut Metrics::default(),
+      );
+      let score = score.unwrap();
 
-  //   game.make_move(m);
-  // }
+      assert_eq!(
+        view_score,
+        score,
+        "Expected equal scores at {}, found {} in table, computed {} to depth {}",
+        view.onoro(),
+        view_score,
+        score,
+        view_score.determined_depth()
+      );
+    }
 
-  to_phase2(&mut game);
-  println!("{game}");
+    game.make_move(m);
+  }
 
-  println!("{}", game.pawns_mathematica_list());
+  // to_phase2(&mut game);
+  // println!("{game}");
+
+  // println!("{}", game.pawns_mathematica_list());
 
   // let start = Instant::now();
   // let num_states = explore_p2(&game, 2);
