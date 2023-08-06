@@ -338,6 +338,17 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Onoro<N, N2, AD
     }
   }
 
+  pub fn pawns_mathematica_list(&self) -> String {
+    format!(
+      "{{{}}}",
+      self
+        .pawns()
+        .map(|pawn| format!("{{{},{}}}", pawn.pos.x(), pawn.pos.y()))
+        .reduce(|acc, coord| acc + "," + &coord)
+        .unwrap()
+    )
+  }
+
   pub fn score(&self) -> Score {
     self.score.score()
   }

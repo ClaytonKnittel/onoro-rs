@@ -13,8 +13,8 @@ A solver for the game of Onoro, invented by a friend's uncle.
 ## How the game is played
 
 The game of Onoro is a two-player perfect-information competitive game played on
-a flat surface. Each player has 8 pawns (from chess), the first player has black
-pawns and the second has white.
+an unmarked flat surface. Each player has 8 pawns (from chess), the first player
+has black pawns and the second has white.
 
 The goal of the game is to have four pawns in a row. The first player to do so
 wins. Additionally, if a player has no legal moves, they lose.

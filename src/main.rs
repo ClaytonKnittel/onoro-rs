@@ -305,14 +305,7 @@ fn main() {
   to_phase2(&mut game);
   println!("{game}");
 
-  println!(
-    "{{{}}}",
-    game
-      .pawns()
-      .map(|pawn| format!("{{{},{}}}", pawn.pos.x(), pawn.pos.y()))
-      .reduce(|acc, coord| acc + "," + &coord)
-      .unwrap()
-  );
+  println!("{}", game.pawns_mathematica_list());
 
   // let start = Instant::now();
   // let num_states = explore_p2(&game, 2);
