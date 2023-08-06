@@ -260,14 +260,16 @@ fn main() {
   //   .build()
   //   .unwrap();
 
-  let depth = 1;
+  let depth = 10;
 
   for _ in 0..1 {
     let mut metrics1 = Metrics::default();
     let mut metrics2 = Metrics::default();
     let mut table = OnoroTable::new();
 
+    let start = Instant::now();
     let (score, m) = find_best_move(&game, depth, &mut metrics1);
+    let end = Instant::now();
     let m = m.unwrap();
     println!("{}, {}", m, score.unwrap());
     println!("{}", game.print_with_move(m));
@@ -275,14 +277,26 @@ fn main() {
       "{} states explored, {} leaves",
       metrics1.n_states, metrics1.n_leaves
     );
+    println!(
+      "{:?}, {} states/sec",
+      end - start,
+      metrics1.n_states as f64 / (end - start).as_secs_f64()
+    );
 
+    let start = Instant::now();
     let (score, m) = find_best_move_table(&game, &mut table, depth, &mut metrics2);
+    let end = Instant::now();
     let m = m.unwrap();
     println!("{}, {}", m, score.unwrap());
     println!("{}", game.print_with_move(m));
     println!(
       "{} states explored, {} hits, {} misses, {} leaves",
       metrics2.n_states, metrics2.n_hits, metrics2.n_misses, metrics2.n_leaves
+    );
+    println!(
+      "{:?}, {} states/sec",
+      end - start,
+      metrics2.n_states as f64 / (end - start).as_secs_f64()
     );
 
     game.make_move(m);
