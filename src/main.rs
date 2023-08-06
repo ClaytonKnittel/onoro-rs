@@ -1,7 +1,9 @@
-use std::time::Instant;
+use std::{collections::HashSet, time::Instant};
 
-use onoro::{ColorAttrs, Colored, Move, Onoro16, Score, ScoreValue};
+use onoro::{Move, Onoro16, Onoro16View, OnoroView, Score, ScoreValue};
 use rand::Rng;
+
+type OnoroTable = HashSet<Onoro16View>;
 
 fn validate_moves(onoro: &Onoro16) {
   let mut move_iter = onoro.each_p1_move();
@@ -72,10 +74,26 @@ fn explore_p2(onoro: &Onoro16, depth: u32) -> u64 {
   total_states
 }
 
-fn find_best_move(onoro: &Onoro16, depth: u32) -> (Option<Score>, Option<Move>) {
+#[derive(Debug, Default)]
+struct Metrics {
+  n_states: u64,
+  n_misses: u64,
+  n_hits: u64,
+  n_leaves: u64,
+}
+
+fn find_best_move(
+  onoro: &Onoro16,
+  depth: u32,
+  metrics: &mut Metrics,
+) -> (Option<Score>, Option<Move>) {
   // Can't score games that are already over.
   debug_assert!(onoro.finished().is_none());
+
+  metrics.n_states += 1;
+
   if depth == 0 {
+    metrics.n_leaves += 1;
     return (Some(Score::tie(0)), None);
   }
 
@@ -87,15 +105,18 @@ fn find_best_move(onoro: &Onoro16, depth: u32) -> (Option<Score>, Option<Move>) 
     let mut g = onoro.clone();
     g.make_move(m);
     if g.finished().is_some() {
+      metrics.n_leaves += 1;
       return (Some(Score::win(1)), Some(m));
     }
   }
+
+  metrics.n_misses += 1;
 
   for m in onoro.each_move() {
     let mut g = onoro.clone();
     g.make_move(m);
 
-    let (score, _) = find_best_move(&g, depth - 1);
+    let (score, _) = find_best_move(&g, depth - 1, metrics);
     let score = match score {
       Some(score) => score.backstep(),
       // Consider winning by no legal moves as not winning until after the
@@ -126,10 +147,109 @@ fn find_best_move(onoro: &Onoro16, depth: u32) -> (Option<Score>, Option<Move>) 
   (best_score, best_move)
 }
 
+fn find_best_move_table(
+  onoro: &Onoro16,
+  table: &mut OnoroTable,
+  depth: u32,
+  metrics: &mut Metrics,
+) -> (Option<Score>, Option<Move>) {
+  // Can't score games that are already over.
+  debug_assert!(onoro.finished().is_none());
+
+  metrics.n_states += 1;
+  // println!("Exploring: {}", onoro);
+
+  if depth == 0 {
+    metrics.n_leaves += 1;
+    return (Some(Score::tie(0)), None);
+  }
+
+  let mut best_score = None;
+  let mut best_move = None;
+
+  // First, check if any move ends the game.
+  for m in onoro.each_move() {
+    let mut g = onoro.clone();
+    g.make_move(m);
+    if g.finished().is_some() {
+      metrics.n_leaves += 1;
+      return (Some(Score::win(1)), Some(m));
+    }
+  }
+
+  metrics.n_misses += 1;
+
+  for m in onoro.each_move() {
+    let mut g = onoro.clone();
+    g.make_move(m);
+
+    let mut view = OnoroView::new(g);
+    let score = table
+      .get(&view)
+      .map(|view| view.onoro().score())
+      .and_then(|score| {
+        if score.determined(depth) {
+          metrics.n_states += 1;
+          metrics.n_hits += 1;
+          Some(score)
+        } else {
+          None
+        }
+      })
+      .unwrap_or_else(|| {
+        let (score, _) = find_best_move_table(view.onoro(), table, depth - 1, metrics);
+        let score = match score {
+          Some(score) => score.backstep(),
+          // Consider winning by no legal moves as not winning until after the
+          // other player's attempt at making a move, since all game states that
+          // don't have 4 in a row of a pawn are considered a tie.
+          None => Score::win(2),
+        };
+
+        // Update the cached score in case it changed.
+        let score = if let Some(cached_view) = table.take(&view) {
+          score.merge(&cached_view.onoro().score())
+        } else {
+          score
+        };
+
+        score
+      });
+
+    view.mut_onoro().set_score(score.clone());
+    println!("Inserting {}", view);
+    table.replace(view);
+
+    match best_score.clone() {
+      Some(best_score_val) => {
+        if score.better(&best_score_val) {
+          best_score = Some(score.clone());
+          best_move = Some(m);
+        }
+      }
+      None => {
+        best_score = Some(score.clone());
+        best_move = Some(m);
+      }
+    }
+
+    // Stop the search early if there's already a winning move.
+    if score.score_at_depth(depth) == ScoreValue::CurrentPlayerWins {
+      break;
+    }
+  }
+
+  (best_score, best_move)
+}
+
 fn main() {
-  let mut game = Onoro16::default_start();
+  let mut game = Onoro16::hex_start();
 
   println!("size of game state: {}", std::mem::size_of::<Onoro16>());
+  println!(
+    "size of game view: {}",
+    std::mem::size_of_val(&OnoroView::new(Onoro16::default_start()))
+  );
 
   println!("{}", game);
 
@@ -139,12 +259,32 @@ fn main() {
   //   .build()
   //   .unwrap();
 
-  for _ in 0..14 {
-    let (score, m) = find_best_move(&game, 6);
-    println!("{}, {}", m.as_ref().unwrap(), score.unwrap());
-    println!("{}", game.print_with_move(m.unwrap()));
+  let depth = 1;
 
-    game.make_move(m.unwrap());
+  for _ in 0..1 {
+    let mut metrics1 = Metrics::default();
+    let mut metrics2 = Metrics::default();
+    let mut table = OnoroTable::new();
+
+    let (score, m) = find_best_move(&game, depth, &mut metrics1);
+    let m = m.unwrap();
+    println!("{}, {}", m, score.unwrap());
+    println!("{}", game.print_with_move(m));
+    println!(
+      "{} states explored, {} leaves",
+      metrics1.n_states, metrics1.n_leaves
+    );
+
+    let (score, m) = find_best_move_table(&game, &mut table, depth, &mut metrics2);
+    let m = m.unwrap();
+    println!("{}, {}", m, score.unwrap());
+    println!("{}", game.print_with_move(m));
+    println!(
+      "{} states explored, {} hits, {} misses, {} leaves",
+      metrics2.n_states, metrics2.n_hits, metrics2.n_misses, metrics2.n_leaves
+    );
+
+    game.make_move(m);
   }
 
   // to_phase2(&mut game);

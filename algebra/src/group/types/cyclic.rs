@@ -37,6 +37,7 @@ impl<const N: u16> Ordinal for Cyclic<N> {
   }
 
   fn from_ord(ord: usize) -> Self {
+    debug_assert!(ord < N as usize);
     Self(ord as u16)
   }
 }

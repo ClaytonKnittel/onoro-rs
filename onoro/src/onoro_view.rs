@@ -34,6 +34,11 @@ pub struct OnoroView<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize>
 impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroView<N, N2, ADJ_CNT_SIZE> {
   pub fn new(onoro: Onoro<N, N2, ADJ_CNT_SIZE>) -> Self {
     let symm_state = board_symm_state(&onoro);
+    println!(
+      "COM place: ({}, {})",
+      onoro.sum_of_mass().x() as u32 % onoro.pawns_in_play(),
+      onoro.sum_of_mass().y() as u32 % onoro.pawns_in_play()
+    );
 
     let (hash, op_ord) = match symm_state.symm_class {
       SymmetryClass::C => Self::find_canonical_orientation_d6(&onoro, &symm_state),
@@ -51,6 +56,14 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroView<N, N2
       op_ord,
       hash,
     }
+  }
+
+  pub fn onoro(&self) -> &Onoro<N, N2, ADJ_CNT_SIZE> {
+    &self.onoro
+  }
+
+  pub fn mut_onoro(&mut self) -> &mut Onoro<N, N2, ADJ_CNT_SIZE> {
+    &mut self.onoro
   }
 
   fn find_canonical_orientation_d6(
@@ -242,11 +255,25 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Display
   for OnoroView<N, N2, ADJ_CNT_SIZE>
 {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    let symm_state = board_symm_state(self.onoro());
+    let rotated = self.onoro().rotated_d6_c(symm_state.op);
+    let rotated = match self.symm_class {
+      SymmetryClass::C => rotated.rotated_d6_c(D6::from_ord(self.op_ord as usize)),
+      SymmetryClass::V => rotated.rotated_d3_v(D3::from_ord(self.op_ord as usize)),
+      SymmetryClass::E => rotated.rotated_k4_e(K4::from_ord(self.op_ord as usize)),
+      SymmetryClass::CV => rotated.rotated_c2_cv(C2::from_ord(self.op_ord as usize)),
+      SymmetryClass::CE => rotated.rotated_c2_ce(C2::from_ord(self.op_ord as usize)),
+      SymmetryClass::EV => rotated.rotated_c2_ev(C2::from_ord(self.op_ord as usize)),
+      SymmetryClass::Trivial => rotated,
+    };
+
     write!(
       f,
-      "{}\n{:?}: {} ({:#018x?})",
+      "{}\n{}\n{:?}: canon: {}, normalize: {} ({:#018x?})",
       self.onoro,
+      rotated,
       self.symm_class,
+      symm_state.op,
       match self.symm_class {
         SymmetryClass::C => D6::from_ord(self.op_ord as usize).to_string(),
         SymmetryClass::V => D3::from_ord(self.op_ord as usize).to_string(),
@@ -497,6 +524,45 @@ mod tests {
     assert_ne!(view1, view4);
     assert_ne!(view2, view4);
     assert_eq!(view3, view4);
+  }
+
+  #[test]
+  #[allow(non_snake_case)]
+  fn test_CV_symm_hex_start() {
+    const BOARD_POSITIONS: [&str; 6] = [
+      ". . B
+        . B W
+         W . B
+          B W .",
+      ". B W B
+        W . B .
+         B W . .",
+      ". B W
+        W . B
+         B W B",
+      ". B W
+        W . B
+         B W .
+          B . .",
+      ". . B W
+        . W . B
+         B B W .",
+      "B B W
+        W . B
+         B W .",
+    ];
+
+    let views =
+      BOARD_POSITIONS.map(|view| OnoroView::new(Onoro16::from_board_string(view).unwrap()));
+    for i in 0..views.len() {
+      assert_eq!(views[i].symm_class, SymmetryClass::CV);
+      for j in 0..i {
+        let view1 = &views[j];
+        let view2 = &views[i];
+
+        assert_eq!(view1, view2);
+      }
+    }
   }
 
   #[test]

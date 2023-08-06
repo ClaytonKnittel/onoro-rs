@@ -53,6 +53,7 @@ impl<const N: u16> Ordinal for Dihedral<N> {
     if ord < N as usize {
       Self::Rot(ord as u16)
     } else {
+      debug_assert!(ord < 2 * N as usize);
       Self::Rfl((ord - N as usize) as u16)
     }
   }

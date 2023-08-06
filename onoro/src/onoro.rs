@@ -4,12 +4,13 @@ use std::{
   fmt::{Debug, Display},
 };
 
+use algebra::group::Group;
 use itertools::interleave;
 use union_find::ConstUnionFind;
 
 use crate::{
   canonicalize::{board_symm_state, BoardSymmetryState},
-  groups::D6,
+  groups::{C2, D3, D6, K4},
   make_onoro_error,
   util::broadcast_u8_to_u64,
   Color, Colored,
@@ -137,8 +138,21 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Onoro<N, N2, AD
     game
   }
 
+  pub fn hex_start() -> Self {
+    Self::from_board_string(
+      ". B W
+        W . B
+         B W .",
+    )
+    .unwrap()
+  }
+
   /// Constructs an identical Onoro game rotated by `op`.
-  pub fn rotated(&self, op: D6) -> Self {
+  fn rotated<G: Group, OpFn: FnMut(&HexPosOffset, &G) -> HexPosOffset>(
+    &self,
+    op: G,
+    mut op_fn: OpFn,
+  ) -> Self {
     let mut game = Self::new();
 
     let mut black_pawns = Vec::new();
@@ -148,7 +162,7 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Onoro<N, N2, AD
     let center = HexPos::new(N as u32 / 2, N as u32 / 2);
     for pawn in self.pawns() {
       let pos = HexPos::from(pawn.pos) - origin;
-      let pos = pos.apply_d6_c(&op);
+      let pos = op_fn(&pos, &op);
 
       match pawn.color {
         PawnColor::Black => {
@@ -174,6 +188,30 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Onoro<N, N2, AD
     }
 
     game
+  }
+
+  pub fn rotated_d6_c(&self, op: D6) -> Self {
+    self.rotated(op, HexPosOffset::apply_d6_c)
+  }
+
+  pub fn rotated_d3_v(&self, op: D3) -> Self {
+    self.rotated(op, HexPosOffset::apply_d3_v)
+  }
+
+  pub fn rotated_k4_e(&self, op: K4) -> Self {
+    self.rotated(op, HexPosOffset::apply_k4_e)
+  }
+
+  pub fn rotated_c2_cv(&self, op: C2) -> Self {
+    self.rotated(op, HexPosOffset::apply_c2_cv)
+  }
+
+  pub fn rotated_c2_ce(&self, op: C2) -> Self {
+    self.rotated(op, HexPosOffset::apply_c2_ce)
+  }
+
+  pub fn rotated_c2_ev(&self, op: C2) -> Self {
+    self.rotated(op, HexPosOffset::apply_c2_ev)
   }
 
   pub fn print_with_move(&self, m: Move) -> String {
@@ -302,6 +340,10 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Onoro<N, N2, AD
 
   pub fn score(&self) -> Score {
     self.score.score()
+  }
+
+  pub fn set_score(&mut self, score: Score) {
+    self.score = PackedScore::new(score, self.score.packed_data().clone());
   }
 
   fn onoro_state(&self) -> &OnoroState {
