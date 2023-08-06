@@ -506,6 +506,14 @@ impl std::ops::SubAssign for HexPosOffset {
   }
 }
 
+impl std::ops::Mul<i32> for HexPosOffset {
+  type Output = Self;
+
+  fn mul(self, rhs: i32) -> Self::Output {
+    Self::new(self.x * rhs, self.y * rhs)
+  }
+}
+
 impl Display for HexPosOffset {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     write!(f, "({}, {})", self.x, self.y)

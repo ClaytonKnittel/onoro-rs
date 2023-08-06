@@ -497,33 +497,36 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Onoro<N, N2, AD
     let shift = Self::calc_move_shift(&pos);
     // Only shift the pawns if we have to, to avoid extra memory
     // reading/writing.
-    if shift != IdxOffset::identity() {
+    if shift != HexPosOffset::origin() {
+      let idx_offset = IdxOffset::from(shift);
       self.pawn_poses.iter_mut().for_each(|pos| {
         if *pos != PackedIdx::null() {
-          *pos += shift;
+          *pos += idx_offset;
         }
       });
+      self.sum_of_mass =
+        (HexPos::from(self.sum_of_mass) + shift * (self.pawns_in_play() as i32)).into();
     }
 
     // Check for a win
-    let finished = self.check_win((pos + shift).into());
+    let finished = self.check_win(HexPos::from(pos) + shift);
     self.mut_onoro_state().set_finished(finished);
   }
 
   /// Given the position of a newly placed/moved pawn, returns the offset to
   /// apply to all positions on the board.
-  fn calc_move_shift(m: &PackedIdx) -> IdxOffset {
-    let mut offset = IdxOffset::new(0, 0);
+  fn calc_move_shift(m: &PackedIdx) -> HexPosOffset {
+    let mut offset = HexPosOffset::new(0, 0);
 
     if m.y() == 0 {
-      offset = IdxOffset::new(0, 1);
+      offset = HexPosOffset::new(0, 1);
     } else if m.y() == Self::board_width() as u32 - 1 {
-      offset = IdxOffset::new(0, -1);
+      offset = HexPosOffset::new(0, -1);
     }
     if m.x() == 0 {
-      offset += IdxOffset::new(1, 0);
+      offset += HexPosOffset::new(1, 0);
     } else if m.x() == Self::board_width() as u32 - 1 {
-      offset += IdxOffset::new(-1, 0);
+      offset += HexPosOffset::new(-1, 0);
     }
 
     offset

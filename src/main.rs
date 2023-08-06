@@ -155,9 +155,9 @@ fn find_best_move_table(
 ) -> (Option<Score>, Option<Move>) {
   // Can't score games that are already over.
   debug_assert!(onoro.finished().is_none());
+  debug_assert!(onoro.validate().map_err(|res| panic!("{}", res)).is_ok());
 
   metrics.n_states += 1;
-  // println!("Exploring: {}", onoro);
 
   if depth == 0 {
     metrics.n_leaves += 1;
@@ -217,7 +217,8 @@ fn find_best_move_table(
       });
 
     view.mut_onoro().set_score(score.clone());
-    println!("Inserting {}", view);
+    // TODO: have criteria for inserting into table if memory is an issue. I.e.
+    // if can detect win in < 3 moves, don't insert.
     table.replace(view);
 
     match best_score.clone() {

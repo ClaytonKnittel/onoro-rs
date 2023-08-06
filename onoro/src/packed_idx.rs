@@ -1,5 +1,7 @@
 use std::num::Wrapping;
 
+use crate::hex_pos::HexPosOffset;
+
 use super::hex_pos::HexPos;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -46,6 +48,12 @@ impl PackedIdx {
     PackedIdx {
       bytes: Wrapping(self.bytes.0.wrapping_add(other.bytes.0)),
     }
+  }
+}
+
+impl From<HexPos> for PackedIdx {
+  fn from(value: HexPos) -> Self {
+    Self::new(value.x(), value.y())
   }
 }
 
@@ -102,6 +110,12 @@ impl IdxOffset {
   }
 }
 
+impl From<HexPosOffset> for IdxOffset {
+  fn from(value: HexPosOffset) -> Self {
+    Self::new(value.x(), value.y())
+  }
+}
+
 impl std::ops::Add<PackedIdx> for IdxOffset {
   type Output = PackedIdx;
 
@@ -125,12 +139,6 @@ impl std::ops::Add for IdxOffset {
 impl std::ops::AddAssign for IdxOffset {
   fn add_assign(&mut self, rhs: IdxOffset) {
     self.bytes += rhs.bytes
-  }
-}
-
-impl From<HexPos> for PackedIdx {
-  fn from(value: HexPos) -> Self {
-    Self::new(value.x(), value.y())
   }
 }
 

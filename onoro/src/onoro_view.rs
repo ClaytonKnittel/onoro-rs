@@ -34,11 +34,6 @@ pub struct OnoroView<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize>
 impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroView<N, N2, ADJ_CNT_SIZE> {
   pub fn new(onoro: Onoro<N, N2, ADJ_CNT_SIZE>) -> Self {
     let symm_state = board_symm_state(&onoro);
-    println!(
-      "COM place: ({}, {})",
-      onoro.sum_of_mass().x() as u32 % onoro.pawns_in_play(),
-      onoro.sum_of_mass().y() as u32 % onoro.pawns_in_play()
-    );
 
     let (hash, op_ord) = match symm_state.symm_class {
       SymmetryClass::C => Self::find_canonical_orientation_d6(&onoro, &symm_state),
@@ -257,7 +252,7 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Display
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     let symm_state = board_symm_state(self.onoro());
     let rotated = self.onoro().rotated_d6_c(symm_state.op);
-    let rotated = match self.symm_class {
+    let _rotated = match self.symm_class {
       SymmetryClass::C => rotated.rotated_d6_c(D6::from_ord(self.op_ord as usize)),
       SymmetryClass::V => rotated.rotated_d3_v(D3::from_ord(self.op_ord as usize)),
       SymmetryClass::E => rotated.rotated_k4_e(K4::from_ord(self.op_ord as usize)),
@@ -269,9 +264,8 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Display
 
     write!(
       f,
-      "{}\n{}\n{:?}: canon: {}, normalize: {} ({:#018x?})",
+      "{}\n{:?}: canon: {}, normalize: {} ({:#018x?})",
       self.onoro,
-      rotated,
       self.symm_class,
       symm_state.op,
       match self.symm_class {
