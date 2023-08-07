@@ -1,5 +1,4 @@
-use std::collections::HashSet;
-
+use dashmap::{setref::one::Ref, DashSet};
 use onoro::Onoro16View;
 
 pub struct PassThroughHasher {
@@ -17,6 +16,7 @@ impl std::hash::Hasher for PassThroughHasher {
   }
 }
 
+#[derive(Clone)]
 pub struct BuildPassThroughHasher;
 
 impl std::hash::BuildHasher for BuildPassThroughHasher {
@@ -26,4 +26,44 @@ impl std::hash::BuildHasher for BuildPassThroughHasher {
   }
 }
 
-pub type OnoroTable = HashSet<Onoro16View, BuildPassThroughHasher>;
+pub struct OnoroTable {
+  table: DashSet<Onoro16View, BuildPassThroughHasher>,
+}
+
+impl OnoroTable {
+  pub fn new() -> Self {
+    Self {
+      table: DashSet::with_hasher(BuildPassThroughHasher),
+    }
+  }
+
+  pub fn table(&self) -> &DashSet<Onoro16View, BuildPassThroughHasher> {
+    &self.table
+  }
+
+  pub fn len(&self) -> usize {
+    self.table.len()
+  }
+
+  pub fn get<'a>(
+    &'a self,
+    key: &Onoro16View,
+  ) -> Option<Ref<'a, Onoro16View, BuildPassThroughHasher>> {
+    self.table.get(key)
+  }
+
+  pub fn remove(&self, key: &Onoro16View) -> Option<Onoro16View> {
+    self.table.remove(key)
+  }
+
+  /// Updates an Onoro view in the table, potentially modifying the passed view
+  /// to match the merged view that is in the table upon returning.
+  pub fn update(&self, view: &mut Onoro16View) {
+    while !self.table.insert(view.clone()) {
+      if let Some(prev_view) = self.table.remove(view) {
+        let merged_score = view.onoro().score().merge(&prev_view.onoro().score());
+        view.mut_onoro().set_score(merged_score);
+      }
+    }
+  }
+}

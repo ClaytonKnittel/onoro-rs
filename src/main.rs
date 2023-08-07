@@ -1,11 +1,11 @@
-use std::time::Instant;
+use std::{sync::Arc, time::Instant};
 
-use onoro::{Move, Onoro16, Onoro16View, OnoroView};
+use onoro::{Move, Onoro16, OnoroView};
 use rand::Rng;
 
 use crate::{
-  onoro_table::{BuildPassThroughHasher, OnoroTable},
-  search::{find_best_move_par, find_best_move_table, Metrics, ParSearchOptions},
+  onoro_table::OnoroTable,
+  search::{find_best_move, find_best_move_par, find_best_move_table, Metrics, ParSearchOptions},
 };
 
 mod onoro_table;
@@ -104,61 +104,75 @@ fn main() {
   //   .build()
   //   .unwrap();
 
-  let depth = 16;
+  let depth = 12;
 
-  let mut metrics = Metrics::default();
-  let mut table = OnoroTable::with_hasher(BuildPassThroughHasher);
-  find_best_move_par(
-    &game,
-    &mut table,
-    depth,
-    ParSearchOptions::default().with_unit_depth(4),
-    &mut metrics,
-  );
+  for _ in 0..1 {
+    let mut metrics = Metrics::default();
+    let table = Arc::new(OnoroTable::new());
 
-  // for _ in 0..1 {
-  //   let mut metrics = Metrics::default();
-  //   let mut table = OnoroTable::with_hasher(BuildPassThroughHasher);
+    let start = Instant::now();
+    let (score, m) = find_best_move_table(&game, table.clone(), depth, &mut metrics);
+    let end = Instant::now();
+    let m = m.unwrap();
+    println!("{}, {}", m, score.unwrap());
+    println!("{}", game.print_with_move(m));
+    println!(
+      "{} states explored, {} hits, {} misses, {} leaves",
+      metrics.n_states, metrics.n_hits, metrics.n_misses, metrics.n_leaves
+    );
+    println!(
+      "{:?}, {} states/sec",
+      end - start,
+      metrics.n_states as f64 / (end - start).as_secs_f64()
+    );
 
-  //   let start = Instant::now();
-  //   let (score, m) = find_best_move_table(&game, &mut table, depth, &mut metrics);
-  //   let end = Instant::now();
-  //   let m = m.unwrap();
-  //   println!("{}, {}", m, score.unwrap());
-  //   println!("{}", game.print_with_move(m));
-  //   println!(
-  //     "{} states explored, {} hits, {} misses, {} leaves",
-  //     metrics.n_states, metrics.n_hits, metrics.n_misses, metrics.n_leaves
-  //   );
-  //   println!(
-  //     "{:?}, {} states/sec",
-  //     end - start,
-  //     metrics.n_states as f64 / (end - start).as_secs_f64()
-  //   );
+    let mut metrics = Metrics::default();
+    let table = Arc::new(OnoroTable::new());
+    let start = Instant::now();
+    let (score, m) = find_best_move_par(
+      &game,
+      table.clone(),
+      depth,
+      ParSearchOptions::default().with_unit_depth(5),
+      &mut metrics,
+    );
+    let end = Instant::now();
+    let m = m.unwrap();
+    println!("{}, {}", m, score.unwrap());
+    println!("{}", game.print_with_move(m));
+    println!(
+      "{} states explored, {} hits, {} misses, {} leaves",
+      metrics.n_states, metrics.n_hits, metrics.n_misses, metrics.n_leaves
+    );
+    println!(
+      "{:?}, {} states/sec",
+      end - start,
+      metrics.n_states as f64 / (end - start).as_secs_f64()
+    );
 
-  //   // println!("Checking table: {} entries:", table.len());
-  //   // for view in table.iter() {
-  //   //   let view_score = view.onoro().score();
-  //   //   let (score, _) = find_best_move(
-  //   //     view.onoro(),
-  //   //     view_score.determined_depth(),
-  //   //     &mut Metrics::default(),
-  //   //   );
-  //   //   let score = score.unwrap();
+    println!("Checking table: {} entries:", table.len());
+    for view in table.table().iter() {
+      let view_score = view.onoro().score();
+      let (score, _) = find_best_move(
+        view.onoro(),
+        view_score.determined_depth(),
+        &mut Metrics::default(),
+      );
+      let score = score.unwrap();
 
-  //   //   assert_eq!(
-  //   //     view_score,
-  //   //     score,
-  //   //     "Expected equal scores at {}, found {} in table, computed {} to depth {}",
-  //   //     view.onoro(),
-  //   //     view_score,
-  //   //     score,
-  //   //     view_score.determined_depth()
-  //   //   );
-  //   // }
+      assert_eq!(
+        view_score,
+        score,
+        "Expected equal scores at {}, found {} in table, computed {} to depth {}",
+        view.onoro(),
+        view_score,
+        score,
+        view_score.determined_depth()
+      );
+    }
 
-  //   game.make_move(m);
-  // }
+    game.make_move(m);
+  }
 
   // to_phase2(&mut game);
   // println!("{game}");

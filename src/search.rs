@@ -103,7 +103,7 @@ pub fn find_best_move(
 
 pub fn find_best_move_table(
   onoro: &Onoro16,
-  table: &mut OnoroTable,
+  table: Arc<OnoroTable>,
   depth: u32,
   metrics: &mut Metrics,
 ) -> (Option<Score>, Option<Move>) {
@@ -155,7 +155,7 @@ pub fn find_best_move_table(
         }
       })
       .unwrap_or_else(|| {
-        let (score, _) = find_best_move_table(view.onoro(), table, depth - 1, metrics);
+        let (score, _) = find_best_move_table(view.onoro(), table.clone(), depth - 1, metrics);
         let score = match score {
           Some(score) => score,
           // Consider winning by no legal moves as not winning until after the
@@ -165,7 +165,7 @@ pub fn find_best_move_table(
         };
 
         // Update the cached score in case it changed.
-        let score = if let Some(cached_view) = table.take(&view) {
+        let score = if let Some(cached_view) = table.remove(&view) {
           score.merge(&cached_view.onoro().score())
         } else {
           score
@@ -175,7 +175,7 @@ pub fn find_best_move_table(
       });
 
     view.mut_onoro().set_score(score.clone());
-    table.replace(view);
+    table.update(&mut view);
 
     let score = score.backstep();
     match best_score.clone() {
@@ -248,20 +248,6 @@ impl PartialEq for ParUnit {
 
 impl Eq for ParUnit {}
 
-fn find_best_move_par_unit(
-  onoro: &Onoro16,
-  table: &mut OnoroTable,
-  depth: u32,
-  total_depth: u32,
-  metrics: &mut Metrics,
-) -> (Option<Score>, Option<Move>) {
-  if depth + 3 < total_depth {
-    return find_best_move_table(onoro, table, depth, metrics);
-  }
-
-  todo!()
-}
-
 fn fill_queue(
   onoro: &Onoro16,
   queued_units: &mut HashSet<ParUnit, BuildPassThroughHasher>,
@@ -315,7 +301,7 @@ fn fill_queue(
 
 pub fn find_best_move_par(
   onoro: &Onoro16,
-  table: &mut OnoroTable,
+  table: Arc<OnoroTable>,
   depth: u32,
   options: ParSearchOptions,
   metrics: &mut Metrics,
@@ -333,21 +319,32 @@ pub fn find_best_move_par(
     .into_iter()
     .for_each(|root| sender.try_send(root).unwrap());
 
-  let cnt = Arc::new(AtomicU64::new(0));
+  let threads: Vec<_> = (0..options.n_threads)
+    .map(|_| {
+      let receiver = receiver.clone();
+      let table = table.clone();
+      thread::spawn(move || {
+        let mut metrics = Metrics::default();
+        for unit in receiver.try_iter() {
+          find_best_move_table(
+            unit.view.onoro(),
+            table.clone(),
+            depth.saturating_sub(options.unit_depth),
+            &mut metrics,
+          );
+        }
 
-  let threads = (0..options.n_threads).map(|_| {
-    let receiver = receiver.clone();
-    let cnt = cnt.clone();
-    thread::spawn(move || {
-      for _unit in receiver.try_iter() {
-        cnt.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-      }
+        metrics
+      })
     })
-  });
+    .collect();
 
-  threads.map(|thread| thread.join().unwrap()).count();
+  threads
+    .into_iter()
+    .map(|thread| thread.join().unwrap())
+    .for_each(|metric| {
+      *metrics += metric;
+    });
 
-  println!("Count: {}", cnt.load(std::sync::atomic::Ordering::Relaxed));
-
-  todo!()
+  find_best_move_table(onoro, table, depth, metrics)
 }
