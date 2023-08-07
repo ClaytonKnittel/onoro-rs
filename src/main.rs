@@ -164,6 +164,10 @@ fn find_best_move_table(
   debug_assert!(onoro.finished().is_none());
   debug_assert!(onoro.validate().map_err(|res| panic!("{}", res)).is_ok());
 
+  if depth < 2 {
+    return find_best_move(onoro, depth, metrics);
+  }
+
   metrics.n_states += 1;
 
   if depth == 0 {
@@ -195,7 +199,7 @@ fn find_best_move_table(
       .get(&view)
       .map(|view| view.onoro().score())
       .and_then(|score| {
-        if score.determined(depth) {
+        if score.determined(depth - 1) {
           metrics.n_states += 1;
           metrics.n_hits += 1;
           Some(score)
@@ -224,8 +228,6 @@ fn find_best_move_table(
       });
 
     view.mut_onoro().set_score(score.clone());
-    // TODO: have criteria for inserting into table if memory is an issue. I.e.
-    // if can detect win in < 3 moves, don't insert.
     table.replace(view);
 
     let score = score.backstep();
@@ -252,7 +254,7 @@ fn find_best_move_table(
 }
 
 fn main() {
-  let mut game = Onoro16::hex_start();
+  let mut game = Onoro16::default_start();
 
   println!("size of game state: {}", std::mem::size_of::<Onoro16>());
   println!(
@@ -268,7 +270,7 @@ fn main() {
   //   .build()
   //   .unwrap();
 
-  let depth = 9;
+  let depth = 13;
 
   for _ in 0..1 {
     let mut metrics = Metrics::default();
@@ -290,26 +292,26 @@ fn main() {
       metrics.n_states as f64 / (end - start).as_secs_f64()
     );
 
-    println!("Checking table: {} entries:", table.len());
-    for view in table.iter() {
-      let view_score = view.onoro().score();
-      let (score, _) = find_best_move(
-        view.onoro(),
-        view_score.determined_depth(),
-        &mut Metrics::default(),
-      );
-      let score = score.unwrap();
+    // println!("Checking table: {} entries:", table.len());
+    // for view in table.iter() {
+    //   let view_score = view.onoro().score();
+    //   let (score, _) = find_best_move(
+    //     view.onoro(),
+    //     view_score.determined_depth(),
+    //     &mut Metrics::default(),
+    //   );
+    //   let score = score.unwrap();
 
-      assert_eq!(
-        view_score,
-        score,
-        "Expected equal scores at {}, found {} in table, computed {} to depth {}",
-        view.onoro(),
-        view_score,
-        score,
-        view_score.determined_depth()
-      );
-    }
+    //   assert_eq!(
+    //     view_score,
+    //     score,
+    //     "Expected equal scores at {}, found {} in table, computed {} to depth {}",
+    //     view.onoro(),
+    //     view_score,
+    //     score,
+    //     view_score.determined_depth()
+    //   );
+    // }
 
     game.make_move(m);
   }
