@@ -142,6 +142,17 @@ pub fn find_best_move_table(
     g.make_move(m);
 
     let mut view = OnoroView::new(g);
+
+    let v = OnoroView::new(
+      Onoro16::from_board_string(
+        ". . W B W . 
+        . . W W . . 
+         . B B B . .  
+          . W B . . .",
+      )
+      .unwrap(),
+    );
+
     let score = table
       .get(&view)
       .map(|view| view.onoro().score())
@@ -164,18 +175,11 @@ pub fn find_best_move_table(
           None => Score::win(1),
         };
 
-        // Update the cached score in case it changed.
-        let score = if let Some(cached_view) = table.remove(&view) {
-          score.merge(&cached_view.onoro().score())
-        } else {
-          score
-        };
+        view.mut_onoro().set_score(score.clone());
+        table.update(&mut view);
 
-        score
+        view.onoro().score()
       });
-
-    view.mut_onoro().set_score(score.clone());
-    table.update(&mut view);
 
     let score = score.backstep();
     match best_score.clone() {

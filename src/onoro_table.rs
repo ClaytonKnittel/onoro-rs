@@ -1,5 +1,5 @@
 use dashmap::{setref::one::Ref, DashSet};
-use onoro::Onoro16View;
+use onoro::{Onoro16, Onoro16View, OnoroView};
 
 pub struct PassThroughHasher {
   state: u64,
@@ -50,10 +50,6 @@ impl OnoroTable {
     key: &Onoro16View,
   ) -> Option<Ref<'a, Onoro16View, BuildPassThroughHasher>> {
     self.table.get(key)
-  }
-
-  pub fn remove(&self, key: &Onoro16View) -> Option<Onoro16View> {
-    self.table.remove(key)
   }
 
   /// Updates an Onoro view in the table, potentially modifying the passed view
