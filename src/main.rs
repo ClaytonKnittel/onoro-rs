@@ -3,7 +3,31 @@ use std::{collections::HashSet, time::Instant};
 use onoro::{Move, Onoro16, Onoro16View, OnoroView, Score, ScoreValue};
 use rand::Rng;
 
-type OnoroTable = HashSet<Onoro16View>;
+pub struct PassThroughHasher {
+  state: u64,
+}
+
+impl std::hash::Hasher for PassThroughHasher {
+  fn write(&mut self, bytes: &[u8]) {
+    debug_assert!(bytes.len() == 8 && self.state == 0);
+    self.state = unsafe { *(bytes.as_ptr() as *const u64) };
+  }
+
+  fn finish(&self) -> u64 {
+    self.state
+  }
+}
+
+pub struct BuildPassThroughHasher;
+
+impl std::hash::BuildHasher for BuildPassThroughHasher {
+  type Hasher = PassThroughHasher;
+  fn build_hasher(&self) -> PassThroughHasher {
+    PassThroughHasher { state: 0 }
+  }
+}
+
+type OnoroTable = HashSet<Onoro16View, BuildPassThroughHasher>;
 
 #[allow(dead_code)]
 fn validate_moves(onoro: &Onoro16) {
@@ -270,11 +294,11 @@ fn main() {
   //   .build()
   //   .unwrap();
 
-  let depth = 13;
+  let depth = 15;
 
   for _ in 0..1 {
     let mut metrics = Metrics::default();
-    let mut table = OnoroTable::new();
+    let mut table = OnoroTable::with_hasher(BuildPassThroughHasher);
 
     let start = Instant::now();
     let (score, m) = find_best_move_table(&game, &mut table, depth, &mut metrics);
