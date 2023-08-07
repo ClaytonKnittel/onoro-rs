@@ -23,7 +23,7 @@ type ViewHashTable<G> = HashTable<16, 256, G>;
 /// canonicalizing symmetry operations. These caches values are used for quicker
 /// equality comparison between different Onoro game states which may be in
 /// different orientations.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct OnoroView<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> {
   onoro: Onoro<N, N2, ADJ_CNT_SIZE>,
   symm_class: SymmetryClass,
