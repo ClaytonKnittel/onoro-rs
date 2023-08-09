@@ -180,6 +180,15 @@ impl Score {
     }
   }
 
+  /// Constructs a score for a game state where not all possible next moves were
+  /// explored. This sets `turn_count_tie` to 1, since we can't prove that there
+  /// is no forced win out to any depth other than 1, since depth 1 is
+  /// preemptively checked for immediate wins.
+  pub fn break_early(&self) -> Self {
+    debug_assert_ne!(self.turn_count_win(), 0);
+    Score::new(self.cur_player_wins(), 1, self.turn_count_win())
+  }
+
   const fn pack(cur_player_wins: bool, turn_count_tie: u32, turn_count_win: u32) -> (u16, u8) {
     debug_assert!(turn_count_tie < (1u32 << 12));
     debug_assert!(turn_count_win < (1u32 << 11));

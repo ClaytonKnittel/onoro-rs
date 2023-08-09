@@ -160,9 +160,9 @@ fn main() {
       );
       let score = score.unwrap();
 
-      if view_score != score {
+      if !view_score.compatible(&score) {
         println!(
-          "Expected equal scores at {}, found {} in table, computed {} to depth {}",
+          "Expected compatible scores at {}, found {} in table, computed {} to depth {}",
           view.onoro(),
           view_score,
           score,

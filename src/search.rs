@@ -143,16 +143,6 @@ pub fn find_best_move_table(
 
     let mut view = OnoroView::new(g);
 
-    let v = OnoroView::new(
-      Onoro16::from_board_string(
-        ". . W B W . 
-        . . W W . . 
-         . B B B . .  
-          . W B . . .",
-      )
-      .unwrap(),
-    );
-
     let score = table
       .get(&view)
       .map(|view| view.onoro().score())
@@ -197,6 +187,7 @@ pub fn find_best_move_table(
 
     // Stop the search early if there's already a winning move.
     if score.score_at_depth(depth) == ScoreValue::CurrentPlayerWins {
+      best_score = Some(score.break_early());
       break;
     }
   }
