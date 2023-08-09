@@ -133,6 +133,9 @@ pub fn find_best_move_table(
   let mut best_move = None;
   metrics.n_misses += 1;
 
+  // TODO: mark visited states as score = ancestor(), then skip over those
+  // opportunistically until all children are being explored, then start
+  // exploring the ancestors.
   for m in onoro.each_move() {
     let mut g = onoro.clone();
     g.make_move(m);
