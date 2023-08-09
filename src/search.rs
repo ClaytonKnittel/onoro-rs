@@ -1,11 +1,7 @@
-use std::{
-  collections::HashSet,
-  hash::Hash,
-  sync::{atomic::AtomicU64, Arc},
-  thread,
-};
+use std::{collections::HashSet, hash::Hash, sync::Arc, thread};
 
 use onoro::{Move, Onoro16, Onoro16View, OnoroView, Score, ScoreValue};
+use rand::{seq::SliceRandom, thread_rng};
 
 use crate::onoro_table::{BuildPassThroughHasher, OnoroTable};
 
@@ -94,6 +90,7 @@ pub fn find_best_move(
 
     // Stop the search early if there's already a winning move.
     if score.score_at_depth(depth) == ScoreValue::CurrentPlayerWins {
+      best_score = Some(score.break_early());
       break;
     }
   }
@@ -292,6 +289,11 @@ fn fill_queue(
       );
     }
   }
+
+  // Randomize the order of the roots to minimize the chance of threads
+  // exploring similar states.
+  let mut rng = thread_rng();
+  roots.shuffle(&mut rng);
 }
 
 pub fn find_best_move_par(

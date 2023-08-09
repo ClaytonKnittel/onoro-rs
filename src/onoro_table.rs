@@ -1,5 +1,5 @@
 use dashmap::{setref::one::Ref, DashSet};
-use onoro::{Onoro16, Onoro16View, OnoroView};
+use onoro::Onoro16View;
 
 pub struct PassThroughHasher {
   state: u64,

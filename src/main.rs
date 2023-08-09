@@ -126,29 +126,29 @@ fn main() {
       metrics.n_states as f64 / (end - start).as_secs_f64()
     );
 
-    // let mut metrics = Metrics::default();
-    // let table = Arc::new(OnoroTable::new());
-    // let start = Instant::now();
-    // let (score, m) = find_best_move_par(
-    //   &game,
-    //   table.clone(),
-    //   depth,
-    //   ParSearchOptions::default().with_unit_depth(5),
-    //   &mut metrics,
-    // );
-    // let end = Instant::now();
-    // let m = m.unwrap();
-    // println!("{}, {}", m, score.unwrap());
-    // println!("{}", game.print_with_move(m));
-    // println!(
-    //   "{} states explored, {} hits, {} misses, {} leaves",
-    //   metrics.n_states, metrics.n_hits, metrics.n_misses, metrics.n_leaves
-    // );
-    // println!(
-    //   "{:?}, {} states/sec",
-    //   end - start,
-    //   metrics.n_states as f64 / (end - start).as_secs_f64()
-    // );
+    let mut metrics = Metrics::default();
+    let table = Arc::new(OnoroTable::new());
+    let start = Instant::now();
+    let (score, m) = find_best_move_par(
+      &game,
+      table.clone(),
+      depth,
+      ParSearchOptions::default().with_unit_depth(5),
+      &mut metrics,
+    );
+    let end = Instant::now();
+    let m = m.unwrap();
+    println!("{}, {}", m, score.unwrap());
+    println!("{}", game.print_with_move(m));
+    println!(
+      "{} states explored, {} hits, {} misses, {} leaves",
+      metrics.n_states, metrics.n_hits, metrics.n_misses, metrics.n_leaves
+    );
+    println!(
+      "{:?}, {} states/sec",
+      end - start,
+      metrics.n_states as f64 / (end - start).as_secs_f64()
+    );
 
     println!("Checking table: {} entries:", table.len());
     for view in table.table().iter() {
