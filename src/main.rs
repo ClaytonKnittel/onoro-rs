@@ -104,7 +104,7 @@ fn main() {
   //   .build()
   //   .unwrap();
 
-  let depth = 12;
+  let depth = 14;
 
   for _ in 0..1 {
     let mut metrics = Metrics::default();
@@ -151,7 +151,7 @@ fn main() {
     );
 
     println!("Checking table: {} entries:", table.len());
-    for view in table.table().iter() {
+    for view in table.table().iter().step_by(17) {
       let view_score = view.onoro().score();
       let (score, _) = find_best_move(
         view.onoro(),

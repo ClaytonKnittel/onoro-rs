@@ -119,9 +119,6 @@ pub fn find_best_move_table(
     return (Some(Score::tie(0)), None);
   }
 
-  let mut best_score = None;
-  let mut best_move = None;
-
   // First, check if any move ends the game.
   for m in onoro.each_move() {
     let mut g = onoro.clone();
@@ -132,6 +129,8 @@ pub fn find_best_move_table(
     }
   }
 
+  let mut best_score = None;
+  let mut best_move = None;
   metrics.n_misses += 1;
 
   for m in onoro.each_move() {
@@ -296,6 +295,9 @@ fn fill_queue(
   roots.shuffle(&mut rng);
 }
 
+/// TODO: keep a stack (regular HashSet) of visited onoro states on a single
+/// thread to prevent repeating moves. Will need hash/eq on game state, not
+/// rotationally invariant.
 pub fn find_best_move_par(
   onoro: &Onoro16,
   table: Arc<OnoroTable>,
