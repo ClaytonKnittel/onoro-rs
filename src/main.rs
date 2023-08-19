@@ -4,11 +4,16 @@ use onoro::{Move, Onoro16, OnoroView};
 use rand::Rng;
 
 use crate::{
+  metrics::Metrics,
   onoro_table::OnoroTable,
-  search::{find_best_move, find_best_move_par, find_best_move_table, Metrics, ParSearchOptions},
+  par_search_opts::ParSearchOptions,
+  search::{find_best_move, find_best_move_par_old, find_best_move_table},
 };
 
+mod metrics;
 mod onoro_table;
+mod par_search;
+mod par_search_opts;
 mod search;
 
 #[allow(dead_code)]
@@ -104,7 +109,7 @@ fn main() {
   //   .build()
   //   .unwrap();
 
-  let depth = 14;
+  let depth = 10;
 
   for _ in 0..1 {
     let mut metrics = Metrics::default();
@@ -129,7 +134,7 @@ fn main() {
     let mut metrics = Metrics::default();
     let table = Arc::new(OnoroTable::new());
     let start = Instant::now();
-    let (score, m) = find_best_move_par(
+    let (score, m) = find_best_move_par_old(
       &game,
       table.clone(),
       depth,

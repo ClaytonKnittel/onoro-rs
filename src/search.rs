@@ -3,34 +3,11 @@ use std::{collections::HashSet, hash::Hash, sync::Arc, thread};
 use onoro::{Move, Onoro16, Onoro16View, OnoroView, Score, ScoreValue};
 use rand::{seq::SliceRandom, thread_rng};
 
-use crate::onoro_table::{BuildPassThroughHasher, OnoroTable};
-
-#[derive(Clone, Debug, Default)]
-pub struct Metrics {
-  pub n_states: u64,
-  pub n_misses: u64,
-  pub n_hits: u64,
-  pub n_leaves: u64,
-}
-
-impl std::ops::Add for Metrics {
-  type Output = Self;
-
-  fn add(self, rhs: Self) -> Self::Output {
-    Self {
-      n_states: self.n_states + rhs.n_states,
-      n_misses: self.n_misses + rhs.n_misses,
-      n_hits: self.n_hits + rhs.n_hits,
-      n_leaves: self.n_leaves + rhs.n_leaves,
-    }
-  }
-}
-
-impl std::ops::AddAssign for Metrics {
-  fn add_assign(&mut self, rhs: Self) {
-    *self = self.clone() + rhs;
-  }
-}
+use crate::{
+  metrics::Metrics,
+  onoro_table::{BuildPassThroughHasher, OnoroTable},
+  par_search_opts::ParSearchOptions,
+};
 
 pub fn find_best_move(
   onoro: &Onoro16,
@@ -194,34 +171,6 @@ pub fn find_best_move_table(
   (best_score, best_move)
 }
 
-#[derive(Clone, Copy)]
-pub struct ParSearchOptions {
-  pub n_threads: u32,
-  pub unit_depth: u32,
-}
-
-impl ParSearchOptions {
-  pub fn with_n_threads(&self, n_threads: u32) -> Self {
-    Self { n_threads, ..*self }
-  }
-
-  pub fn with_unit_depth(&self, unit_depth: u32) -> Self {
-    Self {
-      unit_depth,
-      ..*self
-    }
-  }
-}
-
-impl Default for ParSearchOptions {
-  fn default() -> Self {
-    Self {
-      n_threads: 4,
-      unit_depth: 3,
-    }
-  }
-}
-
 #[derive(Clone)]
 struct ParUnit {
   view: Onoro16View,
@@ -301,7 +250,7 @@ fn fill_queue(
 /// TODO: keep a stack (regular HashSet) of visited onoro states on a single
 /// thread to prevent repeating moves. Will need hash/eq on game state, not
 /// rotationally invariant.
-pub fn find_best_move_par(
+pub fn find_best_move_par_old(
   onoro: &Onoro16,
   table: Arc<OnoroTable>,
   depth: u32,
