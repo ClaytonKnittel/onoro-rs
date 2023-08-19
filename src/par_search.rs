@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
 use onoro::{Move, Onoro16, OnoroView, Score, ScoreValue};
-use rayon::prelude::*;
 
 use crate::{metrics::Metrics, onoro_table::OnoroTable, search::find_best_move};
 
@@ -32,7 +31,7 @@ impl SearchWorker {
     let table = self.table.clone();
 
     if depth < 2 {
-      return find_best_move(&onoro, depth, &mut self.metrics);
+      return find_best_move(onoro, depth, &mut self.metrics);
     }
 
     self.metrics.n_states += 1;
@@ -59,7 +58,7 @@ impl SearchWorker {
     // TODO: mark visited states as score = ancestor(), then skip over those
     // opportunistically until all children are being explored, then start
     // exploring the ancestors.
-    for m in onoro.each_move().into_par_iter() {
+    for m in onoro.each_move() {
       let mut g = onoro.clone();
       g.make_move(m);
 
