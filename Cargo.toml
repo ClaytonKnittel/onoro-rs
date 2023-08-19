@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 dashmap = "5.5"
 multiqueue = "0.3"
+cooperate = { path = "./cooperate" }
 onoro = { path = "./onoro" }
 pprof = { version = "0.11", features = ["flamegraph"] }
 rand = "0.8"

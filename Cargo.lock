@@ -113,6 +113,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "cooperate"
+version = "0.1.0"
+dependencies = [
+ "arrayvec",
+ "dashmap",
+]
+
+[[package]]
 name = "cpp_demangle"
 version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -430,6 +438,7 @@ dependencies = [
 name = "onoro-rs"
 version = "0.1.0"
 dependencies = [
+ "cooperate",
  "dashmap",
  "multiqueue",
  "onoro",
