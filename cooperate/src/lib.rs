@@ -1,4 +1,7 @@
-use std::hash::{BuildHasher, Hash};
+use std::{
+  hash::{BuildHasher, Hash},
+  sync::Arc,
+};
 
 use arrayvec::ArrayVec;
 use dashmap::{setref::one::Ref, DashSet};
@@ -45,6 +48,24 @@ use dashmap::{setref::one::Ref, DashSet};
 ///   }
 /// }
 /// ```
+
+enum StackType<Frame, const N: usize> {
+  Root,
+  Child { parent: Arc<Stack<Frame, N>> },
+}
+
+enum StackState<Frame, const N: usize> {
+  Live { next: Atomic<Stack<Frame, N>> },
+  /// Suspended states have a pointer to some dependant, which can be recursively traced to find
+  /// the root live node that this state is dependent on. This forms a linked union find data
+  /// structure, where the representatives of each union is the live StackState that each state
+  /// transitively depends on. Every other state in the union must be suspended, and a live state
+  /// must first check that it isn't the root live state a suspended state is dependant on before
+  /// it can suspend itself. This will prevent topological deadlock via circular dependency of
+  /// state discovery.
+  Suspended{ dependant: Atomic<Stack<Frame, N>> },
+}
+
 /// Each task has a stack frame exactly large enough to hold enough frames for a
 /// depth-first search of depth `N`.
 struct Stack<Frame, const N: usize>
@@ -52,6 +73,7 @@ where
   Frame: Sized,
 {
   frames: ArrayVec<Frame, N>,
+  ty: StackType<Frame, N>,
 }
 
 struct Unit<Frame, const N: usize>
