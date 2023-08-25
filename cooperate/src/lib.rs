@@ -1,11 +1,11 @@
 use std::{
   hash::{BuildHasher, Hash},
-  sync::atomic::AtomicU32,
+  sync::atomic::{AtomicU32, Ordering},
 };
 
 use arrayvec::ArrayVec;
 use dashmap::{setref::one::Ref, DashSet};
-use seize::AtomicPtr;
+use seize::{AtomicPtr, Collector};
 
 /// Algorithm:
 /// ```rs
@@ -71,31 +71,26 @@ enum StackState<Frame, const N: usize> {
   /// revive the state.
   Split { outstanding_children: AtomicU32 },
   /// Suspended states are states that are waiting on the result of some other
-  /// pending computation
+  /// pending computation. States may only suspend themselves on the computation
+  /// of a frame going exactly as deep as they intend to. Any less deep, and a
+  /// definitive answer may not be found (TODO: maybe wait anyway? definitive
+  /// answer could be found). Any more deep, and topoligical deadlock is
+  /// possible - if a state is dependent on another state, which is itself
+  /// dependent on this state (to arbitrary degrees of separation), then the
+  /// whole cycle of dependent states would be suspended and never resumed.
   Suspended {
     /// Suspended states have a pointer to the next dependant suspended state of
     /// "dependant", forming a singly-linked list of the dependent states.
     next: AtomicPtr<Stack<Frame, N>>,
-    /// Suspended states have a pointer to their direct dependant, which can be
-    /// recursively traced to find the root live node that this state is
-    /// dependent on. This forms a linked union find data structure, where the
-    /// representatives of each union is the live StackState that each state
-    /// transitively depends on. Every other state in the union must be
-    /// suspended, and a live state must first check that it isn't the root live
-    /// state a suspended state is dependant on before it can suspend itself.
-    /// This will prevent topological deadlock via circular dependency of state
-    /// discovery.
-    ///
-    /// Since a currently executing live state is owned by a single thread, the
-    /// check that the root live state is not itself, done before suspending a
-    /// live state and making it dependant on another, can be done without
-    /// locking. If a state finds itself to be the root dependant live state,
-    /// then no transitive dependants of this state could have changed state
-    /// during the search for the root. TODO: figure out how to handle the case
-    /// where it's dependant on another live state, which can be concurrently
-    /// modified. No obvious way to lock on the root state safely.
-    dependant: AtomicPtr<Stack<Frame, N>>,
   },
+}
+
+struct StackFrame<Frame, const N: usize> {
+  /// Application-specific frame struct.
+  frame: Frame,
+  /// All stack frames have an unordered list of all of their suspended direct
+  /// dependants.
+  dependants: AtomicPtr<Stack<Frame, N>>,
 }
 
 /// Each task has a stack frame exactly large enough to hold enough frames for a
@@ -104,18 +99,26 @@ struct Stack<Frame, const N: usize>
 where
   Frame: Sized,
 {
-  frames: ArrayVec<Frame, N>,
+  frames: ArrayVec<StackFrame<Frame, N>, N>,
   ty: StackType<Frame, N>,
   state: StackState<Frame, N>,
-  /// All stack states have an unordered list of all of their suspended direct
-  /// dependants.
-  dependants: AtomicPtr<Stack<Frame, N>>,
 }
 
-struct WorkerData<Frame, const N: usize> {
+struct WorkerData<Frame, State, H, const N: usize> {
   /// The queue of frames local to this worker thread. This can be "stolen" from
   /// by other workers when they run out of work to do.
   queue: AtomicPtr<Stack<Frame, N>>,
+  globals: GlobalData<State, H, N>,
+}
+
+struct GlobalData<State, H, const N: usize> {
+  collector: Collector,
+  /// There is a hash table of all pending states for each search depth.
+  pending_states: [Table<State, H>; N],
+  /// There is a hash table for all states which have been resolved to some
+  /// degree. They may need to be recomputed to a greater depth, but the
+  /// information in this table will only ever accumulate over time.
+  resolved_states: Table<State, H>,
 }
 
 /// Trait for entries in the concurrent hash table, which holds all previously
