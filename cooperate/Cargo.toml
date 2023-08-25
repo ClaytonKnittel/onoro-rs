@@ -8,3 +8,4 @@ edition = "2021"
 [dependencies]
 arrayvec = "0.7"
 dashmap = "5.5"
+seize = "0.2"

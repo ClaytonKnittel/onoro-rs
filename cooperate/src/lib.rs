@@ -1,10 +1,11 @@
 use std::{
   hash::{BuildHasher, Hash},
-  sync::{atomic::AtomicPtr, Arc},
+  sync::atomic::AtomicU32,
 };
 
 use arrayvec::ArrayVec;
 use dashmap::{setref::one::Ref, DashSet};
+use seize::AtomicPtr;
 
 /// Algorithm:
 /// ```rs
@@ -49,39 +50,50 @@ use dashmap::{setref::one::Ref, DashSet};
 /// }
 /// ```
 
-/// The type of a stack is either the root, which contains the initial game state as it's first
-/// frame, or a child, which has a pointer to the parent that it is solving a branch for.
+/// The type of a stack is either the root, which contains the initial game
+/// state as it's first frame, or a child, which has a pointer to the parent
+/// that it is solving a branch for.
 enum StackType<Frame, const N: usize> {
   Root,
-  Child { parent: Arc<Stack<Frame, N>> },
+  Child { parent: AtomicPtr<Stack<Frame, N>> },
 }
 
 enum StackState<Frame, const N: usize> {
+  /// Live states are states that can currently be worked on.
   Live {
-    /// Live states are in an unordered list when queued for execution, which is operated on purely
-    /// atomically without the use of locks.
+    /// Live states are in an unordered list when queued for execution, which is
+    /// operated on purely atomically without the use of locks.
     next: AtomicPtr<Stack<Frame, N>>,
-    /// Live states have an unordered list of all of their suspended direct dependants.
-    dependants: AtomicPtr<Stack<Frame, N>>,
   },
+  /// A split state is a state with split children, upon whose completion will
+  /// resolve the state at the bottom of the stack. It only tracks the number of
+  /// outstanding children. The child to decrease this number to 0 is the one to
+  /// revive the state.
+  Split { outstanding_children: AtomicU32 },
+  /// Suspended states are states that are waiting on the result of some other
+  /// pending computation
   Suspended {
-    /// Suspended states have a pointer to the next dependant suspended state of "dependant".
+    /// Suspended states have a pointer to the next dependant suspended state of
+    /// "dependant", forming a singly-linked list of the dependent states.
     next: AtomicPtr<Stack<Frame, N>>,
-    /// Suspended states have a pointer to their direct dependant, which can be recursively traced to
-    /// find the root live node that this state is dependent on. This forms a linked union find data
-    /// structure, where the representatives of each union is the live StackState that each state
-    /// transitively depends on. Every other state in the union must be suspended, and a live state
-    /// must first check that it isn't the root live state a suspended state is dependant on before
-    /// it can suspend itself. This will prevent topological deadlock via circular dependency of
-    /// state discovery.
+    /// Suspended states have a pointer to their direct dependant, which can be
+    /// recursively traced to find the root live node that this state is
+    /// dependent on. This forms a linked union find data structure, where the
+    /// representatives of each union is the live StackState that each state
+    /// transitively depends on. Every other state in the union must be
+    /// suspended, and a live state must first check that it isn't the root live
+    /// state a suspended state is dependant on before it can suspend itself.
+    /// This will prevent topological deadlock via circular dependency of state
+    /// discovery.
     ///
-    /// Since a currently executing live state is owned by a single thread, the check that the root
-    /// live state is not itself, done before suspending a live state and making it dependant on
-    /// another, can be done without locking. If a state finds itself to be the root dependant live
-    /// state, then no transitive dependants of this state could have changed state during the
-    /// search for the root. TODO: figure out how to handle the case where it's dependant on
-    /// another live state, which can be concurrently modified. No obvious way to lock on the root
-    /// state safely.
+    /// Since a currently executing live state is owned by a single thread, the
+    /// check that the root live state is not itself, done before suspending a
+    /// live state and making it dependant on another, can be done without
+    /// locking. If a state finds itself to be the root dependant live state,
+    /// then no transitive dependants of this state could have changed state
+    /// during the search for the root. TODO: figure out how to handle the case
+    /// where it's dependant on another live state, which can be concurrently
+    /// modified. No obvious way to lock on the root state safely.
     dependant: AtomicPtr<Stack<Frame, N>>,
   },
 }
@@ -95,23 +107,28 @@ where
   frames: ArrayVec<Frame, N>,
   ty: StackType<Frame, N>,
   state: StackState<Frame, N>,
+  /// All stack states have an unordered list of all of their suspended direct
+  /// dependants.
+  dependants: AtomicPtr<Stack<Frame, N>>,
 }
 
 struct WorkerData<Frame, const N: usize> {
-  /// The queue of frames local to this worker thread. This can be "stolen" from by other workers
-  /// when they run out of work to do.
+  /// The queue of frames local to this worker thread. This can be "stolen" from
+  /// by other workers when they run out of work to do.
   queue: AtomicPtr<Stack<Frame, N>>,
 }
 
-/// Trait for entries in the concurrent hash table, which holds all previously computed and
-/// in-progress states.
+/// Trait for entries in the concurrent hash table, which holds all previously
+/// computed and in-progress states.
 pub trait TableEntry {
-  /// Returns true when an entry in the table is in progress, otherwise it's considered resolved.
+  /// Returns true when an entry in the table is in progress, otherwise it's
+  /// considered resolved.
   fn in_progress(&self) -> bool;
 
-  /// Merges two states into one. For processes which slowly discover information about entries,
-  /// this method should merge the information obtained by both entries into one entry. This is
-  /// used to resolve table insertion conflicts.
+  /// Merges two states into one. For processes which slowly discover
+  /// information about entries, this method should merge the information
+  /// obtained by both entries into one entry. This is used to resolve table
+  /// insertion conflicts.
   fn merge(&mut self, other: &Self);
 }
 
