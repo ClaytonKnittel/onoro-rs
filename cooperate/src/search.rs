@@ -6,12 +6,12 @@ use crate::Metrics;
 ///
 /// TODO: make this alpha-beta search.
 pub fn find_best_move<G: Clone + Game>(
-  onoro: &G,
+  game: &G,
   depth: u32,
   metrics: &mut Metrics,
 ) -> (Option<Score>, Option<G::Move>) {
   // Can't score games that are already over.
-  debug_assert!(onoro.finished().is_none());
+  debug_assert!(game.finished().is_none());
 
   metrics.n_states += 1;
 
@@ -24,8 +24,8 @@ pub fn find_best_move<G: Clone + Game>(
   let mut best_move = None;
 
   // First, check if any move ends the game.
-  for m in onoro.each_move() {
-    let mut g = onoro.clone();
+  for m in game.each_move() {
+    let mut g = game.clone();
     g.make_move(m);
     if g.finished().is_some() {
       metrics.n_leaves += 1;
@@ -35,8 +35,8 @@ pub fn find_best_move<G: Clone + Game>(
 
   metrics.n_misses += 1;
 
-  for m in onoro.each_move() {
-    let mut g = onoro.clone();
+  for m in game.each_move() {
+    let mut g = game.clone();
     g.make_move(m);
 
     let (score, _) = find_best_move(&g, depth - 1, metrics);
