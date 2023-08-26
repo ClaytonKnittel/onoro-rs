@@ -4,6 +4,7 @@ use std::{
   fmt::{Debug, Display},
 };
 
+use abstract_game::{PackedScore, Score};
 use algebra::group::Group;
 use itertools::interleave;
 use union_find::ConstUnionFind;
@@ -22,9 +23,7 @@ use super::{
   onoro_state::OnoroState,
   packed_hex_pos::PackedHexPos,
   packed_idx::{IdxOffset, PackedIdx},
-  packed_score::PackedScore,
   r#move::Move,
-  score::Score,
 };
 
 /// For move generation, the number of bits to use per-tile (for counting

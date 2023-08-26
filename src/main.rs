@@ -1,16 +1,15 @@
 use std::{sync::Arc, time::Instant};
 
+use cooperate::Metrics;
 use onoro::{Move, Onoro16, OnoroView};
 use rand::Rng;
 
 use crate::{
-  metrics::Metrics,
   onoro_table::OnoroTable,
   par_search_opts::ParSearchOptions,
   search::{find_best_move, find_best_move_par_old, find_best_move_table},
 };
 
-mod metrics;
 mod onoro_table;
 mod par_search;
 mod par_search_opts;

@@ -3,6 +3,10 @@
 version = 3
 
 [[package]]
+name = "abstract_game"
+version = "0.1.0"
+
+[[package]]
 name = "algebra"
 version = "0.1.0"
 
@@ -82,6 +86,7 @@ checksum = "dd8b5dd2ae5ed71462c540258bedcb51965123ad7e7ccf4b9a8cafaa4a63576d"
 name = "onoro"
 version = "0.1.0"
 dependencies = [
+ "abstract_game",
  "algebra",
  "const-random",
  "itertools",

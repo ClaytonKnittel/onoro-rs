@@ -3,9 +3,15 @@ use std::{
   sync::atomic::{AtomicU32, Ordering},
 };
 
+use abstract_game::{Game, Score, ScoreValue};
 use arrayvec::ArrayVec;
 use dashmap::{setref::one::Ref, DashSet};
 use seize::{AtomicPtr, Collector};
+
+mod metrics;
+mod search;
+
+pub use metrics::*;
 
 /// Algorithm:
 /// ```rs
@@ -112,6 +118,7 @@ struct WorkerData<Frame, State, H, const N: usize> {
 }
 
 struct GlobalData<State, H, const N: usize> {
+  /// Global memory reclamation construct.
   collector: Collector,
   /// There is a hash table of all pending states for each search depth.
   pending_states: [Table<State, H>; N],
@@ -124,10 +131,6 @@ struct GlobalData<State, H, const N: usize> {
 /// Trait for entries in the concurrent hash table, which holds all previously
 /// computed and in-progress states.
 pub trait TableEntry {
-  /// Returns true when an entry in the table is in progress, otherwise it's
-  /// considered resolved.
-  fn in_progress(&self) -> bool;
-
   /// Merges two states into one. For processes which slowly discover
   /// information about entries, this method should merge the information
   /// obtained by both entries into one entry. This is used to resolve table
@@ -178,3 +181,12 @@ where
     }
   }
 }
+
+pub struct Options {
+  /// The number of worker threads to use in the thread pool.
+  num_threads: u32,
+  /// The depth to expand to for generating work units.
+  unit_depth: u32,
+}
+
+pub fn solve<G: Game>(game: &G, options: Options) {}

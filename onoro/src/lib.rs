@@ -12,8 +12,6 @@ mod onoro_state;
 mod onoro_view;
 mod packed_hex_pos;
 mod packed_idx;
-mod packed_score;
-mod score;
 mod tile_hash;
 mod util;
 
@@ -22,4 +20,3 @@ pub use color_print::*;
 pub use onoro_defs::*;
 pub use onoro_view::*;
 pub use r#move::*;
-pub use score::*;

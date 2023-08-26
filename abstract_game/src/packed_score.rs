@@ -1,6 +1,6 @@
 use std::fmt::{Debug, Display};
 
-use super::score::Score;
+use crate::Score;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PackedScore<P> {
