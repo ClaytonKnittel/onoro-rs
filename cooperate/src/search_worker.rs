@@ -1,4 +1,7 @@
-use std::sync::Arc;
+use std::{
+  hash::{BuildHasher, Hash},
+  sync::Arc,
+};
 
 use abstract_game::Game;
 
@@ -6,21 +9,23 @@ use crate::{
   global_data::{GlobalData, LookupResult},
   queue::Queue,
   stack::Stack,
+  table::TableEntry,
 };
 
-struct WorkerData<G, State, H, const N: usize>
+struct WorkerData<G, H, const N: usize>
 where
   G: Game,
 {
   /// The queue of frames local to this worker thread. This can be "stolen" from
   /// by other workers when they run out of work to do.
   queue: Queue<Stack<G, N>>,
-  globals: Arc<GlobalData<State, H, N>>,
+  globals: Arc<GlobalData<G, H, N>>,
 }
 
-fn start_worker<G, State, H, const N: usize>(mut data: WorkerData<G, State, H, N>)
+fn start_worker<G, H, const N: usize>(mut data: WorkerData<G, H, N>)
 where
-  G: Game,
+  G: Game + Hash + Eq + TableEntry,
+  H: BuildHasher + Clone,
 {
   loop {
     let guard = data.globals.collector().enter();

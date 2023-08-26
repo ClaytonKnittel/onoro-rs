@@ -1,10 +1,13 @@
 use std::hash::{BuildHasher, Hash};
 
+use abstract_game::{Game, Score};
 use dashmap::{setref::one::Ref, DashSet};
 
 /// Trait for entries in the concurrent hash table, which holds all previously
 /// computed and in-progress states.
 pub trait TableEntry {
+  fn score(&self) -> Score;
+
   /// Merges two states into one. For processes which slowly discover
   /// information about entries, this method should merge the information
   /// obtained by both entries into one entry. This is used to resolve table
@@ -12,13 +15,13 @@ pub trait TableEntry {
   fn merge(&mut self, other: &Self);
 }
 
-pub struct Table<State, H> {
-  table: DashSet<State, H>,
+pub struct Table<G, H> {
+  table: DashSet<G, H>,
 }
 
-impl<State, H> Table<State, H>
+impl<G, H> Table<G, H>
 where
-  State: Hash + Eq + TableEntry + Clone,
+  G: Game + Hash + Eq + TableEntry,
   H: BuildHasher + Clone,
 {
   pub fn with_hasher(hasher: H) -> Self {
@@ -27,7 +30,7 @@ where
     }
   }
 
-  pub fn table(&self) -> &DashSet<State, H> {
+  pub fn table(&self) -> &DashSet<G, H> {
     &self.table
   }
 
@@ -35,13 +38,17 @@ where
     self.table.len()
   }
 
-  pub fn get<'a>(&'a self, key: &State) -> Option<Ref<'a, State, H>> {
+  pub fn get<'a>(&'a self, key: &G) -> Option<Ref<'a, G, H>> {
     self.table.get(key)
+  }
+
+  pub fn insert(&self, state: &G) -> bool {
+    self.table.insert(state.clone())
   }
 
   /// Updates an Onoro view in the table, potentially modifying the passed view
   /// to match the merged view that is in the table upon returning.
-  pub fn update(&self, state: &mut State) {
+  pub fn update(&self, state: &mut G) {
     // while !self.table.insert(view.clone()) {
     //   if let Some(prev_view) = self.table.remove(view) {
     //     let merged_score = view.onoro().score().merge(&prev_view.onoro().score());
