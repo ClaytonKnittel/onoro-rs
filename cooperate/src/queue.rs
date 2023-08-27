@@ -23,7 +23,7 @@ where
     }
   }
 
-  pub fn push(&mut self, mut item: *mut Linked<Item>, collector: &Collector) {
+  pub fn push(&mut self, mut item: *mut Linked<Item>) {
     let mut head = self.head.load(Ordering::Relaxed);
     unsafe {
       (*item).set_next(head);

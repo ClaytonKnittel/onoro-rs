@@ -1,4 +1,7 @@
-use std::{ptr::null_mut, sync::atomic::AtomicU32};
+use std::{
+  ptr::null_mut,
+  sync::atomic::{AtomicU32, Ordering},
+};
 
 use abstract_game::Game;
 use arrayvec::ArrayVec;
@@ -60,17 +63,15 @@ where
   Child { parent: AtomicPtr<Stack<G, N>> },
 }
 
-pub enum StackState<G, const N: usize>
-where
-  G: Game,
-{
+#[derive(Debug, PartialEq, Eq)]
+pub enum StackState {
   /// Live states are states that can currently be worked on.
-  Live {},
+  Live,
   /// A split state is a state with split children, upon whose completion will
   /// resolve the state at the bottom of the stack. It only tracks the number of
   /// outstanding children. The child to decrease this number to 0 is the one to
   /// revive the state.
-  Split { outstanding_children: AtomicU32 },
+  Split,
   /// Suspended states are states that are waiting on the result of some other
   /// pending computation. States may only suspend themselves on the computation
   /// of a frame going exactly as deep as they intend to. Any less deep, and a
@@ -79,11 +80,7 @@ where
   /// possible - if a state is dependent on another state, which is itself
   /// dependent on this state (to arbitrary degrees of separation), then the
   /// whole cycle of dependent states would be suspended and never resumed.
-  Suspended {
-    /// Suspended states have a pointer to the next dependant suspended state of
-    /// "dependant", forming a singly-linked list of the dependent states.
-    next: AtomicPtr<Stack<G, N>>,
-  },
+  Suspended,
 }
 
 pub struct StackFrame<G, const N: usize>
@@ -95,7 +92,7 @@ where
   move_iter: Option<G::MoveIterator>,
   /// All stack frames have an unordered list of all of their suspended direct
   /// dependants.
-  dependants: *mut Linked<Stack<G, N>>,
+  dependants: AtomicPtr<Stack<G, N>>,
 }
 
 impl<G, const N: usize> StackFrame<G, N>
@@ -106,7 +103,7 @@ where
     Self {
       game,
       move_iter: None,
-      dependants: null_mut(),
+      dependants: AtomicPtr::new(null_mut()),
     }
   }
 
@@ -123,6 +120,13 @@ where
       }
     }
   }
+
+  pub unsafe fn queue_dependant_unlocked(&self, dependant: *mut Linked<Stack<G, N>>) {
+    unsafe {
+      (*dependant).next = self.dependants.load(Ordering::Relaxed);
+    }
+    self.dependants.store(dependant, Ordering::Relaxed);
+  }
 }
 
 /// Each task has a stack frame exactly large enough to hold enough frames for a
@@ -134,10 +138,20 @@ where
   root_depth: u32,
   frames: ArrayVec<StackFrame<G, N>, N>,
   ty: StackType<G, N>,
-  state: StackState<G, N>,
+  /// TODO: Can remove state? Implicit from where the stack lies in the data
+  /// structure.
+  state: StackState,
   /// Live states are queued for execution, which requires a pointer to the next
-  /// queued item. This should only be non-null for queued live states.
+  /// queued item.
+  ///
+  /// Suspended states have a pointer to the next dependant suspended state of
+  /// "dependant", forming a singly-linked list of the dependent states.
   next: *mut Linked<Stack<G, N>>,
+  /// A split state is a state with split children, upon whose completion will
+  /// resolve the state at the bottom of the stack. It only tracks the number of
+  /// outstanding children. The child to decrease this number to 0 is the one to
+  /// revive the state.
+  outstanding_children: AtomicU32,
 }
 
 impl<G, const N: usize> Stack<G, N>
@@ -151,6 +165,7 @@ where
       ty: StackType::Root,
       state: StackState::Live {},
       next: null_mut(),
+      outstanding_children: AtomicU32::new(0),
     };
     root.frames.push(StackFrame::new(initial_game));
     root
@@ -160,8 +175,36 @@ where
     self.frames.push(StackFrame::new(game));
   }
 
-  pub fn bottom_frame(&mut self) -> &mut StackFrame<G, N> {
+  pub fn revive(&mut self) {
+    debug_assert_ne!(self.state, StackState::Live);
+    self.state = StackState::Live;
+  }
+
+  pub fn suspend(&mut self) {
+    debug_assert_eq!(self.state, StackState::Live);
+    self.state = StackState::Suspended;
+  }
+
+  pub fn frame(&self, idx: usize) -> &StackFrame<G, N> {
+    debug_assert!(idx < self.frames.len());
+    unsafe { self.frames.get_unchecked(idx) }
+  }
+
+  pub fn mut_frame(&mut self, idx: usize) -> &mut StackFrame<G, N> {
+    debug_assert!(idx < self.frames.len());
+    unsafe { self.frames.get_unchecked_mut(idx) }
+  }
+
+  pub fn bottom_frame(&self) -> &StackFrame<G, N> {
+    self.frames.last().unwrap()
+  }
+
+  pub fn bottom_frame_mut(&mut self) -> &mut StackFrame<G, N> {
     self.frames.last_mut().unwrap()
+  }
+
+  pub fn bottom_frame_idx(&mut self) -> usize {
+    self.frames.len() - 1
   }
 
   /// The search depth of the bottom frame of this stack.

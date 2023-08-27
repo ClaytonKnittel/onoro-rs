@@ -37,7 +37,7 @@ where
     };
 
     'seq: loop {
-      let frame = unsafe { (*stack).bottom_frame() };
+      let frame = unsafe { (*stack).bottom_frame_mut() };
 
       if let Some(m) = frame.next_move() {
         let next_state = frame.game().with_move(m);
