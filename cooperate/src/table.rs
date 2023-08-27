@@ -49,12 +49,6 @@ where
   /// Updates an Onoro view in the table, potentially modifying the passed view
   /// to match the merged view that is in the table upon returning.
   pub fn update(&self, state: &mut G) {
-    // while !self.table.insert(view.clone()) {
-    //   if let Some(prev_view) = self.table.remove(view) {
-    //     let merged_score = view.onoro().score().merge(&prev_view.onoro().score());
-    //     view.mut_onoro().set_score(merged_score);
-    //   }
-    // }
     while !self.table.insert(state.clone()) {
       if let Some(other_state) = self.table.remove(state) {
         state.merge(&other_state);

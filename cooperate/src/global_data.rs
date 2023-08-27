@@ -17,6 +17,9 @@ where
   G: Game,
 {
   /// A pointer to the lifetime-protected stack.
+  ///
+  /// TODO: Do we need to lifetime-protect stacks? Or can we allocate all of
+  /// them up front and free them at the end?
   stack: AtomicPtr<Stack<G, N>>,
   /// The index of the frame for this state.
   frame_idx: u32,
