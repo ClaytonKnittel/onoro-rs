@@ -35,10 +35,10 @@ where
       Some(stack_ptr) => stack_ptr,
       None => break,
     };
+    // We own stack here, so we can access it without atomics.
+    let stack = unsafe { &mut *stack_ptr };
 
     'seq: loop {
-      // We own stack here, so we can access it without atomics.
-      let stack = unsafe { &mut *stack_ptr };
       let frame = stack.bottom_frame_mut();
 
       if let Some(m) = frame.next_move() {
