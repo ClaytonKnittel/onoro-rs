@@ -1,13 +1,14 @@
+use core::num;
 use std::{
   ptr::null_mut,
   sync::atomic::{AtomicU32, Ordering},
 };
 
-use abstract_game::Game;
+use abstract_game::{Game, Score};
 use arrayvec::ArrayVec;
 use seize::{AtomicPtr, Linked};
 
-use crate::queue::QueueItem;
+use crate::{queue::QueueItem, util::TransparentIterator};
 
 /// Algorithm:
 /// ```rs
@@ -87,11 +88,17 @@ pub struct StackFrame<G, const N: usize>
 where
   G: Game,
 {
-  /// Application-specific frame struct.
+  /// The current game state at this frame.
   game: G,
+  /// An iterator over the moves at this game state. If `None`, then no moves
+  /// have been iterated over yet.
   move_iter: Option<G::MoveIterator>,
+  // The best score found for this game so far.
+  best_score: Score,
   /// All stack frames have an unordered list of all of their suspended direct
-  /// dependants.
+  /// dependants. This can only be appended to under the bin mutex lock from the
+  /// pending states hashmap, and reclaimed for revival after removing this
+  /// frame from the pending states hashmap.
   dependants: AtomicPtr<Stack<G, N>>,
 }
 
@@ -103,6 +110,7 @@ where
     Self {
       game,
       move_iter: None,
+      best_score: Score::no_info(),
       dependants: AtomicPtr::new(null_mut()),
     }
   }
@@ -135,17 +143,23 @@ pub struct Stack<G, const N: usize>
 where
   G: Game,
 {
+  /// The search depth this stack frame will go out to starting from the root
+  /// frame.
   root_depth: u32,
   frames: ArrayVec<StackFrame<G, N>, N>,
   ty: StackType<G, N>,
   /// TODO: Can remove state? Implicit from where the stack lies in the data
   /// structure.
   state: StackState,
-  /// Live states are queued for execution, which requires a pointer to the next
-  /// queued item.
+  /// For live states that are queued for execution, this is a pointer to the
+  /// next queued item.
   ///
-  /// Suspended states have a pointer to the next dependant suspended state of
-  /// "dependant", forming a singly-linked list of the dependent states.
+  /// For suspended states, this is a pointer to the next dependant suspended
+  /// state of "dependant", forming a singly-linked list of the dependent
+  /// states. This `next` pointer is modified under the bin-lock of the state
+  /// that this stack is suspended on in `DashMap`. When the stack is
+  /// unsuspended, there will not be any other threads that have references to
+  /// this frame since queueing is done under a lock.
   next: *mut Linked<Stack<G, N>>,
   /// A split state is a state with split children, upon whose completion will
   /// resolve the state at the bottom of the stack. It only tracks the number of
@@ -156,9 +170,9 @@ where
 
 impl<G, const N: usize> Stack<G, N>
 where
-  G: Game,
+  G: Game + 'static,
 {
-  pub fn root(initial_game: G, depth: u32) -> Self {
+  pub fn make_root(initial_game: G, depth: u32) -> Self {
     let mut root = Self {
       root_depth: depth,
       frames: ArrayVec::new(),
@@ -168,6 +182,19 @@ where
       outstanding_children: AtomicU32::new(0),
     };
     root.frames.push(StackFrame::new(initial_game));
+    root
+  }
+
+  fn make_child(game: G, depth: u32, parent: AtomicPtr<Self>) -> Self {
+    let mut root = Self {
+      root_depth: depth,
+      frames: ArrayVec::new(),
+      ty: StackType::Child { parent },
+      state: StackState::Live {},
+      next: null_mut(),
+      outstanding_children: AtomicU32::new(0),
+    };
+    root.frames.push(StackFrame::new(game));
     root
   }
 
@@ -183,6 +210,46 @@ where
   pub fn suspend(&mut self) {
     debug_assert_eq!(self.state, StackState::Live);
     self.state = StackState::Suspended;
+  }
+
+  /// Splits a stack frame into a separate stack frame for each possible move of
+  /// the bottom game state, returning an iterator over the stack frames for
+  /// each child. The iterator must be consumed completely.
+  ///
+  /// TODO: may want to split at the first frame, not the last.
+  pub fn split(self_ptr: AtomicPtr<Self>) -> impl Iterator<Item = Self> {
+    // Load the pointer directly without lifetime-protecting, since at this
+    // point no other thread can be referencing this stack.
+    let self_ptr = self_ptr.load(Ordering::Relaxed);
+
+    let stack = unsafe { &mut *self_ptr };
+    debug_assert_eq!(stack.state, StackState::Live);
+    debug_assert_eq!(stack.outstanding_children.load(Ordering::Relaxed), 0);
+
+    stack.state = StackState::Split;
+    // Keep 1 extra outstanding children counter so it will be impossible for
+    // any of the child frames to complete and decrement this to 0 before we
+    // have finished producing all of the children. This should be exceedingly
+    // rare, but it's due diligence.
+    stack.outstanding_children.store(1, Ordering::Relaxed);
+
+    // Generate the child states of this stack frame.
+    let game = stack.bottom_frame().game();
+    game
+      .each_move()
+      .map(move |m| {
+        let stack = unsafe { &mut *self_ptr };
+        stack.outstanding_children.fetch_add(1, Ordering::Relaxed);
+        let mut game = stack.bottom_frame().game().clone();
+        game.make_move(m);
+        Self::make_child(game, stack.bottom_depth() - 1, AtomicPtr::new(self_ptr))
+      })
+      .chain(TransparentIterator::new(move || {
+        let stack = unsafe { &mut *self_ptr };
+        if stack.outstanding_children.fetch_sub(1, Ordering::Relaxed) == 0 {
+          // TODO: All children have finished, revive this frame.
+        }
+      }))
   }
 
   pub fn frame(&self, idx: usize) -> &StackFrame<G, N> {
@@ -209,7 +276,7 @@ where
 
   /// The search depth of the bottom frame of this stack.
   pub fn bottom_depth(&self) -> u32 {
-    self.root_depth + self.frames.len() as u32 - 1
+    self.root_depth - (self.frames.len() as u32 - 1)
   }
 }
 

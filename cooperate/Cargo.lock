@@ -3,6 +3,10 @@
 version = 3
 
 [[package]]
+name = "abstract_game"
+version = "0.1.0"
+
+[[package]]
 name = "arrayvec"
 version = "0.7.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -30,6 +34,7 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 name = "cooperate"
 version = "0.1.0"
 dependencies = [
+ "abstract_game",
  "arrayvec",
  "dashmap",
  "seize",

@@ -21,6 +21,11 @@ impl Score {
     }
   }
 
+  /// Construct a `Score` that contains no information.
+  pub const fn no_info() -> Self {
+    Self::tie(0)
+  }
+
   /// Construct a `Score` for the current player winning in `turn_count_win`
   /// moves.
   pub const fn win(turn_count_win: u32) -> Self {

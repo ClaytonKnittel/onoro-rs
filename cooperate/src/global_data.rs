@@ -21,8 +21,18 @@ where
   /// TODO: Do we need to lifetime-protect stacks? Or can we allocate all of
   /// them up front and free them at the end?
   stack: AtomicPtr<Stack<G, N>>,
-  /// The index of the frame for this state.
+  /// The index of the frame that is being awaited on by this entry in the
+  /// pending states map.
+  ///
+  /// TODO: can infer from context, based on root depth and position in the
+  /// pending states table.
   frame_idx: u32,
+}
+
+pub enum LookupResult {
+  Found { score: Score },
+  NotFound,
+  Queued,
 }
 
 pub struct GlobalData<G, H, const N: usize>
@@ -39,15 +49,9 @@ where
   resolved_states: Table<G, H>,
 }
 
-pub enum LookupResult {
-  Found { score: Score },
-  NotFound,
-  Queued,
-}
-
 impl<G, H, const N: usize> GlobalData<G, H, N>
 where
-  G: Game + Clone + Hash + Eq + TableEntry,
+  G: Game + Clone + Hash + Eq + TableEntry + 'static,
   H: BuildHasher + Clone,
 {
   pub fn collector(&self) -> &Collector {
@@ -55,8 +59,9 @@ where
   }
 
   /// Will try to find the bottom frame of the stack in the state tables. If it
-  /// isn't found, it will reserve a spot in `pending_states` by placing the
-  /// bottom game state of the stack.
+  /// isn't found, or it is found but wasn't searched deep enough, it will
+  /// reserve a spot in `pending_states` by placing the bottom game state of the
+  /// stack.
   ///
   /// Stack must be under a seize::Guard for this to be safe.
   pub fn get_or_queue(&self, stack_ptr: *mut Linked<Stack<G, N>>) -> LookupResult {
@@ -64,9 +69,11 @@ where
     let bottom_state = stack.bottom_frame();
     let game = bottom_state.game();
     if let Some(resolved_state) = self.resolved_states.get(game) {
-      return LookupResult::Found {
-        score: resolved_state.score(),
-      };
+      if resolved_state.score().determined(stack.bottom_depth()) {
+        return LookupResult::Found {
+          score: resolved_state.score(),
+        };
+      }
     }
 
     // If the state wasn't found in the resolved table, then try to insert it
@@ -80,21 +87,28 @@ where
         // Do not need to protect this load since this is under the bin mutex
         // lock in DashMap.
         let pending_stack = unsafe { &mut *pending_frame.stack.load(Ordering::Relaxed) };
-        pending_stack.suspend();
         let frame = pending_stack.frame(pending_frame.frame_idx as usize);
         unsafe {
+          (*stack_ptr).suspend();
           frame.queue_dependant_unlocked(stack_ptr);
         }
+
+        LookupResult::Queued
       }
       Entry::Vacant(entry) => {
         entry.insert(PendingFrame {
           stack: std::sync::atomic::AtomicPtr::new(stack_ptr),
           frame_idx: stack.bottom_frame_idx() as u32,
         });
+
+        // We claimed the pending slot.
+        LookupResult::NotFound
       }
     }
 
-    // We claimed the pending slot.
-    LookupResult::NotFound
+    // TODO: check that resolved_states still doesn't have game? Can maybe
+    // guarantee to avoid repeat work by checking again. Will have to revive all
+    // queued frames on the frame just inserted, but should be rare so not a big
+    // deal.
   }
 }

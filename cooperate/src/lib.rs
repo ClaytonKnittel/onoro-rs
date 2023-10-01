@@ -7,6 +7,7 @@ mod search;
 mod search_worker;
 mod stack;
 mod table;
+mod util;
 
 pub use metrics::*;
 
