@@ -95,6 +95,8 @@ where
   move_iter: Option<G::MoveIterator>,
   // The best score found for this game so far.
   best_score: Score,
+  // The corresponding best move found for `best_score`.
+  best_move: Option<G::Move>,
   /// All stack frames have an unordered list of all of their suspended direct
   /// dependants. This can only be appended to under the bin mutex lock from the
   /// pending states hashmap, and reclaimed for revival after removing this
@@ -111,6 +113,7 @@ where
       game,
       move_iter: None,
       best_score: Score::no_info(),
+      best_move: None,
       dependants: AtomicPtr::new(null_mut()),
     }
   }
@@ -126,6 +129,13 @@ where
         self.move_iter = Some(self.game.each_move());
         self.move_iter.as_mut().unwrap().next()
       }
+    }
+  }
+
+  pub fn maybe_update_score(&mut self, score: Score, m: G::Move) {
+    if score.better(&self.best_score) {
+      self.best_score = score;
+      self.best_move = Some(m);
     }
   }
 
@@ -200,6 +210,10 @@ where
 
   pub fn push(&mut self, game: G) {
     self.frames.push(StackFrame::new(game));
+  }
+
+  pub fn pop(&mut self) -> StackFrame<G, N> {
+    self.frames.pop().unwrap()
   }
 
   pub fn revive(&mut self) {

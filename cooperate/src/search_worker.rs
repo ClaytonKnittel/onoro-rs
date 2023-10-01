@@ -43,20 +43,19 @@ where
 
       if let Some(m) = frame.next_move() {
         let next_state = frame.game().with_move(m);
-        stack.push(next_state);
+        // This is unsafe because we are modifying the stack and using `frame`
+        // later, whose lifetime depends on stack. However, we know that no
+        // references will be invalidated, so it is safe.
+        unsafe { &mut *stack_ptr }.push(next_state);
 
         match data.globals.get_or_queue(stack_ptr) {
           LookupResult::Found { score } => {
-            todo!();
             // Update best score in frame
-            // frame.maybe_update_score(score, m);
+            frame.maybe_update_score(score, m);
+            stack.pop();
           }
-          LookupResult::NotFound => {
-            // Compute the score of the move. The set_ref is a reference to
-            // the placeholder state in the set indicating that this state
-            // is currently being computed.
-            // unit.insert_frame(Frame::new(next_state, set_ref));
-          }
+          // If the state was not found, then we can continue on exploring it.
+          LookupResult::NotFound => {}
           // If the state was queued, then it was added to the list of states
           // waiting on the result of some game state. After this result is
           // found, all states which are pending are re-added to some worker's
