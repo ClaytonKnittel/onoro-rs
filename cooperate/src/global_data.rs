@@ -111,4 +111,30 @@ where
     // queued frames on the frame just inserted, but should be rare so not a big
     // deal.
   }
+
+  /// Commits the bottom stack frame to `resolved_states`. Re-queues all states
+  /// that are pending on the resolution of this game state.
+  pub fn commit_score(&self, stack_ptr: *mut Linked<Stack<G, N>>) {
+    let stack = unsafe { &mut *stack_ptr };
+    let bottom_state = stack.bottom_frame();
+    let game = bottom_state.game();
+
+    self.resolved_states.update(game);
+
+    // Remove the state from the pending states.
+    let depth_idx = stack.bottom_depth() as usize - 1;
+    debug_assert!(depth_idx < N);
+    match self.pending_states[depth_idx].entry(game.clone()) {
+      Entry::Occupied(entry) => {
+        let pending_frame = entry.remove();
+        debug_assert_eq!(pending_frame.stack.load(Ordering::Relaxed), stack_ptr);
+        debug_assert_eq!(pending_frame.frame_idx as usize, stack.bottom_frame_idx());
+      }
+      Entry::Vacant(_) => {
+        debug_assert!(false, "Unexpected vacant entry in pending table.");
+      }
+    }
+
+    // TODO: re-queue all pending states here.
+  }
 }

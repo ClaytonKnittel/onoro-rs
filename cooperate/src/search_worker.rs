@@ -67,7 +67,7 @@ where
       } else {
         // All moves have been explored. Update the table with the game's
         // now-known score, and re-queue all pending units.
-        todo!()
+        data.globals.commit_score(stack_ptr);
       }
     }
   }

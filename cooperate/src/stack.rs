@@ -132,6 +132,8 @@ where
     }
   }
 
+  /// Updates the best score/move pair of this frame if `score` is better than
+  /// the current best score.
   pub fn maybe_update_score(&mut self, score: Score, m: G::Move) {
     if score.better(&self.best_score) {
       self.best_score = score;
@@ -209,6 +211,7 @@ where
   }
 
   pub fn push(&mut self, game: G) {
+    debug_assert!(!self.frames.is_full());
     self.frames.push(StackFrame::new(game));
   }
 

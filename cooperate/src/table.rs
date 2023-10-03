@@ -42,15 +42,12 @@ where
     self.table.get(key)
   }
 
-  pub fn insert(&self, state: &G) -> bool {
-    self.table.insert(state.clone())
-  }
-
   /// Updates an Onoro view in the table, potentially modifying the passed view
   /// to match the merged view that is in the table upon returning.
-  pub fn update(&self, state: &mut G) {
+  pub fn update(&self, state: &G) {
+    let mut state = state.clone();
     while !self.table.insert(state.clone()) {
-      if let Some(other_state) = self.table.remove(state) {
+      if let Some(other_state) = self.table.remove(&state) {
         state.merge(&other_state);
       }
     }
