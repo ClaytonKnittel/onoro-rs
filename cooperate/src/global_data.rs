@@ -8,6 +8,7 @@ use dashmap::{mapref::entry::Entry, DashMap};
 use seize::{AtomicPtr, Collector, Linked};
 
 use crate::{
+  queue::Queue,
   stack::Stack,
   table::{Table, TableEntry},
 };
@@ -113,8 +114,9 @@ where
   }
 
   /// Commits the bottom stack frame to `resolved_states`. Re-queues all states
-  /// that are pending on the resolution of this game state.
-  pub fn commit_score(&self, stack_ptr: *mut Linked<Stack<G, N>>) {
+  /// that are pending on the resolution of this game state to this worker's own
+  /// queue.
+  pub fn commit_score(&self, stack_ptr: *mut Linked<Stack<G, N>>, queue: &Queue<Stack<G, N>>) {
     let stack = unsafe { &mut *stack_ptr };
     let bottom_state = stack.bottom_frame();
     let game = bottom_state.game();
@@ -136,5 +138,8 @@ where
     }
 
     // TODO: re-queue all pending states here.
+    while let Some(dependant) = unsafe { bottom_state.pop_dependant_unlocked() } {
+      queue.push(dependant);
+    }
   }
 }

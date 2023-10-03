@@ -147,6 +147,18 @@ where
     }
     self.dependants.store(dependant, Ordering::Relaxed);
   }
+
+  pub unsafe fn pop_dependant_unlocked(&self) -> Option<*mut Linked<Stack<G, N>>> {
+    let head = self.dependants.load(Ordering::Relaxed);
+    if head.is_null() {
+      return None;
+    }
+
+    self
+      .dependants
+      .store(unsafe { (*head).next }, Ordering::Relaxed);
+    Some(head)
+  }
 }
 
 /// Each task has a stack frame exactly large enough to hold enough frames for a
@@ -287,7 +299,7 @@ where
     self.frames.last_mut().unwrap()
   }
 
-  pub fn bottom_frame_idx(&mut self) -> usize {
+  pub fn bottom_frame_idx(&self) -> usize {
     self.frames.len() - 1
   }
 

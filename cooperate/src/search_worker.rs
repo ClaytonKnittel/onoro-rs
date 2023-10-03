@@ -22,7 +22,7 @@ where
   globals: Arc<GlobalData<G, H, N>>,
 }
 
-fn start_worker<G, H, const N: usize>(mut data: WorkerData<G, H, N>)
+fn start_worker<G, H, const N: usize>(data: WorkerData<G, H, N>)
 where
   G: Game + Hash + Eq + TableEntry + 'static,
   H: BuildHasher + Clone,
@@ -67,7 +67,7 @@ where
       } else {
         // All moves have been explored. Update the table with the game's
         // now-known score, and re-queue all pending units.
-        data.globals.commit_score(stack_ptr);
+        data.globals.commit_score(stack_ptr, &data.queue);
       }
     }
   }
