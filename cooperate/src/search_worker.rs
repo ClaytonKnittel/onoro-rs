@@ -271,22 +271,18 @@ mod tests {
     for sticks in 1..=STICKS as u32 {
       let game = globals.resolved_states_table().get(&Nim::new(sticks));
       assert!(game.is_some());
-      let game = game.unwrap().clone();
+      let game = game.unwrap();
       if sticks % 3 == 0 {
         let turn_count_win = sticks * 2 / 3;
         assert_eq!(
           game.score(),
           Score::new(false, turn_count_win - 1, turn_count_win),
-          "game: {}",
-          game
         );
       } else {
         let turn_count_win = sticks / 3 * 2;
         assert_eq!(
           game.score(),
-          Score::new(true, turn_count_win, turn_count_win + 1),
-          "game: {}",
-          game
+          Score::new(true, turn_count_win, turn_count_win + 1)
         );
       }
     }
