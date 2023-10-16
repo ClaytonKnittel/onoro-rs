@@ -132,6 +132,10 @@ where
     }
   }
 
+  pub fn best_score(&self) -> (&Score, Option<G::Move>) {
+    (&self.best_score, self.best_move)
+  }
+
   /// Updates the best score/move pair of this frame if `score` is better than
   /// the current best score.
   pub fn maybe_update_score(&mut self, score: Score, m: G::Move) {

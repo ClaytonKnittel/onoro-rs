@@ -55,6 +55,15 @@ where
   G: Game + Clone + Hash + Eq + TableEntry + 'static,
   H: BuildHasher + Clone,
 {
+  pub fn new(hasher: H) -> Self {
+    Self {
+      collector: Collector::new(),
+      pending_states: [0; N]
+        .map(|_| DashMap::<G, PendingFrame<G, N>, H>::with_hasher(hasher.clone())),
+      resolved_states: Table::with_hasher(hasher),
+    }
+  }
+
   pub fn collector(&self) -> &Collector {
     &self.collector
   }
@@ -137,7 +146,7 @@ where
       }
     }
 
-    // TODO: re-queue all pending states here.
+    // Re-queue all pending states.
     while let Some(dependant) = unsafe { bottom_state.pop_dependant_unlocked() } {
       queue.push(dependant);
     }
