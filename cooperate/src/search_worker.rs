@@ -47,7 +47,9 @@ where
           StackType::Root => {
             break;
           }
-          StackType::Child { parent } => {}
+          StackType::Child { parent } => {
+            Stack::resolve_outstanding_child(parent);
+          }
         }
         break;
       }

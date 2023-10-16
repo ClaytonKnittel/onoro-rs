@@ -298,7 +298,7 @@ where
   /// each child. The iterator must be consumed completely.
   ///
   /// TODO: may want to split at the first frame, not the last.
-  pub fn split(self_ptr: AtomicPtr<Self>) -> impl Iterator<Item = Self> {
+  pub fn split(self_ptr: &AtomicPtr<Self>) -> impl Iterator<Item = Self> {
     // Load the pointer directly without lifetime-protecting, since at this
     // point no other thread can be referencing this stack.
     let self_ptr = self_ptr.load(Ordering::Relaxed);
@@ -336,8 +336,10 @@ where
   /// TODO: try tracking the best score/move in the parent stack frame, protect
   /// those and outstanding_children with a lock, instead of re-iterating over
   /// the parent and relying on the children states to be in the resolved table.
-  pub fn resolve_outstanding_child(&self) {
-    if self.outstanding_children.fetch_sub(1, Ordering::Relaxed) == 0 {
+  pub fn resolve_outstanding_child(self_ptr: &AtomicPtr<Self>) {
+    let self_ptr = self_ptr.load(Ordering::Relaxed);
+    let stack = unsafe { &mut *self_ptr };
+    if stack.outstanding_children.fetch_sub(1, Ordering::Relaxed) == 0 {
       // TODO: All children have finished, revive this frame.
     }
   }
