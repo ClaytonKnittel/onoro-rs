@@ -78,7 +78,7 @@ where
   /// Stack must be under a seize::Guard for this to be safe.
   pub fn get_or_queue(&self, stack_ptr: *mut Linked<Stack<G, N>>) -> LookupResult {
     let stack = unsafe { &mut *stack_ptr };
-    let bottom_state = stack.bottom_frame();
+    let bottom_state = stack.bottom_frame().unwrap();
     let game = bottom_state.game();
     if let Some(resolved_state) = self.resolved_states.get(game) {
       if resolved_state.score().determined(stack.bottom_depth()) {
@@ -92,6 +92,9 @@ where
     // into its respective pending table.
     let depth_idx = stack.bottom_depth() as usize - 1;
     debug_assert!(depth_idx < N);
+    for x in self.pending_states[depth_idx].iter() {
+      println!("      found guy at {depth_idx}: {}", x.key());
+    }
     match self.pending_states[depth_idx].entry(game.clone()) {
       Entry::Occupied(entry) => {
         // If there is already a pending computation, then queue ourselves on it.
@@ -126,17 +129,30 @@ where
     // deal.
   }
 
-  /// Commits the scores of every complete stack frame, starting from the bottom.
+  /// Commits the scores of every complete stack frame, if there are any and
+  /// starting from the bottom, and makes the next move that needs to be
+  /// explored.
   ///
   /// TODO: take stack: &Stack<...> as a parameter, not stack_ptr.
-  pub fn commit_scores(&self, stack_ptr: *mut Linked<Stack<G, N>>, queue: &Queue<Stack<G, N>>) {
+  pub fn explore_next_state(
+    &self,
+    stack_ptr: *mut Linked<Stack<G, N>>,
+    queue: &Queue<Stack<G, N>>,
+  ) {
     let stack = unsafe { &mut *stack_ptr };
-    let mut bottom_state = stack.bottom_frame();
-    debug_assert!(bottom_state.current_move().is_none());
 
-    while bottom_state.current_move().is_none() {
-      self.commit_score(stack, stack_ptr, queue);
-      bottom_state = stack.bottom_frame();
+    while let Some(bottom_state) = stack.bottom_frame() {
+      match bottom_state.current_move() {
+        Some(m) => {
+          println!("  move {} for {}", m, bottom_state.game());
+          let next_state = bottom_state.game().with_move(m);
+          stack.push(next_state);
+          break;
+        }
+        None => {
+          self.commit_score(stack, stack_ptr, queue);
+        }
+      }
     }
   }
 
@@ -152,11 +168,15 @@ where
     let depth_idx = stack.bottom_depth() as usize - 1;
     let bottom_frame_idx = stack.bottom_frame_idx();
 
-    let bottom_state = stack.bottom_frame_mut();
-    let game = bottom_state.game();
-    // TODO: this may update the score of game, but right now that is ignored.
-    // Updated scores will contain more information, so we should be using that
-    // and update game's score here.
+    let bottom_state = stack.bottom_frame_mut().unwrap();
+    let score = bottom_state.best_score().0.clone();
+    let game = bottom_state.game_mut();
+    game.set_score(score);
+    println!(
+      "  Out of moves for {}, committing score {}",
+      game,
+      game.score()
+    );
     self.resolved_states.update(game);
 
     // Remove the state from the pending states.
@@ -171,6 +191,9 @@ where
       Entry::Vacant(_) => {
         debug_assert!(false, "Unexpected vacant entry in pending table.");
       }
+    }
+    for x in self.pending_states[depth_idx].iter() {
+      println!("      found guy at {depth_idx}: {}", x.key());
     }
 
     // Re-queue all pending states.

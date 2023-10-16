@@ -15,6 +15,9 @@ pub struct Score {
 }
 
 impl Score {
+  const MAX_WIN_DEPTH: u32 = 0x007f;
+  const MAX_TIE_DEPTH: u32 = 0x0fff;
+
   pub const fn new(cur_player_wins: bool, turn_count_tie: u32, turn_count_win: u32) -> Self {
     Self {
       data: Self::pack(cur_player_wins, turn_count_tie, turn_count_win),
@@ -41,6 +44,12 @@ impl Score {
   /// Construct a `Score` for no possible forcing win in `turn_count_tie` moves.
   pub const fn tie(turn_count_tie: u32) -> Self {
     Score::new(false, turn_count_tie, 0)
+  }
+
+  /// Construct a `Score` for no possible forcing win in any number of moves
+  /// into the future.
+  pub const fn guaranteed_tie() -> Self {
+    Score::new(false, Self::MAX_TIE_DEPTH, 0)
   }
 
   /// Used to mark a game state as an ancestor of the current tree being
@@ -92,13 +101,15 @@ impl Score {
   ///
   /// If a winning move for one player has been found in n steps, then it is
   /// turned into a winning move for the other player in n + 1 steps.
-  pub const fn backstep(&self) -> Self {
+  pub fn backstep(&self) -> Self {
     let (mut cur_player_wins, mut turn_count_tie, mut turn_count_win) = Self::unpack(self.data);
     if turn_count_win > 0 {
       turn_count_win += 1;
       cur_player_wins = !cur_player_wins;
     }
-    turn_count_tie += 1;
+    if turn_count_tie != Self::MAX_TIE_DEPTH {
+      turn_count_tie += 1;
+    }
 
     Score::new(cur_player_wins, turn_count_tie, turn_count_win)
   }
@@ -204,8 +215,8 @@ impl Score {
   }
 
   const fn unpack((a, b): (u16, u8)) -> (bool, u32, u32) {
-    let turn_count_tie = (a as u32) & 0x0fff;
-    let turn_count_win = ((a as u32) >> 12) | ((b as u32) & 0x7f);
+    let turn_count_tie = (a as u32) & Self::MAX_TIE_DEPTH;
+    let turn_count_win = ((a as u32) >> 12) | ((b as u32) & Self::MAX_WIN_DEPTH);
     let cur_player_wins = ((b as u32) >> 7) != 0;
 
     (cur_player_wins, turn_count_tie, turn_count_win)
@@ -227,7 +238,11 @@ impl Display for Score {
     if self == &Self::ancestor() {
       write!(f, "[ancestor]")
     } else if turn_count_win == 0 {
-      write!(f, "[tie:{turn_count_tie}]")
+      if turn_count_tie == Self::MAX_TIE_DEPTH {
+        write!(f, "[tie:∞]")
+      } else {
+        write!(f, "[tie:{turn_count_tie}]")
+      }
     } else {
       write!(
         f,

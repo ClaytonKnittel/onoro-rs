@@ -128,22 +128,36 @@ where
     &self.game
   }
 
+  pub fn game_mut(&mut self) -> &mut G {
+    &mut self.game
+  }
+
   /// The current move to explore for this stack frame.
   pub fn current_move(&self) -> Option<G::Move> {
     self.current_move
   }
 
-  pub fn best_score(&self) -> (&Score, Option<G::Move>) {
-    (&self.best_score, self.best_move)
+  pub fn best_score(&self) -> (Score, Option<G::Move>) {
+    (
+      if self.best_move.is_none() {
+        // If there were no possible moves and the game is considered a tie,
+        // then this is a guaranteed tie.
+        Score::guaranteed_tie()
+      } else {
+        self.best_score.clone()
+      },
+      self.best_move,
+    )
   }
 
   /// Updates the best score/move pair of this frame if `score` is better than
   /// the current best score, and advances the current move to the next move.
-  pub fn update_score_and_advance(&mut self, score: Score) {
-    if score.better(&self.best_score) {
+  fn update_score_and_advance(&mut self, score: Score) {
+    if self.best_move.is_none() || score.better(&self.best_score) {
       self.best_score = score;
       self.best_move = self.current_move;
     }
+    self.advance();
   }
 
   pub unsafe fn queue_dependant_unlocked(&self, dependant: *mut Linked<Stack<G, N>>) {
@@ -239,6 +253,10 @@ where
     root
   }
 
+  pub fn stack_type(&self) -> &StackType<G, N> {
+    &self.ty
+  }
+
   pub fn push(&mut self, game: G) {
     debug_assert!(!self.frames.is_full());
     self.frames.push(StackFrame::new(game));
@@ -249,8 +267,9 @@ where
   /// parent stack frame.
   pub fn pop_with_score(&mut self, score: Score) -> StackFrame<G, N> {
     let completed_frame = self.frames.pop().unwrap();
-    let parent_frame = self.frames.last_mut().unwrap();
-    parent_frame.update_score_and_advance(score);
+    if let Some(parent_frame) = self.frames.last_mut() {
+      parent_frame.update_score_and_advance(score.backstep());
+    }
 
     completed_frame
   }
@@ -259,7 +278,7 @@ where
   /// remove the bottom stack frame and update the score/current move of the
   /// parent stack frame.
   pub fn pop(&mut self) -> StackFrame<G, N> {
-    let completed_frame = self.frames.pop().unwrap();
+    let completed_frame = self.frames.last().unwrap();
     debug_assert!(completed_frame.current_move().is_none());
     self.pop_with_score(completed_frame.best_score().0.clone())
   }
@@ -296,13 +315,13 @@ where
     stack.outstanding_children.store(1, Ordering::Relaxed);
 
     // Generate the child states of this stack frame.
-    let game = stack.bottom_frame().game();
+    let game = stack.bottom_frame().unwrap().game();
     game
       .each_move()
       .map(move |m| {
         let stack = unsafe { &mut *self_ptr };
         stack.outstanding_children.fetch_add(1, Ordering::Relaxed);
-        let mut game = stack.bottom_frame().game().clone();
+        let mut game = stack.bottom_frame().unwrap().game().clone();
         game.make_move(m);
         Self::make_child(game, stack.bottom_depth() - 1, AtomicPtr::new(self_ptr))
       })
@@ -312,6 +331,15 @@ where
           // TODO: All children have finished, revive this frame.
         }
       }))
+  }
+
+  /// TODO: try tracking the best score/move in the parent stack frame, protect
+  /// those and outstanding_children with a lock, instead of re-iterating over
+  /// the parent and relying on the children states to be in the resolved table.
+  pub fn resolve_outstanding_child(&self) {
+    if self.outstanding_children.fetch_sub(1, Ordering::Relaxed) == 0 {
+      // TODO: All children have finished, revive this frame.
+    }
   }
 
   pub fn frame(&self, idx: usize) -> &StackFrame<G, N> {
@@ -324,12 +352,12 @@ where
     unsafe { self.frames.get_unchecked_mut(idx) }
   }
 
-  pub fn bottom_frame(&self) -> &StackFrame<G, N> {
-    self.frames.last().unwrap()
+  pub fn bottom_frame(&self) -> Option<&StackFrame<G, N>> {
+    self.frames.last()
   }
 
-  pub fn bottom_frame_mut(&mut self) -> &mut StackFrame<G, N> {
-    self.frames.last_mut().unwrap()
+  pub fn bottom_frame_mut(&mut self) -> Option<&mut StackFrame<G, N>> {
+    self.frames.last_mut()
   }
 
   pub fn bottom_frame_idx(&self) -> usize {

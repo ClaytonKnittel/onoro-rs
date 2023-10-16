@@ -9,7 +9,7 @@ use abstract_game::Game;
 use crate::{
   global_data::{GlobalData, LookupResult},
   queue::Queue,
-  stack::Stack,
+  stack::{Stack, StackType},
   table::TableEntry,
 };
 
@@ -41,11 +41,24 @@ where
     let stack = unsafe { &mut *stack_ptr };
 
     'seq: loop {
+      if stack.bottom_frame().is_none() {
+        // We've finished exploring this stack frame.
+        match stack.stack_type() {
+          StackType::Root => {
+            break;
+          }
+          StackType::Child { parent } => {}
+        }
+        break;
+      }
+
       println!(
         "Exploring {} (depth {})",
-        stack.bottom_frame().game(),
+        stack.bottom_frame().unwrap().game(),
         unsafe { &mut *stack_ptr }.bottom_depth()
       );
+
+      // TODO: check if game is over here before queueing.
 
       match data.globals.get_or_queue(stack_ptr) {
         LookupResult::Found { score } => {
@@ -61,8 +74,8 @@ where
           stack.pop_with_score(score);
           println!(
             "{}, {}",
-            stack.bottom_frame().best_score().0,
-            match stack.bottom_frame().best_score().1 {
+            stack.bottom_frame().unwrap().best_score().0,
+            match stack.bottom_frame().unwrap().best_score().1 {
               Some(m) => m.to_string(),
               None => "[None]".to_string(),
             }
@@ -82,20 +95,7 @@ where
         }
       }
 
-      let frame = stack.bottom_frame_mut();
-      if let Some(m) = frame.current_move() {
-        println!("  move {}", m);
-        let next_state = frame.game().with_move(m);
-        stack.push(next_state);
-      } else {
-        let stack = unsafe { &mut *stack_ptr };
-        let bottom_state = stack.bottom_frame();
-        let game = bottom_state.game();
-        println!("  Out of moves, committing score {}", game.score());
-        // All moves have been explored. Update the table with the game's
-        // now-known score, and re-queue all pending units.
-        data.globals.commit_scores(stack_ptr, &data.queue);
-      }
+      data.globals.explore_next_state(stack_ptr, &data.queue);
     }
   }
 }
@@ -203,6 +203,10 @@ mod tests {
   impl TableEntry for Nim {
     fn score(&self) -> abstract_game::Score {
       self.score.clone()
+    }
+
+    fn set_score(&mut self, score: Score) {
+      self.score = score;
     }
 
     fn merge(&mut self, other: &Self) {
