@@ -41,52 +41,52 @@ where
     let stack = unsafe { &mut *stack_ptr };
 
     'seq: loop {
-      let frame = stack.bottom_frame_mut();
-      println!("Exploring {}", frame.game());
+      println!(
+        "Exploring {} (depth {})",
+        stack.bottom_frame().game(),
+        unsafe { &mut *stack_ptr }.bottom_depth()
+      );
 
-      if let Some(m) = frame.next_move() {
+      match data.globals.get_or_queue(stack_ptr) {
+        LookupResult::Found { score } => {
+          // Update best score in frame
+          print!(
+            "    Found, updating score from {}, {} to ",
+            stack.frame(stack.bottom_frame_idx() - 1).best_score().0,
+            match stack.frame(stack.bottom_frame_idx() - 1).best_score().1 {
+              Some(m) => m.to_string(),
+              None => "[None]".to_string(),
+            }
+          );
+          stack.pop_with_score(score);
+          println!(
+            "{}, {}",
+            stack.bottom_frame().best_score().0,
+            match stack.bottom_frame().best_score().1 {
+              Some(m) => m.to_string(),
+              None => "[None]".to_string(),
+            }
+          );
+        }
+        // If the state was not found, then we can continue on exploring it.
+        LookupResult::NotFound => {
+          println!("    Inserted placeholder in table");
+        }
+        // If the state was queued, then it was added to the list of states
+        // waiting on the result of some game state. After this result is
+        // found, all states which are pending are re-added to some worker's
+        // queue (randomly distributed).
+        LookupResult::Queued => {
+          println!("    Queued on other state");
+          break 'seq;
+        }
+      }
+
+      let frame = stack.bottom_frame_mut();
+      if let Some(m) = frame.current_move() {
         println!("  move {}", m);
         let next_state = frame.game().with_move(m);
-        // This is unsafe because we are modifying the stack and using `frame`
-        // later, whose lifetime depends on stack. However, we know that no
-        // references will be invalidated, so it is safe.
-        unsafe { &mut *stack_ptr }.push(next_state);
-
-        match data.globals.get_or_queue(stack_ptr) {
-          LookupResult::Found { score } => {
-            // Update best score in frame
-            print!(
-              "    Found, updating score from {}, {} to ",
-              frame.best_score().0,
-              match frame.best_score().1 {
-                Some(m) => m.to_string(),
-                None => "[None]".to_string(),
-              }
-            );
-            frame.maybe_update_score(score, m);
-            println!(
-              "{}, {}",
-              frame.best_score().0,
-              match frame.best_score().1 {
-                Some(m) => m.to_string(),
-                None => "[None]".to_string(),
-              }
-            );
-            stack.pop();
-          }
-          // If the state was not found, then we can continue on exploring it.
-          LookupResult::NotFound => {
-            println!("    Not found in table");
-          }
-          // If the state was queued, then it was added to the list of states
-          // waiting on the result of some game state. After this result is
-          // found, all states which are pending are re-added to some worker's
-          // queue (randomly distributed).
-          LookupResult::Queued => {
-            println!("    Queued on other state");
-            break 'seq;
-          }
-        }
+        stack.push(next_state);
       } else {
         let stack = unsafe { &mut *stack_ptr };
         let bottom_state = stack.bottom_frame();
@@ -94,7 +94,7 @@ where
         println!("  Out of moves, committing score {}", game.score());
         // All moves have been explored. Update the table with the game's
         // now-known score, and re-queue all pending units.
-        data.globals.commit_score(stack_ptr, &data.queue);
+        data.globals.commit_scores(stack_ptr, &data.queue);
       }
     }
   }
@@ -103,6 +103,7 @@ where
 #[cfg(test)]
 mod tests {
   use std::{
+    collections::hash_map::RandomState,
     fmt::Display,
     hash::Hash,
     sync::{atomic::Ordering, Arc},
@@ -114,31 +115,6 @@ mod tests {
   use crate::{global_data::GlobalData, queue::Queue, stack::Stack, table::TableEntry};
 
   use super::{start_worker, WorkerData};
-
-  struct PassThroughHasher {
-    state: u64,
-  }
-
-  impl std::hash::Hasher for PassThroughHasher {
-    fn write(&mut self, bytes: &[u8]) {
-      debug_assert!(bytes.len() == 8 && self.state == 0);
-      self.state = unsafe { *(bytes.as_ptr() as *const u64) };
-    }
-
-    fn finish(&self) -> u64 {
-      self.state
-    }
-  }
-
-  #[derive(Clone)]
-  struct BuildPassThroughHasher;
-
-  impl std::hash::BuildHasher for BuildPassThroughHasher {
-    type Hasher = PassThroughHasher;
-    fn build_hasher(&self) -> PassThroughHasher {
-      PassThroughHasher { state: 0 }
-    }
-  }
 
   enum NimPlayer {
     First,
@@ -165,7 +141,7 @@ mod tests {
     type Item = NimMove;
 
     fn next(&mut self) -> Option<Self::Item> {
-      if self.sticks == self.max_sticks {
+      if self.sticks > self.max_sticks {
         None
       } else {
         self.sticks += 1;
@@ -176,7 +152,7 @@ mod tests {
     }
   }
 
-  #[derive(Clone, PartialEq, Eq)]
+  #[derive(Clone)]
   struct Nim {
     sticks: u32,
     turn: u32,
@@ -236,9 +212,18 @@ mod tests {
 
   impl Hash for Nim {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-      (self.sticks as u64 + self.turn as u64 * 0x1_0000_0000).hash(state);
+      self.sticks.hash(state);
+      (self.turn % 2).hash(state);
     }
   }
+
+  impl PartialEq for Nim {
+    fn eq(&self, other: &Self) -> bool {
+      self.sticks == other.sticks && (self.turn % 2) == (other.turn % 2)
+    }
+  }
+
+  impl Eq for Nim {}
 
   impl Display for Nim {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -248,7 +233,7 @@ mod tests {
 
   #[test]
   fn test_basic() {
-    let globals = Arc::new(GlobalData::<_, _, 11>::new(BuildPassThroughHasher));
+    let globals = Arc::new(GlobalData::<_, _, 11>::new(RandomState::new()));
     let queue = Queue::new();
 
     let stack = AtomicPtr::new(

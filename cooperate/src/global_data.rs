@@ -1,4 +1,5 @@
 use std::{
+  fmt::Display,
   hash::{BuildHasher, Hash},
   sync::atomic::Ordering,
 };
@@ -9,7 +10,7 @@ use seize::{AtomicPtr, Collector, Linked};
 
 use crate::{
   queue::Queue,
-  stack::Stack,
+  stack::{Stack, StackFrame},
   table::{Table, TableEntry},
 };
 
@@ -52,7 +53,8 @@ where
 
 impl<G, H, const N: usize> GlobalData<G, H, N>
 where
-  G: Game + Clone + Hash + Eq + TableEntry + 'static,
+  G: Display + Game + Clone + Hash + Eq + TableEntry + 'static,
+  G::Move: Display,
   H: BuildHasher + Clone,
 {
   pub fn new(hasher: H) -> Self {
@@ -111,6 +113,8 @@ where
           frame_idx: stack.bottom_frame_idx() as u32,
         });
 
+        println!("    inserting at {depth_idx}");
+
         // We claimed the pending slot.
         LookupResult::NotFound
       }
@@ -122,24 +126,47 @@ where
     // deal.
   }
 
+  /// Commits the scores of every complete stack frame, starting from the bottom.
+  ///
+  /// TODO: take stack: &Stack<...> as a parameter, not stack_ptr.
+  pub fn commit_scores(&self, stack_ptr: *mut Linked<Stack<G, N>>, queue: &Queue<Stack<G, N>>) {
+    let stack = unsafe { &mut *stack_ptr };
+    let mut bottom_state = stack.bottom_frame();
+    debug_assert!(bottom_state.current_move().is_none());
+
+    while bottom_state.current_move().is_none() {
+      self.commit_score(stack, stack_ptr, queue);
+      bottom_state = stack.bottom_frame();
+    }
+  }
+
   /// Commits the bottom stack frame to `resolved_states`. Re-queues all states
   /// that are pending on the resolution of this game state to this worker's own
   /// queue.
-  pub fn commit_score(&self, stack_ptr: *mut Linked<Stack<G, N>>, queue: &Queue<Stack<G, N>>) {
-    let stack = unsafe { &mut *stack_ptr };
-    let bottom_state = stack.bottom_frame();
-    let game = bottom_state.game();
+  fn commit_score(
+    &self,
+    stack: &mut Stack<G, N>,
+    stack_ptr: *mut Linked<Stack<G, N>>,
+    queue: &Queue<Stack<G, N>>,
+  ) {
+    let depth_idx = stack.bottom_depth() as usize - 1;
+    let bottom_frame_idx = stack.bottom_frame_idx();
 
+    let bottom_state = stack.bottom_frame_mut();
+    let game = bottom_state.game();
+    // TODO: this may update the score of game, but right now that is ignored.
+    // Updated scores will contain more information, so we should be using that
+    // and update game's score here.
     self.resolved_states.update(game);
 
     // Remove the state from the pending states.
-    let depth_idx = stack.bottom_depth() as usize - 1;
+    println!("    removing at {depth_idx}");
     debug_assert!(depth_idx < N);
     match self.pending_states[depth_idx].entry(game.clone()) {
       Entry::Occupied(entry) => {
         let pending_frame = entry.remove();
         debug_assert_eq!(pending_frame.stack.load(Ordering::Relaxed), stack_ptr);
-        debug_assert_eq!(pending_frame.frame_idx as usize, stack.bottom_frame_idx());
+        debug_assert_eq!(pending_frame.frame_idx as usize, bottom_frame_idx);
       }
       Entry::Vacant(_) => {
         debug_assert!(false, "Unexpected vacant entry in pending table.");
@@ -150,5 +177,8 @@ where
     while let Some(dependant) = unsafe { bottom_state.pop_dependant_unlocked() } {
       queue.push(dependant);
     }
+
+    // Pop this state from the stack.
+    stack.pop();
   }
 }

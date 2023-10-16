@@ -1,5 +1,6 @@
 use core::num;
 use std::{
+  fmt::Display,
   ptr::null_mut,
   sync::atomic::{AtomicU32, Ordering},
 };
@@ -8,7 +9,7 @@ use abstract_game::{Game, Score};
 use arrayvec::ArrayVec;
 use seize::{AtomicPtr, Linked};
 
-use crate::{queue::QueueItem, util::TransparentIterator};
+use crate::{queue::QueueItem, table::TableEntry, util::TransparentIterator};
 
 /// Algorithm:
 /// ```rs
@@ -93,9 +94,11 @@ where
   /// An iterator over the moves at this game state. If `None`, then no moves
   /// have been iterated over yet.
   move_iter: Option<G::MoveIterator>,
-  // The best score found for this game so far.
+  /// The current move being explored by the child of this frame.
+  current_move: Option<G::Move>,
+  /// The best score found for this game so far.
   best_score: Score,
-  // The corresponding best move found for `best_score`.
+  /// The corresponding best move found for `best_score`.
   best_move: Option<G::Move>,
   /// All stack frames have an unordered list of all of their suspended direct
   /// dependants. This can only be appended to under the bin mutex lock from the
@@ -109,27 +112,25 @@ where
   G: Game,
 {
   pub fn new(game: G) -> Self {
-    Self {
+    let mut s = Self {
       game,
       move_iter: None,
+      current_move: None,
       best_score: Score::no_info(),
       best_move: None,
       dependants: AtomicPtr::new(null_mut()),
-    }
+    };
+    s.advance();
+    s
   }
 
   pub fn game(&self) -> &G {
     &self.game
   }
 
-  pub fn next_move(&mut self) -> Option<G::Move> {
-    match &mut self.move_iter {
-      Some(move_iter) => move_iter.next(),
-      None => {
-        self.move_iter = Some(self.game.each_move());
-        self.move_iter.as_mut().unwrap().next()
-      }
-    }
+  /// The current move to explore for this stack frame.
+  pub fn current_move(&self) -> Option<G::Move> {
+    self.current_move
   }
 
   pub fn best_score(&self) -> (&Score, Option<G::Move>) {
@@ -137,11 +138,11 @@ where
   }
 
   /// Updates the best score/move pair of this frame if `score` is better than
-  /// the current best score.
-  pub fn maybe_update_score(&mut self, score: Score, m: G::Move) {
+  /// the current best score, and advances the current move to the next move.
+  pub fn update_score_and_advance(&mut self, score: Score) {
     if score.better(&self.best_score) {
       self.best_score = score;
-      self.best_move = Some(m);
+      self.best_move = self.current_move;
     }
   }
 
@@ -162,6 +163,17 @@ where
       .dependants
       .store(unsafe { (*head).next }, Ordering::Relaxed);
     Some(head)
+  }
+
+  /// Advances the current move to the next possible move.
+  fn advance(&mut self) {
+    self.current_move = match &mut self.move_iter {
+      Some(move_iter) => move_iter.next(),
+      None => {
+        self.move_iter = Some(self.game.each_move());
+        self.move_iter.as_mut().unwrap().next()
+      }
+    };
   }
 }
 
@@ -198,7 +210,8 @@ where
 
 impl<G, const N: usize> Stack<G, N>
 where
-  G: Game + 'static,
+  G: Game + TableEntry + 'static,
+  G::Move: Display,
 {
   pub fn make_root(initial_game: G, depth: u32) -> Self {
     let mut root = Self {
@@ -231,8 +244,24 @@ where
     self.frames.push(StackFrame::new(game));
   }
 
+  /// To be called to resolve the bottom frame to the given score. This will
+  /// remove the bottom stack frame and update the score/current move of the
+  /// parent stack frame.
+  pub fn pop_with_score(&mut self, score: Score) -> StackFrame<G, N> {
+    let completed_frame = self.frames.pop().unwrap();
+    let parent_frame = self.frames.last_mut().unwrap();
+    parent_frame.update_score_and_advance(score);
+
+    completed_frame
+  }
+
+  /// To be called when the bottom stack frame has resolved its score. This will
+  /// remove the bottom stack frame and update the score/current move of the
+  /// parent stack frame.
   pub fn pop(&mut self) -> StackFrame<G, N> {
-    self.frames.pop().unwrap()
+    let completed_frame = self.frames.pop().unwrap();
+    debug_assert!(completed_frame.current_move().is_none());
+    self.pop_with_score(completed_frame.best_score().0.clone())
   }
 
   pub fn revive(&mut self) {
