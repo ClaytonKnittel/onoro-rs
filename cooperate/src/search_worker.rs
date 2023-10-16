@@ -4,7 +4,7 @@ use std::{
   sync::Arc,
 };
 
-use abstract_game::Game;
+use abstract_game::{Game, Score};
 
 use crate::{
   global_data::{GlobalData, LookupResult},
@@ -60,40 +60,43 @@ where
         unsafe { &mut *stack_ptr }.bottom_depth()
       );
 
-      // TODO: check if game is over here before queueing.
-
-      match data.globals.get_or_queue(stack_ptr) {
-        LookupResult::Found { score } => {
-          // Update best score in frame
-          print!(
-            "    Found, updating score from {}, {} to ",
-            stack.frame(stack.bottom_frame_idx() - 1).best_score().0,
-            match stack.frame(stack.bottom_frame_idx() - 1).best_score().1 {
-              Some(m) => m.to_string(),
-              None => "[None]".to_string(),
-            }
-          );
-          stack.pop_with_score(score);
-          println!(
-            "{}, {}",
-            stack.bottom_frame().unwrap().best_score().0,
-            match stack.bottom_frame().unwrap().best_score().1 {
-              Some(m) => m.to_string(),
-              None => "[None]".to_string(),
-            }
-          );
-        }
-        // If the state was not found, then we can continue on exploring it.
-        LookupResult::NotFound => {
-          println!("    Inserted placeholder in table");
-        }
-        // If the state was queued, then it was added to the list of states
-        // waiting on the result of some game state. After this result is
-        // found, all states which are pending are re-added to some worker's
-        // queue (randomly distributed).
-        LookupResult::Queued => {
-          println!("    Queued on other state");
-          break 'seq;
+      let game = stack.bottom_frame().unwrap().game();
+      if let Some(winner) = game.finished() {
+        // Since scores indicating a player is currently winning are not
+        // representable, we construct scores for the parent of this frame that
+        // indicate the opposite player will can in one turn.
+        let score_for_parent = if winner == game.current_player() {
+          // If the current player is winning, then in the parent frame, the
+          // current player (the other player in this frame) is losing next
+          // turn.
+          Score::lose(1)
+        } else {
+          // If the current player is losing, then in the parent frame, the
+          // current player (the other player in this frame) is winning next
+          // turn.
+          Score::win(1)
+        };
+        println!("    parent score is {score_for_parent}");
+        stack.pop_with_backstepped_score(score_for_parent);
+      } else {
+        match data.globals.get_or_queue(stack_ptr) {
+          LookupResult::Found { score } => {
+            // Update best score in frame
+            println!("    Found",);
+            stack.pop_with_score(score);
+          }
+          // If the state was not found, then we can continue on exploring it.
+          LookupResult::NotFound => {
+            println!("    Inserted placeholder in table");
+          }
+          // If the state was queued, then it was added to the list of states
+          // waiting on the result of some game state. After this result is
+          // found, all states which are pending are re-added to some worker's
+          // queue (randomly distributed).
+          LookupResult::Queued => {
+            println!("    Queued on other state");
+            break 'seq;
+          }
         }
       }
 
@@ -118,6 +121,7 @@ mod tests {
 
   use super::{start_worker, WorkerData};
 
+  #[derive(PartialEq, Eq)]
   enum NimPlayer {
     First,
     Second,
@@ -188,6 +192,14 @@ mod tests {
       self.turn += 1;
     }
 
+    fn current_player(&self) -> Self::PlayerIdentifier {
+      if self.turn % 2 == 0 {
+        NimPlayer::First
+      } else {
+        NimPlayer::Second
+      }
+    }
+
     fn finished(&self) -> Option<Self::PlayerIdentifier> {
       if self.sticks == 0 {
         // The winner is the player to take the last stick.
@@ -219,13 +231,12 @@ mod tests {
   impl Hash for Nim {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
       self.sticks.hash(state);
-      (self.turn % 2).hash(state);
     }
   }
 
   impl PartialEq for Nim {
     fn eq(&self, other: &Self) -> bool {
-      self.sticks == other.sticks && (self.turn % 2) == (other.turn % 2)
+      self.sticks == other.sticks
     }
   }
 
@@ -239,17 +250,45 @@ mod tests {
 
   #[test]
   fn test_basic() {
-    let globals = Arc::new(GlobalData::<_, _, 11>::new(RandomState::new()));
+    const STICKS: usize = 100;
+    const STICKS_P_1: usize = STICKS + 1;
+    let globals = Arc::new(GlobalData::<_, _, STICKS_P_1>::new(RandomState::new()));
     let queue = Queue::new();
 
     let stack = AtomicPtr::new(
       globals
         .collector()
-        .link_boxed(Stack::make_root(Nim::new(10), 11)),
+        .link_boxed(Stack::make_root(Nim::new(STICKS as u32), STICKS as u32 + 1)),
     );
     queue.push(stack.load(Ordering::Relaxed));
-    let d = WorkerData { queue, globals };
+    let d = WorkerData {
+      queue,
+      globals: globals.clone(),
+    };
 
     start_worker(d);
+
+    for sticks in 1..=STICKS as u32 {
+      let game = globals.resolved_states_table().get(&Nim::new(sticks));
+      assert!(game.is_some());
+      let game = game.unwrap().clone();
+      if sticks % 3 == 0 {
+        let turn_count_win = sticks * 2 / 3;
+        assert_eq!(
+          game.score(),
+          Score::new(false, turn_count_win - 1, turn_count_win),
+          "game: {}",
+          game
+        );
+      } else {
+        let turn_count_win = sticks / 3 * 2;
+        assert_eq!(
+          game.score(),
+          Score::new(true, turn_count_win, turn_count_win + 1),
+          "game: {}",
+          game
+        );
+      }
+    }
   }
 }

@@ -70,6 +70,10 @@ where
     &self.collector
   }
 
+  pub fn resolved_states_table(&self) -> &Table<G, H> {
+    &self.resolved_states
+  }
+
   /// Will try to find the bottom frame of the stack in the state tables. If it
   /// isn't found, or it is found but wasn't searched deep enough, it will
   /// reserve a spot in `pending_states` by placing the bottom game state of the
@@ -130,7 +134,7 @@ where
   }
 
   /// Commits the scores of every complete stack frame, if there are any and
-  /// starting from the bottom, and makes the next move that needs to be
+  /// starting from the bottom, and finds the next move that needs to be
   /// explored.
   ///
   /// TODO: take stack: &Stack<...> as a parameter, not stack_ptr.

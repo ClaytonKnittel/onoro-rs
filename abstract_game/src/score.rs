@@ -9,13 +9,13 @@ pub enum ScoreValue {
   Tie,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct Score {
   pub(crate) data: (u16, u8),
 }
 
 impl Score {
-  const MAX_WIN_DEPTH: u32 = 0x007f;
+  const MAX_WIN_DEPTH: u32 = 0x07ff;
   const MAX_TIE_DEPTH: u32 = 0x0fff;
 
   pub const fn new(cur_player_wins: bool, turn_count_tie: u32, turn_count_win: u32) -> Self {
@@ -206,8 +206,8 @@ impl Score {
   }
 
   const fn pack(cur_player_wins: bool, turn_count_tie: u32, turn_count_win: u32) -> (u16, u8) {
-    debug_assert!(turn_count_tie < (1u32 << 12));
-    debug_assert!(turn_count_win < (1u32 << 11));
+    debug_assert!(turn_count_tie < Self::MAX_TIE_DEPTH);
+    debug_assert!(turn_count_win < Self::MAX_WIN_DEPTH);
 
     let a: u16 = (turn_count_tie | (turn_count_win << 12)) as u16;
     let b: u8 = ((turn_count_win >> 4) | if cur_player_wins { 0x80u32 } else { 0u32 }) as u8;
@@ -216,7 +216,7 @@ impl Score {
 
   const fn unpack((a, b): (u16, u8)) -> (bool, u32, u32) {
     let turn_count_tie = (a as u32) & Self::MAX_TIE_DEPTH;
-    let turn_count_win = ((a as u32) >> 12) | ((b as u32) & Self::MAX_WIN_DEPTH);
+    let turn_count_win = ((a as u32) >> 12) | (((b as u32) & (Self::MAX_WIN_DEPTH >> 4)) << 4);
     let cur_player_wins = ((b as u32) >> 7) != 0;
 
     (cur_player_wins, turn_count_tie, turn_count_win)
@@ -230,6 +230,12 @@ impl PartialEq for Score {
 }
 
 impl Eq for Score {}
+
+impl Debug for Score {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(f, "{}", self)
+  }
+}
 
 impl Display for Score {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

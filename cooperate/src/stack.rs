@@ -109,7 +109,8 @@ where
 
 impl<G, const N: usize> StackFrame<G, N>
 where
-  G: Game,
+  G: Game + Display,
+  G::Move: Display,
 {
   pub fn new(game: G) -> Self {
     let mut s = Self {
@@ -154,8 +155,29 @@ where
   /// the current best score, and advances the current move to the next move.
   fn update_score_and_advance(&mut self, score: Score) {
     if self.best_move.is_none() || score.better(&self.best_score) {
+      println!(
+        "    Updating for {}: {} ({}) to {} ({})",
+        self.game(),
+        if self.best_move.is_none() {
+          "[None]".to_string()
+        } else {
+          self.best_move.unwrap().to_string()
+        },
+        self.best_score,
+        self.current_move.unwrap(),
+        score
+      );
       self.best_score = score;
       self.best_move = self.current_move;
+    } else {
+      println!(
+        "    Not updating for {}: {} ({}) vs {} ({})",
+        self.game(),
+        self.best_move.unwrap(),
+        self.best_score,
+        self.current_move.unwrap(),
+        score
+      );
     }
     self.advance();
   }
@@ -224,7 +246,7 @@ where
 
 impl<G, const N: usize> Stack<G, N>
 where
-  G: Game + TableEntry + 'static,
+  G: Game + TableEntry + Display + 'static,
   G::Move: Display,
 {
   pub fn make_root(initial_game: G, depth: u32) -> Self {
@@ -262,16 +284,23 @@ where
     self.frames.push(StackFrame::new(game));
   }
 
+  /// To be called to resolve the bottom frame to the given score which is
+  /// already relative to the parent frame. This will remove the bottom stack
+  /// frame and update the score/current move of the parent stack frame.
+  pub fn pop_with_backstepped_score(&mut self, score: Score) -> StackFrame<G, N> {
+    let completed_frame = self.frames.pop().unwrap();
+    if let Some(parent_frame) = self.frames.last_mut() {
+      parent_frame.update_score_and_advance(score);
+    }
+
+    completed_frame
+  }
+
   /// To be called to resolve the bottom frame to the given score. This will
   /// remove the bottom stack frame and update the score/current move of the
   /// parent stack frame.
   pub fn pop_with_score(&mut self, score: Score) -> StackFrame<G, N> {
-    let completed_frame = self.frames.pop().unwrap();
-    if let Some(parent_frame) = self.frames.last_mut() {
-      parent_frame.update_score_and_advance(score.backstep());
-    }
-
-    completed_frame
+    self.pop_with_backstepped_score(score.backstep())
   }
 
   /// To be called when the bottom stack frame has resolved its score. This will
