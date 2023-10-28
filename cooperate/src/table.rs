@@ -1,4 +1,7 @@
-use std::hash::{BuildHasher, Hash};
+use std::{
+  collections::hash_map::RandomState,
+  hash::{BuildHasher, Hash},
+};
 
 use abstract_game::{Game, Score};
 use dashmap::{setref::one::Ref, DashSet};
@@ -25,6 +28,17 @@ pub trait TableEntry {
 
 pub struct Table<G, H> {
   table: DashSet<G, H>,
+}
+
+impl<G> Table<G, RandomState>
+where
+  G: Game + Hash + Eq + TableEntry,
+{
+  pub fn new() -> Self {
+    Self {
+      table: DashSet::new(),
+    }
+  }
 }
 
 impl<G, H> Table<G, H>

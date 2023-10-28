@@ -1,4 +1,5 @@
 use std::{
+  collections::hash_map::RandomState,
   fmt::Display,
   hash::{BuildHasher, Hash},
   sync::atomic::Ordering,
@@ -51,13 +52,27 @@ where
   resolved_states: Table<G, H>,
 }
 
+impl<G, const N: usize> GlobalData<G, RandomState, N>
+where
+  G: Display + Game + Clone + Hash + Eq + TableEntry + 'static,
+  G::Move: Display,
+{
+  pub fn new() -> Self {
+    Self {
+      collector: Collector::new(),
+      pending_states: [0; N].map(|_| DashMap::<G, PendingFrame<G, N>, RandomState>::new()),
+      resolved_states: Table::new(),
+    }
+  }
+}
+
 impl<G, H, const N: usize> GlobalData<G, H, N>
 where
   G: Display + Game + Clone + Hash + Eq + TableEntry + 'static,
   G::Move: Display,
   H: BuildHasher + Clone,
 {
-  pub fn new(hasher: H) -> Self {
+  pub fn with_hasher(hasher: H) -> Self {
     Self {
       collector: Collector::new(),
       pending_states: [0; N]
