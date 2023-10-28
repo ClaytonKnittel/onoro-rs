@@ -1,4 +1,4 @@
-use core::num;
+use abstract_game::GameIter;
 use std::{
   fmt::Display,
   ptr::null_mut,
@@ -204,10 +204,10 @@ where
   /// Advances the current move to the next possible move.
   fn advance(&mut self) {
     self.current_move = match &mut self.move_iter {
-      Some(move_iter) => move_iter.next(),
+      Some(move_iter) => move_iter.next(&self.game),
       None => {
-        self.move_iter = Some(self.game.each_move());
-        self.move_iter.as_mut().unwrap().next()
+        self.move_iter = Some(self.game.move_generator());
+        self.move_iter.as_mut().unwrap().next(&self.game)
       }
     };
   }

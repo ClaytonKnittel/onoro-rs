@@ -11,7 +11,7 @@ use seize::{AtomicPtr, Collector, Linked};
 
 use crate::{
   queue::Queue,
-  stack::{Stack, StackFrame},
+  stack::Stack,
   table::{Table, TableEntry},
 };
 

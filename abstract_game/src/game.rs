@@ -1,9 +1,43 @@
+pub trait GameIter: Sized {
+  type Item;
+  type Game;
+
+  fn next(&mut self, game: &Self::Game) -> Option<Self::Item>;
+
+  fn to_iter<'a>(self, game: &'a Self::Game) -> GameIterator<'a, Self, Self::Game> {
+    GameIterator {
+      game,
+      game_iter: self,
+    }
+  }
+}
+
+pub struct GameIterator<'a, GI, G> {
+  game: &'a G,
+  game_iter: GI,
+}
+
+impl<'a, GI, I, G> Iterator for GameIterator<'a, GI, G>
+where
+  GI: GameIter<Item = I, Game = G>,
+{
+  type Item = I;
+
+  fn next(&mut self) -> Option<Self::Item> {
+    self.game_iter.next(self.game)
+  }
+}
+
 pub trait Game: Clone + Sized {
   type Move: Copy;
-  type MoveIterator: Iterator<Item = Self::Move>;
+  type MoveIterator: GameIter<Item = Self::Move, Game = Self>;
   type PlayerIdentifier: Eq;
 
-  fn each_move(&self) -> Self::MoveIterator;
+  fn move_generator(&self) -> Self::MoveIterator;
+  fn each_move<'a>(&'a self) -> GameIterator<'a, Self::MoveIterator, Self> {
+    self.move_generator().to_iter(self)
+  }
+
   fn make_move(&mut self, m: Self::Move);
 
   /// Returns the `Self::PlayerIdentifier` of the player to make the next move.
