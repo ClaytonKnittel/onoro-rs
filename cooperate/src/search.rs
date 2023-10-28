@@ -1,4 +1,4 @@
-use abstract_game::{Game, Score, ScoreValue};
+use abstract_game::{Game, GameResult, Score, ScoreValue};
 
 use crate::Metrics;
 
@@ -11,7 +11,7 @@ pub fn find_best_move<G: Clone + Game>(
   metrics: &mut Metrics,
 ) -> (Option<Score>, Option<G::Move>) {
   // Can't score games that are already over.
-  debug_assert!(game.finished().is_none());
+  debug_assert!(game.finished() == GameResult::NotFinished);
 
   metrics.n_states += 1;
 
@@ -27,9 +27,16 @@ pub fn find_best_move<G: Clone + Game>(
   for m in game.each_move() {
     let mut g = game.clone();
     g.make_move(m);
-    if g.finished().is_some() {
-      metrics.n_leaves += 1;
-      return (Some(Score::win(1)), Some(m));
+    match g.finished() {
+      GameResult::Win(_) => {
+        metrics.n_leaves += 1;
+        return (Some(Score::win(1)), Some(m));
+      }
+      GameResult::Tie => {
+        metrics.n_leaves += 1;
+        return (Some(Score::tie(1)), Some(m));
+      }
+      GameResult::NotFinished => {}
     }
   }
 

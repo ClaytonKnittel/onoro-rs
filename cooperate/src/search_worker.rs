@@ -4,7 +4,7 @@ use std::{
   sync::Arc,
 };
 
-use abstract_game::{Game, Score};
+use abstract_game::{Game, GameResult, Score};
 
 use crate::{
   global_data::{GlobalData, LookupResult},
@@ -40,7 +40,7 @@ where
     // We own stack here, so we can access it without atomics.
     let stack = unsafe { &mut *stack_ptr };
 
-    'seq: loop {
+    loop {
       if stack.bottom_frame().is_none() {
         // We've finished exploring this stack frame.
         match stack.stack_type() {
@@ -55,26 +55,31 @@ where
       }
 
       println!(
-        "Exploring {} (depth {})",
+        "\nExploring\n{}\n(depth {})",
         stack.bottom_frame().unwrap().game(),
         unsafe { &mut *stack_ptr }.bottom_depth()
       );
 
       let game = stack.bottom_frame().unwrap().game();
-      if let Some(winner) = game.finished() {
+      let game_result = game.finished();
+      if game_result != GameResult::NotFinished {
         // Since scores indicating a player is currently winning are not
         // representable, we construct scores for the parent of this frame that
         // indicate the opposite player will can in one turn.
-        let score_for_parent = if winner == game.current_player() {
-          // If the current player is winning, then in the parent frame, the
-          // current player (the other player in this frame) is losing next
-          // turn.
-          Score::lose(1)
+        let score_for_parent = if let GameResult::Win(winner) = game_result {
+          if winner == game.current_player() {
+            // If the current player is winning, then in the parent frame, the
+            // current player (the other player in this frame) is losing next
+            // turn.
+            Score::lose(1)
+          } else {
+            // If the current player is losing, then in the parent frame, the
+            // current player (the other player in this frame) is winning next
+            // turn.
+            Score::win(1)
+          }
         } else {
-          // If the current player is losing, then in the parent frame, the
-          // current player (the other player in this frame) is winning next
-          // turn.
-          Score::win(1)
+          Score::tie(1)
         };
         println!("    parent score is {score_for_parent}");
         stack.pop_with_backstepped_score(score_for_parent);
@@ -95,7 +100,7 @@ where
           // queue (randomly distributed).
           LookupResult::Queued => {
             println!("    Queued on other state");
-            break 'seq;
+            break;
           }
         }
       }
@@ -107,16 +112,16 @@ where
 
 #[cfg(test)]
 mod tests {
-  use std::{
-    collections::hash_map::RandomState,
-    sync::{atomic::Ordering, Arc},
-  };
+  use std::sync::{atomic::Ordering, Arc};
 
-  use abstract_game::Score;
   use seize::AtomicPtr;
 
   use crate::{
-    global_data::GlobalData, queue::Queue, stack::Stack, table::TableEntry, test::nim::Nim,
+    global_data::GlobalData,
+    queue::Queue,
+    stack::Stack,
+    table::TableEntry,
+    test::{nim::Nim, tic_tac_toe::Ttt},
   };
 
   use super::{start_worker, WorkerData};
@@ -146,6 +151,30 @@ mod tests {
       assert!(game.is_some());
       let game = game.unwrap();
       assert_eq!(game.score(), game.expected_score());
+    }
+  }
+
+  #[test]
+  fn test_ttt_serial() {
+    const DEPTH: usize = 10;
+    let globals = Arc::new(GlobalData::<_, _, DEPTH>::new());
+    let queue = Queue::new();
+
+    let stack = AtomicPtr::new(
+      globals
+        .collector()
+        .link_boxed(Stack::make_root(Ttt::new(), DEPTH as u32)),
+    );
+    queue.push(stack.load(Ordering::Relaxed));
+    let d = WorkerData {
+      queue,
+      globals: globals.clone(),
+    };
+
+    start_worker(d);
+
+    for state in globals.resolved_states_table().table().iter() {
+      println!("{}\n{}", state.score(), *state);
     }
   }
 }

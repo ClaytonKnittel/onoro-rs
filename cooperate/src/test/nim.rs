@@ -1,6 +1,6 @@
 use std::{fmt::Display, hash::Hash};
 
-use abstract_game::{Game, GameMoveGenerator, Score};
+use abstract_game::{Game, GameMoveGenerator, GameResult, Score};
 
 use crate::table::TableEntry;
 
@@ -94,16 +94,16 @@ impl Game for Nim {
     }
   }
 
-  fn finished(&self) -> Option<Self::PlayerIdentifier> {
+  fn finished(&self) -> GameResult<Self::PlayerIdentifier> {
     if self.sticks == 0 {
       // The winner is the player to take the last stick.
       if self.turn % 2 == 0 {
-        Some(NimPlayer::Second)
+        GameResult::Win(NimPlayer::Second)
       } else {
-        Some(NimPlayer::First)
+        GameResult::Win(NimPlayer::First)
       }
     } else {
-      None
+      GameResult::NotFinished
     }
   }
 }

@@ -28,6 +28,13 @@ where
   }
 }
 
+#[derive(Debug, PartialEq, Eq)]
+pub enum GameResult<PlayerIdentifier> {
+  NotFinished,
+  Win(PlayerIdentifier),
+  Tie,
+}
+
 pub trait Game: Clone + Sized {
   type Move: Copy;
   type MoveGenerator: GameMoveGenerator<Item = Self::Move, Game = Self>;
@@ -45,7 +52,7 @@ pub trait Game: Clone + Sized {
 
   /// Returns `Some(player_id)` if a player has won, otherwise `None` if no
   /// player has won yet.
-  fn finished(&self) -> Option<Self::PlayerIdentifier>;
+  fn finished(&self) -> GameResult<Self::PlayerIdentifier>;
 
   fn with_move(&self, m: Self::Move) -> Self {
     let mut copy = self.clone();

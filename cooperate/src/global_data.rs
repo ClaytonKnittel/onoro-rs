@@ -163,7 +163,7 @@ where
     while let Some(bottom_state) = stack.bottom_frame() {
       match bottom_state.current_move() {
         Some(m) => {
-          println!("  move {} for {}", m, bottom_state.game());
+          println!("  move {} for\n{}", m, bottom_state.game());
           let next_state = bottom_state.game().with_move(m);
           stack.push(next_state);
           break;
