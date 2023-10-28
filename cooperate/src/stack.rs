@@ -1,4 +1,4 @@
-use abstract_game::GameIter;
+use abstract_game::GameMoveGenerator;
 use std::{
   fmt::Display,
   ptr::null_mut,
@@ -93,7 +93,7 @@ where
   game: G,
   /// An iterator over the moves at this game state. If `None`, then no moves
   /// have been iterated over yet.
-  move_iter: Option<G::MoveIterator>,
+  move_gen: Option<G::MoveGenerator>,
   /// The current move being explored by the child of this frame.
   current_move: Option<G::Move>,
   /// The best score found for this game so far.
@@ -115,7 +115,7 @@ where
   pub fn new(game: G) -> Self {
     let mut s = Self {
       game,
-      move_iter: None,
+      move_gen: None,
       current_move: None,
       best_score: Score::no_info(),
       best_move: None,
@@ -203,11 +203,11 @@ where
 
   /// Advances the current move to the next possible move.
   fn advance(&mut self) {
-    self.current_move = match &mut self.move_iter {
-      Some(move_iter) => move_iter.next(&self.game),
+    self.current_move = match &mut self.move_gen {
+      Some(move_gen) => move_gen.next(&self.game),
       None => {
-        self.move_iter = Some(self.game.move_generator());
-        self.move_iter.as_mut().unwrap().next(&self.game)
+        self.move_gen = Some(self.game.move_generator());
+        self.move_gen.as_mut().unwrap().next(&self.game)
       }
     };
   }

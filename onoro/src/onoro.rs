@@ -439,11 +439,11 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Onoro<N, N2, AD
     unsafe { self.make_move_unchecked(m) }
   }
 
-  pub fn each_move(&self) -> MoveIterator<'_, N, N2, ADJ_CNT_SIZE> {
+  pub fn each_move(&self) -> MoveGenerator<'_, N, N2, ADJ_CNT_SIZE> {
     if self.in_phase1() {
-      MoveIterator::P1Moves(self.each_p1_move())
+      MoveGenerator::P1Moves(self.each_p1_move())
     } else {
-      MoveIterator::P2Moves(self.each_p2_move())
+      MoveGenerator::P2Moves(self.each_p2_move())
     }
   }
 
@@ -901,13 +901,13 @@ impl<'a, const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Iterator
   }
 }
 
-pub enum MoveIterator<'a, const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> {
+pub enum MoveGenerator<'a, const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> {
   P1Moves(P1MoveIterator<'a, N, N2, ADJ_CNT_SIZE>),
   P2Moves(P2MoveIterator<'a, N, N2, ADJ_CNT_SIZE>),
 }
 
 impl<'a, const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Iterator
-  for MoveIterator<'a, N, N2, ADJ_CNT_SIZE>
+  for MoveGenerator<'a, N, N2, ADJ_CNT_SIZE>
 {
   type Item = Move;
 

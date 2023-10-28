@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use abstract_game::{Game, GameIter};
+use abstract_game::{Game, GameMoveGenerator};
 
 #[derive(PartialEq, Eq)]
 pub enum TttPlayer {
@@ -32,7 +32,7 @@ impl TttMoveIter {
   }
 }
 
-impl GameIter for TttMoveIter {
+impl GameMoveGenerator for TttMoveIter {
   type Item = TttMove;
   type Game = Ttt;
 
@@ -81,11 +81,11 @@ impl Ttt {
 
 impl Game for Ttt {
   type Move = TttMove;
-  type MoveIterator = TttMoveIter;
+  type MoveGenerator = TttMoveIter;
   type PlayerIdentifier = TttPlayer;
 
-  fn move_generator(&self) -> Self::MoveIterator {
-    Self::MoveIterator { x: 0, y: 0 }
+  fn move_generator(&self) -> Self::MoveGenerator {
+    Self::MoveGenerator { x: 0, y: 0 }
   }
 
   fn make_move(&mut self, m: Self::Move) {

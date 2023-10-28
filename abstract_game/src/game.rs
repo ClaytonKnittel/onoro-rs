@@ -1,4 +1,4 @@
-pub trait GameIter: Sized {
+pub trait GameMoveGenerator: Sized {
   type Item;
   type Game;
 
@@ -19,7 +19,7 @@ pub struct GameIterator<'a, GI, G> {
 
 impl<'a, GI, I, G> Iterator for GameIterator<'a, GI, G>
 where
-  GI: GameIter<Item = I, Game = G>,
+  GI: GameMoveGenerator<Item = I, Game = G>,
 {
   type Item = I;
 
@@ -30,11 +30,11 @@ where
 
 pub trait Game: Clone + Sized {
   type Move: Copy;
-  type MoveIterator: GameIter<Item = Self::Move, Game = Self>;
+  type MoveGenerator: GameMoveGenerator<Item = Self::Move, Game = Self>;
   type PlayerIdentifier: Eq;
 
-  fn move_generator(&self) -> Self::MoveIterator;
-  fn each_move<'a>(&'a self) -> GameIterator<'a, Self::MoveIterator, Self> {
+  fn move_generator(&self) -> Self::MoveGenerator;
+  fn each_move<'a>(&'a self) -> GameIterator<'a, Self::MoveGenerator, Self> {
     self.move_generator().to_iter(self)
   }
 

@@ -1,4 +1,4 @@
-use abstract_game::{Game, GameIter, Score, ScoreValue};
+use abstract_game::{Game, Score, ScoreValue};
 
 use crate::Metrics;
 

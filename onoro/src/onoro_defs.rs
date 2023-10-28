@@ -21,7 +21,7 @@ macro_rules! onoro_view_type {
 #[macro_export]
 macro_rules! onoro_iter_type {
   ($n:literal, $a:lifetime) => {
-    $crate::MoveIterator<$a, $n, { $n * $n }, { adjacency_count_size($n) }>
+    $crate::MoveGenerator<$a, $n, { $n * $n }, { adjacency_count_size($n) }>
   };
 }
 

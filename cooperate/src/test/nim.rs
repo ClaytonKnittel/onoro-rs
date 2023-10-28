@@ -1,6 +1,6 @@
 use std::{fmt::Display, hash::Hash};
 
-use abstract_game::{Game, GameIter, Score};
+use abstract_game::{Game, GameMoveGenerator, Score};
 
 use crate::table::TableEntry;
 
@@ -26,7 +26,7 @@ pub struct NimMoveIter {
   max_sticks: u32,
 }
 
-impl GameIter for NimMoveIter {
+impl GameMoveGenerator for NimMoveIter {
   type Item = NimMove;
   type Game = Nim;
 
@@ -71,10 +71,10 @@ impl Nim {
 
 impl Game for Nim {
   type Move = NimMove;
-  type MoveIterator = NimMoveIter;
+  type MoveGenerator = NimMoveIter;
   type PlayerIdentifier = NimPlayer;
 
-  fn move_generator(&self) -> Self::MoveIterator {
+  fn move_generator(&self) -> Self::MoveGenerator {
     NimMoveIter {
       sticks: 1,
       max_sticks: self.sticks.min(2),
