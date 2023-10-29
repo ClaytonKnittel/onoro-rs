@@ -121,7 +121,6 @@ name = "cooperate"
 version = "0.1.0"
 dependencies = [
  "abstract_game",
- "arrayvec",
  "dashmap",
  "seize",
 ]
