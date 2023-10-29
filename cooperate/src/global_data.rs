@@ -44,6 +44,10 @@ where
 {
   /// Global memory reclamation construct.
   collector: Collector,
+  /// All of the queues for the worker threads. Each thread's queue is at index
+  /// `thread_idx` in this vector. The entries in these queues can be "stolen"
+  /// from by other workers when they run out of work to do.
+  queues: Vec<Queue<Stack<G, N>>>,
   /// There is a hash table of all pending states for each search depth.
   pending_states: [DashMap<G, PendingFrame<G, N>, H>; N],
   /// There is a hash table for all states which have been resolved to some
@@ -57,9 +61,10 @@ where
   G: Display + Game + Clone + Hash + Eq + TableEntry + 'static,
   G::Move: Display,
 {
-  pub fn new() -> Self {
+  pub fn new(num_threads: u32) -> Self {
     Self {
       collector: Collector::new(),
+      queues: (0..num_threads).map(|_| Queue::new()).collect(),
       pending_states: [0; N].map(|_| DashMap::<G, PendingFrame<G, N>, RandomState>::new()),
       resolved_states: Table::new(),
     }
@@ -72,9 +77,10 @@ where
   G::Move: Display,
   H: BuildHasher + Clone,
 {
-  pub fn with_hasher(hasher: H) -> Self {
+  pub fn with_hasher(num_threads: u32, hasher: H) -> Self {
     Self {
       collector: Collector::new(),
+      queues: (0..num_threads).map(|_| Queue::new()).collect(),
       pending_states: [0; N]
         .map(|_| DashMap::<G, PendingFrame<G, N>, H>::with_hasher(hasher.clone())),
       resolved_states: Table::with_hasher(hasher),
@@ -83,6 +89,10 @@ where
 
   pub fn collector(&self) -> &Collector {
     &self.collector
+  }
+
+  pub fn queue(&self, thread_idx: u32) -> &Queue<Stack<G, N>> {
+    self.queues.get(thread_idx as usize).unwrap()
   }
 
   pub fn resolved_states_table(&self) -> &Table<G, H> {
@@ -192,9 +202,9 @@ where
     let game = bottom_state.game_mut();
     game.set_score(score);
     println!(
-      "  Out of moves for {}, committing score {}",
-      game,
-      game.score()
+      "  Out of moves, committing score {} for\n{}",
+      game.score(),
+      game
     );
     self.resolved_states.update(game);
 

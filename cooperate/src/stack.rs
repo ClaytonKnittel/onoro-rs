@@ -156,7 +156,7 @@ where
   fn update_score_and_advance(&mut self, score: Score) {
     if self.best_move.is_none() || score.better(&self.best_score) {
       println!(
-        "    Updating for {}: {} ({}) to {} ({})",
+        "    Updating for\n{}\n      {} ({}) to {} ({})",
         self.game(),
         if self.best_move.is_none() {
           "[None]".to_string()
@@ -171,7 +171,7 @@ where
       self.best_move = self.current_move;
     } else {
       println!(
-        "    Not updating for {}: {} ({}) vs {} ({})",
+        "    Not updating for\n{}\n      {} ({}) vs {} ({})",
         self.game(),
         self.best_move.unwrap(),
         self.best_score,

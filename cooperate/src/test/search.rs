@@ -5,7 +5,7 @@ use crate::Metrics;
 /// A serial, non-cached min-max search of the game state.
 ///
 /// TODO: make this alpha-beta search.
-pub fn find_best_move<G: Clone + Game>(
+pub fn find_best_move_serial<G: Clone + Game>(
   game: &G,
   depth: u32,
   metrics: &mut Metrics,
@@ -46,7 +46,7 @@ pub fn find_best_move<G: Clone + Game>(
     let mut g = game.clone();
     g.make_move(m);
 
-    let (score, _) = find_best_move(&g, depth - 1, metrics);
+    let (score, _) = find_best_move_serial(&g, depth - 1, metrics);
     let score = match score {
       Some(score) => score.backstep(),
       // Consider winning by no legal moves as not winning until after the

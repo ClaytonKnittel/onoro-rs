@@ -4,7 +4,7 @@ use abstract_game::{Game, GameMoveGenerator, GameResult, Score};
 
 use crate::table::TableEntry;
 
-#[derive(PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum TttPlayer {
   First,
   Second,
@@ -94,6 +94,10 @@ impl Ttt {
     }
   }
 
+  pub fn get_turn(&self) -> u32 {
+    self.turn
+  }
+
   fn idx(x: u32, y: u32) -> usize {
     (x + 4 * y) as usize
   }
@@ -114,6 +118,10 @@ impl Ttt {
   pub fn tile_at(&self, x: u32, y: u32) -> TttTile {
     let mask = 0x0001_0001u32 << Self::idx(x, y);
     Self::player_for_mask(self.tile_mask & mask)
+  }
+
+  pub fn compute_expected_score(&self) -> Score {
+    todo!();
   }
 }
 

@@ -8,30 +8,44 @@ use abstract_game::{Game, GameResult, Score};
 
 use crate::{
   global_data::{GlobalData, LookupResult},
-  queue::Queue,
   stack::{Stack, StackType},
   table::TableEntry,
 };
 
-struct WorkerData<G, H, const N: usize>
+pub struct WorkerData<G, H, const N: usize>
 where
   G: Game,
 {
-  /// The queue of frames local to this worker thread. This can be "stolen" from
-  /// by other workers when they run out of work to do.
-  queue: Queue<Stack<G, N>>,
+  /// Index of this worker thread, which corresponds to the position of the
+  /// thread's queue in the globals struct.
+  thread_idx: u32,
+
   globals: Arc<GlobalData<G, H, N>>,
 }
 
-fn start_worker<G, H, const N: usize>(data: WorkerData<G, H, N>)
+impl<G, H, const N: usize> WorkerData<G, H, N>
+where
+  G: Game,
+{
+  pub fn new(thread_idx: u32, globals: Arc<GlobalData<G, H, N>>) -> Self {
+    Self {
+      thread_idx,
+      globals,
+    }
+  }
+}
+
+pub fn start_worker<G, H, const N: usize>(data: WorkerData<G, H, N>)
 where
   G: Display + Game + Hash + Eq + TableEntry + 'static,
   G::Move: Display,
   H: BuildHasher + Clone,
 {
+  let queue = data.globals.queue(data.thread_idx);
+
   loop {
     let guard = data.globals.collector().enter();
-    let unit = data.queue.pop(&guard);
+    let unit = queue.pop(&guard);
 
     let stack_ptr = match unit {
       Some(stack_ptr) => stack_ptr,
@@ -79,7 +93,7 @@ where
             Score::win(1)
           }
         } else {
-          Score::tie(1)
+          Score::guaranteed_tie()
         };
         println!("    parent score is {score_for_parent}");
         stack.pop_with_backstepped_score(score_for_parent);
@@ -105,7 +119,7 @@ where
         }
       }
 
-      data.globals.explore_next_state(stack_ptr, &data.queue);
+      data.globals.explore_next_state(stack_ptr, queue);
     }
   }
 }
@@ -114,14 +128,15 @@ where
 mod tests {
   use std::sync::{atomic::Ordering, Arc};
 
+  use abstract_game::{Game, GameResult};
   use seize::AtomicPtr;
 
   use crate::{
     global_data::GlobalData,
-    queue::Queue,
     stack::Stack,
     table::TableEntry,
-    test::{nim::Nim, tic_tac_toe::Ttt},
+    test::{nim::Nim, search::find_best_move_serial, tic_tac_toe::Ttt},
+    Metrics,
   };
 
   use super::{start_worker, WorkerData};
@@ -130,21 +145,19 @@ mod tests {
   fn test_nim_serial() {
     const STICKS: usize = 100;
     const STICKS_P_1: usize = STICKS + 1;
-    let globals = Arc::new(GlobalData::<_, _, STICKS_P_1>::new());
-    let queue = Queue::new();
+    let globals = Arc::new(GlobalData::<_, _, STICKS_P_1>::new(1));
 
     let stack = AtomicPtr::new(
       globals
         .collector()
         .link_boxed(Stack::make_root(Nim::new(STICKS as u32), STICKS as u32 + 1)),
     );
-    queue.push(stack.load(Ordering::Relaxed));
-    let d = WorkerData {
-      queue,
-      globals: globals.clone(),
-    };
+    globals.queue(0).push(stack.load(Ordering::Relaxed));
 
-    start_worker(d);
+    start_worker(WorkerData {
+      thread_idx: 0,
+      globals: globals.clone(),
+    });
 
     for sticks in 1..=STICKS as u32 {
       let game = globals.resolved_states_table().get(&Nim::new(sticks));
@@ -157,24 +170,39 @@ mod tests {
   #[test]
   fn test_ttt_serial() {
     const DEPTH: usize = 10;
-    let globals = Arc::new(GlobalData::<_, _, DEPTH>::new());
-    let queue = Queue::new();
+    let globals = Arc::new(GlobalData::<_, _, DEPTH>::new(1));
 
     let stack = AtomicPtr::new(
       globals
         .collector()
         .link_boxed(Stack::make_root(Ttt::new(), DEPTH as u32)),
     );
-    queue.push(stack.load(Ordering::Relaxed));
-    let d = WorkerData {
-      queue,
-      globals: globals.clone(),
-    };
+    globals.queue(0).push(stack.load(Ordering::Relaxed));
 
-    start_worker(d);
+    start_worker(WorkerData {
+      thread_idx: 0,
+      globals: globals.clone(),
+    });
 
     for state in globals.resolved_states_table().table().iter() {
-      println!("{}\n{}", state.score(), *state);
+      // Terminal states should not be stored in the table.
+      assert_eq!(state.key().finished(), GameResult::NotFinished);
+
+      // Compute the score using a simple min-max search.
+      let expected_score = find_best_move_serial(state.key(), DEPTH as u32, &mut Metrics::new())
+        .0
+        .unwrap();
+
+      // We can't expect the scores to be equal, since the score from the
+      // algorithm may not be complete (i.e. there's a win in X turns, but we're
+      // unsure if there's a way to win in fewer turns). We expect them to be
+      // compatible.
+      assert!(
+        state.score().compatible(&expected_score),
+        "Expect computed score {} to be compatible with true score {}",
+        state.score(),
+        expected_score
+      );
     }
   }
 }

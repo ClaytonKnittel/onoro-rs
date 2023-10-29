@@ -141,7 +141,7 @@ impl Score {
   }
 
   /// Returns true if the two scores don't contain conflicting information, i.e.
-  /// they are compatible. If true, the scores can be safely `merge`d.
+  /// they are compatible. If true, the scores can be safely `Score::merge`d.
   pub const fn compatible(&self, other: &Score) -> bool {
     let (cur_player_wins1, turn_count_tie1, turn_count_win1) = Self::unpack(self.data);
     let (cur_player_wins2, turn_count_tie2, turn_count_win2) = Self::unpack(other.data);
@@ -206,8 +206,8 @@ impl Score {
   }
 
   const fn pack(cur_player_wins: bool, turn_count_tie: u32, turn_count_win: u32) -> (u16, u8) {
-    debug_assert!(turn_count_tie < Self::MAX_TIE_DEPTH);
-    debug_assert!(turn_count_win < Self::MAX_WIN_DEPTH);
+    debug_assert!(turn_count_tie <= Self::MAX_TIE_DEPTH);
+    debug_assert!(turn_count_win <= Self::MAX_WIN_DEPTH);
 
     let a: u16 = (turn_count_tie | (turn_count_win << 12)) as u16;
     let b: u8 = ((turn_count_win >> 4) | if cur_player_wins { 0x80u32 } else { 0u32 }) as u8;
@@ -256,5 +256,32 @@ impl Display for Score {
         if cur_player_wins { "cur" } else { "oth" }
       )
     }
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use crate::Score;
+
+  fn check_compatible(s1: &Score, s2: &Score) {
+    assert!(s1.compatible(s2));
+    assert!(s2.compatible(s1));
+  }
+
+  fn check_incompatible(s1: &Score, s2: &Score) {
+    assert!(!s1.compatible(s2));
+    assert!(!s2.compatible(s1));
+  }
+
+  #[test]
+  fn test_compatible() {
+    check_compatible(&Score::guaranteed_tie(), &Score::guaranteed_tie());
+    check_compatible(&Score::guaranteed_tie(), &Score::tie(10));
+    check_compatible(&Score::guaranteed_tie(), &Score::no_info());
+
+    check_incompatible(&Score::guaranteed_tie(), &Score::win(1));
+    check_incompatible(&Score::guaranteed_tie(), &Score::lose(1));
+    check_incompatible(&Score::guaranteed_tie(), &Score::win(10));
+    check_incompatible(&Score::guaranteed_tie(), &Score::lose(10));
   }
 }
