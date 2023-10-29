@@ -6,7 +6,7 @@ use std::{
 };
 
 use abstract_game::Game;
-use seize::AtomicPtr;
+use seize::{reclaim, AtomicPtr};
 
 use crate::{
   global_data::GlobalData,
@@ -41,7 +41,7 @@ where
   globals
 }
 
-pub fn solve<G, const DEPTH: usize>(game: &G, options: Options)
+pub fn solve<G>(game: &G, options: Options)
 where
   G: Game + TableEntry + Display + Hash + PartialEq + Eq + 'static,
   G::Move: Display,

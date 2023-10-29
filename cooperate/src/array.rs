@@ -1,5 +1,5 @@
 use std::{
-  alloc::{alloc, Layout},
+  alloc::{alloc, dealloc, Layout},
   marker::PhantomData,
   mem::{align_of, size_of},
 };
@@ -104,5 +104,18 @@ where
     }
 
     Some(unsafe { &mut *self.slot_mut(self.size - 1) })
+  }
+}
+
+impl<T> Drop for Array<T> {
+  fn drop(&mut self) {
+    let t_size = size_of::<T>();
+    let t_align = align_of::<T>();
+    unsafe {
+      dealloc(
+        self.els,
+        Layout::from_size_align(t_size * self.capacity(), t_align).unwrap(),
+      );
+    }
   }
 }

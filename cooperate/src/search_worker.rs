@@ -5,6 +5,7 @@ use std::{
 };
 
 use abstract_game::{Game, GameResult, Score};
+use seize::reclaim;
 
 use crate::{
   global_data::{GlobalData, LookupResult},
@@ -58,12 +59,17 @@ where
       if stack.bottom_frame().is_none() {
         // We've finished exploring this stack frame.
         match stack.stack_type() {
-          StackType::Root => {
-            break;
-          }
+          StackType::Root => {}
           StackType::Child { parent } => {
             Stack::resolve_outstanding_child(parent);
           }
+        }
+
+        unsafe {
+          data
+            .globals
+            .collector()
+            .retire(stack_ptr, reclaim::boxed::<Stack<G>>);
         }
         break;
       }

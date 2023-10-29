@@ -69,7 +69,7 @@ where
 mod tests {
   use std::{ptr::null_mut, sync::Arc, thread};
 
-  use seize::{Collector, Linked};
+  use seize::{reclaim, Collector, Linked};
 
   use super::{Queue, QueueItem};
 
@@ -115,6 +115,8 @@ mod tests {
     let item1 = collector.link_boxed(TestItem::new(0));
     q.push(item1);
     assert_eq!(q.pop(&guard), Some(item1));
+
+    unsafe { collector.retire(item1, reclaim::boxed::<TestItem>) };
   }
 
   #[test]
@@ -148,6 +150,8 @@ mod tests {
       let i = val / NUM_THREADS as u64;
       assert_eq!(last_vals[t_id], i as u32 + 1);
       last_vals[t_id] -= 1;
+
+      unsafe { collector.retire(test_item, reclaim::boxed::<TestItem>) };
     }
 
     for i in 0..NUM_THREADS as usize {
