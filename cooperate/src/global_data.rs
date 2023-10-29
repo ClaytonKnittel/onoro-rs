@@ -15,7 +15,7 @@ use crate::{
   table::{Table, TableEntry},
 };
 
-struct PendingFrame<G, const N: usize>
+struct PendingFrame<G>
 where
   G: Game,
 {
@@ -23,7 +23,7 @@ where
   ///
   /// TODO: Do we need to lifetime-protect stacks? Or can we allocate all of
   /// them up front and free them at the end?
-  stack: AtomicPtr<Stack<G, N>>,
+  stack: AtomicPtr<Stack<G>>,
   /// The index of the frame that is being awaited on by this entry in the
   /// pending states map.
   ///
@@ -38,7 +38,7 @@ pub enum LookupResult {
   Queued,
 }
 
-pub struct GlobalData<G, H, const N: usize>
+pub struct GlobalData<G, H>
 where
   G: Game,
 {
@@ -47,42 +47,45 @@ where
   /// All of the queues for the worker threads. Each thread's queue is at index
   /// `thread_idx` in this vector. The entries in these queues can be "stolen"
   /// from by other workers when they run out of work to do.
-  queues: Vec<Queue<Stack<G, N>>>,
+  queues: Vec<Queue<Stack<G>>>,
   /// There is a hash table of all pending states for each search depth.
-  pending_states: [DashMap<G, PendingFrame<G, N>, H>; N],
+  pending_states: Vec<DashMap<G, PendingFrame<G>, H>>,
   /// There is a hash table for all states which have been resolved to some
   /// degree. They may need to be recomputed to a greater depth, but the
   /// information in this table will only ever accumulate over time.
   resolved_states: Table<G, H>,
 }
 
-impl<G, const N: usize> GlobalData<G, RandomState, N>
+impl<G> GlobalData<G, RandomState>
 where
   G: Display + Game + Clone + Hash + Eq + TableEntry + 'static,
   G::Move: Display,
 {
-  pub fn new(num_threads: u32) -> Self {
+  pub fn new(search_depth: u32, num_threads: u32) -> Self {
     Self {
       collector: Collector::new(),
       queues: (0..num_threads).map(|_| Queue::new()).collect(),
-      pending_states: [0; N].map(|_| DashMap::<G, PendingFrame<G, N>, RandomState>::new()),
+      pending_states: (0..search_depth)
+        .map(|_| DashMap::<G, PendingFrame<G>, RandomState>::new())
+        .collect(),
       resolved_states: Table::new(),
     }
   }
 }
 
-impl<G, H, const N: usize> GlobalData<G, H, N>
+impl<G, H> GlobalData<G, H>
 where
   G: Display + Game + Clone + Hash + Eq + TableEntry + 'static,
   G::Move: Display,
   H: BuildHasher + Clone,
 {
-  pub fn with_hasher(num_threads: u32, hasher: H) -> Self {
+  pub fn with_hasher(search_depth: u32, num_threads: u32, hasher: H) -> Self {
     Self {
       collector: Collector::new(),
       queues: (0..num_threads).map(|_| Queue::new()).collect(),
-      pending_states: [0; N]
-        .map(|_| DashMap::<G, PendingFrame<G, N>, H>::with_hasher(hasher.clone())),
+      pending_states: (0..search_depth)
+        .map(|_| DashMap::<G, PendingFrame<G>, H>::with_hasher(hasher.clone()))
+        .collect(),
       resolved_states: Table::with_hasher(hasher),
     }
   }
@@ -91,7 +94,7 @@ where
     &self.collector
   }
 
-  pub fn queue(&self, thread_idx: u32) -> &Queue<Stack<G, N>> {
+  pub fn queue(&self, thread_idx: u32) -> &Queue<Stack<G>> {
     self.queues.get(thread_idx as usize).unwrap()
   }
 
@@ -105,7 +108,7 @@ where
   /// stack.
   ///
   /// Stack must be under a seize::Guard for this to be safe.
-  pub fn get_or_queue(&self, stack_ptr: *mut Linked<Stack<G, N>>) -> LookupResult {
+  pub fn get_or_queue(&self, stack_ptr: *mut Linked<Stack<G>>) -> LookupResult {
     let stack = unsafe { &mut *stack_ptr };
     let bottom_state = stack.bottom_frame().unwrap();
     let game = bottom_state.game();
@@ -120,7 +123,6 @@ where
     // If the state wasn't found in the resolved table, then try to insert it
     // into its respective pending table.
     let depth_idx = stack.bottom_depth() as usize - 1;
-    debug_assert!(depth_idx < N);
     for x in self.pending_states[depth_idx].iter() {
       println!("      found guy at {depth_idx}: {}", x.key());
     }
@@ -131,7 +133,7 @@ where
         // Do not need to protect this load since this is under the bin mutex
         // lock in DashMap.
         let pending_stack = unsafe { &mut *pending_frame.stack.load(Ordering::Relaxed) };
-        let frame = pending_stack.frame(pending_frame.frame_idx as usize);
+        let frame = pending_stack.frame(pending_frame.frame_idx);
         unsafe {
           (*stack_ptr).suspend();
           frame.queue_dependant_unlocked(stack_ptr);
@@ -163,11 +165,7 @@ where
   /// explored.
   ///
   /// TODO: take stack: &Stack<...> as a parameter, not stack_ptr.
-  pub fn explore_next_state(
-    &self,
-    stack_ptr: *mut Linked<Stack<G, N>>,
-    queue: &Queue<Stack<G, N>>,
-  ) {
+  pub fn explore_next_state(&self, stack_ptr: *mut Linked<Stack<G>>, queue: &Queue<Stack<G>>) {
     let stack = unsafe { &mut *stack_ptr };
 
     while let Some(bottom_state) = stack.bottom_frame() {
@@ -190,9 +188,9 @@ where
   /// queue.
   fn commit_score(
     &self,
-    stack: &mut Stack<G, N>,
-    stack_ptr: *mut Linked<Stack<G, N>>,
-    queue: &Queue<Stack<G, N>>,
+    stack: &mut Stack<G>,
+    stack_ptr: *mut Linked<Stack<G>>,
+    queue: &Queue<Stack<G>>,
   ) {
     let depth_idx = stack.bottom_depth() as usize - 1;
     let bottom_frame_idx = stack.bottom_frame_idx();
@@ -210,7 +208,6 @@ where
 
     // Remove the state from the pending states.
     println!("    removing at {depth_idx}");
-    debug_assert!(depth_idx < N);
     match self.pending_states[depth_idx].entry(game.clone()) {
       Entry::Occupied(entry) => {
         let pending_frame = entry.remove();

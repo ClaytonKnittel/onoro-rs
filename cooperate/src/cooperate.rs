@@ -18,24 +18,23 @@ use crate::{
 pub struct Options {
   /// The number of worker threads to use in the thread pool.
   num_threads: u32,
+  /// The depth to search the game to.
+  search_depth: u32,
   /// The depth to expand to for generating work units.
   unit_depth: u32,
 }
 
-fn construct_globals<G, const DEPTH: usize>(
-  game: &G,
-  options: Options,
-) -> Arc<GlobalData<G, RandomState, DEPTH>>
+fn construct_globals<G>(game: &G, options: Options) -> Arc<GlobalData<G, RandomState>>
 where
   G: Game + TableEntry + Display + Hash + PartialEq + Eq + 'static,
   G::Move: Display,
 {
-  let globals = Arc::new(GlobalData::<_, _, DEPTH>::new(options.num_threads));
+  let globals = Arc::new(GlobalData::new(options.search_depth, options.num_threads));
 
   let stack = AtomicPtr::new(
     globals
       .collector()
-      .link_boxed(Stack::make_root(game.clone(), DEPTH as u32)),
+      .link_boxed(Stack::make_root(game.clone(), options.search_depth)),
   );
   globals.queue(0).push(stack.load(Ordering::Relaxed));
 
@@ -47,7 +46,7 @@ where
   G: Game + TableEntry + Display + Hash + PartialEq + Eq + 'static,
   G::Move: Display,
 {
-  let globals = construct_globals::<_, DEPTH>(game, options);
+  let globals = construct_globals(game, options);
   start_worker(WorkerData::new(0, globals.clone()));
 }
 
@@ -63,11 +62,11 @@ mod tests {
   #[test]
   fn test_nim_serial() {
     const STICKS: usize = 100;
-    const STICKS_P_1: usize = STICKS + 1;
 
-    let globals = construct_globals::<_, STICKS_P_1>(
+    let globals = construct_globals(
       &Nim::new(STICKS as u32),
       crate::Options {
+        search_depth: STICKS as u32 + 1,
         num_threads: 1,
         unit_depth: 0,
       },

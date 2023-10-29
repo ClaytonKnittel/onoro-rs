@@ -1,3 +1,4 @@
+mod array;
 mod cooperate;
 mod global_data;
 mod metrics;

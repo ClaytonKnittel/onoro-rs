@@ -6,10 +6,9 @@ use std::{
 };
 
 use abstract_game::{Game, Score};
-use arrayvec::ArrayVec;
 use seize::{AtomicPtr, Linked};
 
-use crate::{queue::QueueItem, table::TableEntry, util::TransparentIterator};
+use crate::{array::Array, queue::QueueItem, table::TableEntry, util::TransparentIterator};
 
 /// Algorithm:
 /// ```rs
@@ -57,12 +56,12 @@ use crate::{queue::QueueItem, table::TableEntry, util::TransparentIterator};
 /// The type of a stack is either the root, which contains the initial game
 /// state as it's first frame, or a child, which has a pointer to the parent
 /// that it is solving a branch for.
-pub enum StackType<G, const N: usize>
+pub enum StackType<G>
 where
   G: Game,
 {
   Root,
-  Child { parent: AtomicPtr<Stack<G, N>> },
+  Child { parent: AtomicPtr<Stack<G>> },
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -85,7 +84,7 @@ pub enum StackState {
   Suspended,
 }
 
-pub struct StackFrame<G, const N: usize>
+pub struct StackFrame<G>
 where
   G: Game,
 {
@@ -104,10 +103,10 @@ where
   /// dependants. This can only be appended to under the bin mutex lock from the
   /// pending states hashmap, and reclaimed for revival after removing this
   /// frame from the pending states hashmap.
-  dependants: AtomicPtr<Stack<G, N>>,
+  dependants: AtomicPtr<Stack<G>>,
 }
 
-impl<G, const N: usize> StackFrame<G, N>
+impl<G> StackFrame<G>
 where
   G: Game + Display,
   G::Move: Display,
@@ -182,14 +181,14 @@ where
     self.advance();
   }
 
-  pub unsafe fn queue_dependant_unlocked(&self, dependant: *mut Linked<Stack<G, N>>) {
+  pub unsafe fn queue_dependant_unlocked(&self, dependant: *mut Linked<Stack<G>>) {
     unsafe {
       (*dependant).next = self.dependants.load(Ordering::Relaxed);
     }
     self.dependants.store(dependant, Ordering::Relaxed);
   }
 
-  pub unsafe fn pop_dependant_unlocked(&self) -> Option<*mut Linked<Stack<G, N>>> {
+  pub unsafe fn pop_dependant_unlocked(&self) -> Option<*mut Linked<Stack<G>>> {
     let head = self.dependants.load(Ordering::Relaxed);
     if head.is_null() {
       return None;
@@ -215,15 +214,16 @@ where
 
 /// Each task has a stack frame exactly large enough to hold enough frames for a
 /// depth-first search of depth `N`.
-pub struct Stack<G, const N: usize>
+pub struct Stack<G>
 where
   G: Game,
 {
   /// The search depth this stack frame will go out to starting from the root
   /// frame.
   root_depth: u32,
-  frames: ArrayVec<StackFrame<G, N>, N>,
-  ty: StackType<G, N>,
+  /// The frames of this stack.
+  frames: Array<StackFrame<G>>,
+  ty: StackType<G>,
   /// TODO: Can remove state? Implicit from where the stack lies in the data
   /// structure.
   state: StackState,
@@ -236,7 +236,7 @@ where
   /// that this stack is suspended on in `DashMap`. When the stack is
   /// unsuspended, there will not be any other threads that have references to
   /// this frame since queueing is done under a lock.
-  next: *mut Linked<Stack<G, N>>,
+  next: *mut Linked<Stack<G>>,
   /// A split state is a state with split children, upon whose completion will
   /// resolve the state at the bottom of the stack. It only tracks the number of
   /// outstanding children. The child to decrease this number to 0 is the one to
@@ -244,7 +244,7 @@ where
   outstanding_children: AtomicU32,
 }
 
-impl<G, const N: usize> Stack<G, N>
+impl<G> Stack<G>
 where
   G: Game + TableEntry + Display + 'static,
   G::Move: Display,
@@ -252,7 +252,7 @@ where
   pub fn make_root(initial_game: G, depth: u32) -> Self {
     let mut root = Self {
       root_depth: depth,
-      frames: ArrayVec::new(),
+      frames: Array::new(depth),
       ty: StackType::Root,
       state: StackState::Live {},
       next: null_mut(),
@@ -265,7 +265,7 @@ where
   fn make_child(game: G, depth: u32, parent: AtomicPtr<Self>) -> Self {
     let mut root = Self {
       root_depth: depth,
-      frames: ArrayVec::new(),
+      frames: Array::new(depth),
       ty: StackType::Child { parent },
       state: StackState::Live {},
       next: null_mut(),
@@ -275,7 +275,7 @@ where
     root
   }
 
-  pub fn stack_type(&self) -> &StackType<G, N> {
+  pub fn stack_type(&self) -> &StackType<G> {
     &self.ty
   }
 
@@ -287,8 +287,8 @@ where
   /// To be called to resolve the bottom frame to the given score which is
   /// already relative to the parent frame. This will remove the bottom stack
   /// frame and update the score/current move of the parent stack frame.
-  pub fn pop_with_backstepped_score(&mut self, score: Score) -> StackFrame<G, N> {
-    let completed_frame = self.frames.pop().unwrap();
+  pub fn pop_with_backstepped_score(&mut self, score: Score) -> StackFrame<G> {
+    let completed_frame = self.frames.pop();
     if let Some(parent_frame) = self.frames.last_mut() {
       parent_frame.update_score_and_advance(score);
     }
@@ -299,14 +299,14 @@ where
   /// To be called to resolve the bottom frame to the given score. This will
   /// remove the bottom stack frame and update the score/current move of the
   /// parent stack frame.
-  pub fn pop_with_score(&mut self, score: Score) -> StackFrame<G, N> {
+  pub fn pop_with_score(&mut self, score: Score) -> StackFrame<G> {
     self.pop_with_backstepped_score(score.backstep())
   }
 
   /// To be called when the bottom stack frame has resolved its score. This will
   /// remove the bottom stack frame and update the score/current move of the
   /// parent stack frame.
-  pub fn pop(&mut self) -> StackFrame<G, N> {
+  pub fn pop(&mut self) -> StackFrame<G> {
     let completed_frame = self.frames.last().unwrap();
     debug_assert!(completed_frame.current_move().is_none());
     self.pop_with_score(completed_frame.best_score().0.clone())
@@ -373,21 +373,19 @@ where
     }
   }
 
-  pub fn frame(&self, idx: usize) -> &StackFrame<G, N> {
-    debug_assert!(idx < self.frames.len());
-    unsafe { self.frames.get_unchecked(idx) }
+  pub fn frame(&self, idx: u32) -> &StackFrame<G> {
+    self.frames.get(idx)
   }
 
-  pub fn mut_frame(&mut self, idx: usize) -> &mut StackFrame<G, N> {
-    debug_assert!(idx < self.frames.len());
-    unsafe { self.frames.get_unchecked_mut(idx) }
+  pub fn frame_mut(&mut self, idx: u32) -> &mut StackFrame<G> {
+    self.frames.get_mut(idx)
   }
 
-  pub fn bottom_frame(&self) -> Option<&StackFrame<G, N>> {
+  pub fn bottom_frame(&self) -> Option<&StackFrame<G>> {
     self.frames.last()
   }
 
-  pub fn bottom_frame_mut(&mut self) -> Option<&mut StackFrame<G, N>> {
+  pub fn bottom_frame_mut(&mut self) -> Option<&mut StackFrame<G>> {
     self.frames.last_mut()
   }
 
@@ -401,7 +399,7 @@ where
   }
 }
 
-impl<G, const N: usize> QueueItem for Stack<G, N>
+impl<G> QueueItem for Stack<G>
 where
   G: Game,
 {

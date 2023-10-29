@@ -12,7 +12,7 @@ use crate::{
   table::TableEntry,
 };
 
-pub struct WorkerData<G, H, const N: usize>
+pub struct WorkerData<G, H>
 where
   G: Game,
 {
@@ -20,14 +20,14 @@ where
   /// thread's queue in the globals struct.
   thread_idx: u32,
 
-  globals: Arc<GlobalData<G, H, N>>,
+  globals: Arc<GlobalData<G, H>>,
 }
 
-impl<G, H, const N: usize> WorkerData<G, H, N>
+impl<G, H> WorkerData<G, H>
 where
   G: Game,
 {
-  pub fn new(thread_idx: u32, globals: Arc<GlobalData<G, H, N>>) -> Self {
+  pub fn new(thread_idx: u32, globals: Arc<GlobalData<G, H>>) -> Self {
     Self {
       thread_idx,
       globals,
@@ -35,7 +35,7 @@ where
   }
 }
 
-pub fn start_worker<G, H, const N: usize>(data: WorkerData<G, H, N>)
+pub fn start_worker<G, H>(data: WorkerData<G, H>)
 where
   G: Display + Game + Hash + Eq + TableEntry + 'static,
   G::Move: Display,
@@ -144,8 +144,7 @@ mod tests {
   #[test]
   fn test_nim_serial() {
     const STICKS: usize = 100;
-    const STICKS_P_1: usize = STICKS + 1;
-    let globals = Arc::new(GlobalData::<_, _, STICKS_P_1>::new(1));
+    let globals = Arc::new(GlobalData::new(STICKS as u32 + 1, 1));
 
     let stack = AtomicPtr::new(
       globals
@@ -170,7 +169,7 @@ mod tests {
   #[test]
   fn test_ttt_serial() {
     const DEPTH: usize = 10;
-    let globals = Arc::new(GlobalData::<_, _, DEPTH>::new(1));
+    let globals = Arc::new(GlobalData::new(10, 1));
 
     let stack = AtomicPtr::new(
       globals
