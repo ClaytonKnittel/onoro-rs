@@ -40,8 +40,8 @@ pub struct GomokuMoveIter {
 }
 
 impl GomokuMoveIter {
-  fn inc(&mut self) {
-    self.x = (self.x + 1) % 3;
+  fn inc(&mut self, gomoku: &Gomoku) {
+    self.x = (self.x + 1) % gomoku.width;
     self.y += if self.x == 0 { 1 } else { 0 };
   }
 }
@@ -51,15 +51,15 @@ impl GameMoveGenerator for GomokuMoveIter {
   type Game = Gomoku;
 
   fn next(&mut self, gomoku: &Gomoku) -> Option<Self::Item> {
-    while self.y < 3 && gomoku.tile_at(self.x, self.y) != GomokuTile::Empty {
-      self.inc();
+    while self.y < gomoku.height && gomoku.tile_at(self.x, self.y) != GomokuTile::Empty {
+      self.inc(gomoku);
     }
-    if self.y != 3 {
+    if self.y != gomoku.height {
       let res = Some(GomokuMove {
         x: self.x,
         y: self.y,
       });
-      self.inc();
+      self.inc(gomoku);
       res
     } else {
       None
@@ -67,7 +67,7 @@ impl GameMoveGenerator for GomokuMoveIter {
   }
 }
 
-#[derive(Clone, Copy, Hash, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 pub enum GomokuTile {
   Empty,
   X,
@@ -147,6 +147,7 @@ impl Game for Gomoku {
   }
 
   fn make_move(&mut self, m: Self::Move) {
+    debug_assert_eq!(self.tile_at(m.x, m.y), GomokuTile::Empty);
     *self.tiles.get_mut(self.idx(m.x, m.y)) = if self.turn % 2 == 0 {
       GomokuTile::X
     } else {

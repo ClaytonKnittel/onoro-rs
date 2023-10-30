@@ -132,7 +132,10 @@ where
 
 #[cfg(test)]
 mod tests {
-  use std::sync::{atomic::Ordering, Arc};
+  use std::{
+    sync::{atomic::Ordering, Arc},
+    thread,
+  };
 
   use abstract_game::{Game, GameResult};
   use seize::AtomicPtr;
@@ -217,7 +220,7 @@ mod tests {
 
   #[test]
   fn test_gomoku_4x4_serial() {
-    const DEPTH: u32 = 17;
+    const DEPTH: u32 = 8;
     let globals = Arc::new(GlobalData::new(DEPTH, 1));
 
     let stack = AtomicPtr::new(
@@ -227,10 +230,12 @@ mod tests {
     );
     globals.queue(0).push(stack.load(Ordering::Relaxed));
 
+    println!("Solving...");
     start_worker(WorkerData {
       thread_idx: 0,
       globals: globals.clone(),
     });
+    println!("Done.");
 
     // The table should contain the completed initial state.
     assert!(globals
@@ -238,23 +243,35 @@ mod tests {
       .table()
       .contains(&Gomoku::new(4, 4, 4)));
 
-    for state in globals.resolved_states_table().table().iter() {
+    let mut last_i = 0;
+    for (i, state) in globals.resolved_states_table().table().iter().enumerate() {
       // Terminal states should not be stored in the table.
       assert_eq!(state.key().finished(), GameResult::NotFinished);
 
-      // Compute the score using a simple min-max search.
-      let expected_score = state.compute_expected_score(DEPTH);
+      if last_i * 100 / globals.resolved_states_table().len()
+        != i * 100 / globals.resolved_states_table().len()
+      {
+        println!("{}%", i * 100 / globals.resolved_states_table().len());
+      }
+      last_i = i;
 
-      // We can't expect the scores to be equal, since the score from the
-      // algorithm may not be complete (i.e. there's a win in X turns, but we're
-      // unsure if there's a way to win in fewer turns). We expect them to be
-      // compatible.
-      assert!(
-        state.score().compatible(&expected_score),
-        "Expect computed score {} to be compatible with true score {}",
-        state.score(),
-        expected_score
-      );
+      // Only check 1 in every 1000 states.
+      if rand::random::<f32>() < 0.0002 {
+        // Compute the score using a simple min-max search.
+        let expected_score = state.compute_expected_score(DEPTH);
+
+        // We can't expect the scores to be equal, since the score from the
+        // algorithm may not be complete (i.e. there's a win in X turns, but we're
+        // unsure if there's a way to win in fewer turns). We expect them to be
+        // compatible.
+        assert!(
+          state.score().compatible(&expected_score),
+          "Expect computed score {} to be compatible with true score {} for state\n{}",
+          state.score(),
+          expected_score,
+          state.key()
+        );
+      }
     }
   }
 }

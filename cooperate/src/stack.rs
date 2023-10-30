@@ -308,7 +308,6 @@ where
   /// parent stack frame.
   pub fn pop(&mut self) -> StackFrame<G> {
     let completed_frame = self.frames.last().unwrap();
-    debug_assert!(completed_frame.current_move().is_none());
     self.pop_with_score(completed_frame.best_score().0.clone())
   }
 
@@ -375,6 +374,10 @@ where
     if stack.outstanding_children.fetch_sub(1, Ordering::Relaxed) == 0 {
       // TODO: All children have finished, revive this frame.
     }
+  }
+
+  pub fn is_full(&self) -> bool {
+    self.frames.is_full()
   }
 
   pub fn frame(&self, idx: u32) -> &StackFrame<G> {

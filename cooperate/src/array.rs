@@ -163,6 +163,10 @@ where
 
 impl<T> Eq for Array<T> where T: Eq {}
 
+unsafe impl<T> Send for Array<T> where T: Send {}
+
+unsafe impl<T> Sync for Array<T> where T: Sync {}
+
 #[cfg(test)]
 mod tests {
   use super::Array;

@@ -168,16 +168,21 @@ where
   pub fn explore_next_state(&self, stack_ptr: *mut Linked<Stack<G>>, queue: &Queue<Stack<G>>) {
     let stack = unsafe { &mut *stack_ptr };
 
+    // TODO: don't generate moves for bottom stack frames, we will never use them.
     while let Some(bottom_state) = stack.bottom_frame() {
-      match bottom_state.current_move() {
-        Some(m) => {
-          // println!("  move {} for\n{}", m, bottom_state.game());
-          let next_state = bottom_state.game().with_move(m);
-          stack.push(next_state);
-          break;
-        }
-        None => {
-          self.commit_score(stack, stack_ptr, queue);
+      if stack.is_full() {
+        self.commit_score(stack, stack_ptr, queue);
+      } else {
+        match bottom_state.current_move() {
+          Some(m) => {
+            // println!("  move {} for\n{}", m, bottom_state.game());
+            let next_state = bottom_state.game().with_move(m);
+            stack.push(next_state);
+            break;
+          }
+          None => {
+            self.commit_score(stack, stack_ptr, queue);
+          }
         }
       }
     }
