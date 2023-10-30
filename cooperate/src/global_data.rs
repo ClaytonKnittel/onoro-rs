@@ -123,9 +123,9 @@ where
     // If the state wasn't found in the resolved table, then try to insert it
     // into its respective pending table.
     let depth_idx = stack.bottom_depth() as usize - 1;
-    for x in self.pending_states[depth_idx].iter() {
-      println!("      found guy at {depth_idx}: {}", x.key());
-    }
+    // for x in self.pending_states[depth_idx].iter() {
+    //   println!("      found guy at {depth_idx}:\n{}\n", x.key());
+    // }
     match self.pending_states[depth_idx].entry(game.clone()) {
       Entry::Occupied(entry) => {
         // If there is already a pending computation, then queue ourselves on it.
@@ -147,7 +147,7 @@ where
           frame_idx: stack.bottom_frame_idx() as u32,
         });
 
-        println!("    inserting at {depth_idx}");
+        // println!("    inserting at {depth_idx}");
 
         // We claimed the pending slot.
         LookupResult::NotFound
@@ -171,7 +171,7 @@ where
     while let Some(bottom_state) = stack.bottom_frame() {
       match bottom_state.current_move() {
         Some(m) => {
-          println!("  move {} for\n{}", m, bottom_state.game());
+          // println!("  move {} for\n{}", m, bottom_state.game());
           let next_state = bottom_state.game().with_move(m);
           stack.push(next_state);
           break;
@@ -199,15 +199,15 @@ where
     let score = bottom_state.best_score().0.clone();
     let game = bottom_state.game_mut();
     game.set_score(score);
-    println!(
-      "  Out of moves, committing score {} for\n{}",
-      game.score(),
-      game
-    );
+    // println!(
+    //   "  Out of moves, committing score {} for\n{}",
+    //   game.score(),
+    //   game
+    // );
     self.resolved_states.update(game);
 
     // Remove the state from the pending states.
-    println!("    removing at {depth_idx}");
+    // println!("    removing at {depth_idx}");
     match self.pending_states[depth_idx].entry(game.clone()) {
       Entry::Occupied(entry) => {
         let pending_frame = entry.remove();
@@ -218,12 +218,13 @@ where
         debug_assert!(false, "Unexpected vacant entry in pending table.");
       }
     }
-    for x in self.pending_states[depth_idx].iter() {
-      println!("      found guy at {depth_idx}: {}", x.key());
-    }
+    // for x in self.pending_states[depth_idx].iter() {
+    //   println!("      found guy at {depth_idx}:\n{}\n", x.key());
+    // }
 
     // Re-queue all pending states.
     while let Some(dependant) = unsafe { bottom_state.pop_dependant_unlocked() } {
+      unsafe { &mut *dependant }.revive();
       queue.push(dependant);
     }
 

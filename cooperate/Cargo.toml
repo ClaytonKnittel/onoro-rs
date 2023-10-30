@@ -8,4 +8,5 @@ edition = "2021"
 [dependencies]
 abstract_game = { path = "../abstract_game" }
 dashmap = "5.5"
+rand = "0.8"
 seize = "0.2"

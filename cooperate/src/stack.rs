@@ -154,29 +154,29 @@ where
   /// the current best score, and advances the current move to the next move.
   fn update_score_and_advance(&mut self, score: Score) {
     if self.best_move.is_none() || score.better(&self.best_score) {
-      println!(
-        "    Updating for\n{}\n      {} ({}) to {} ({})",
-        self.game(),
-        if self.best_move.is_none() {
-          "[None]".to_string()
-        } else {
-          self.best_move.unwrap().to_string()
-        },
-        self.best_score,
-        self.current_move.unwrap(),
-        score
-      );
+      // println!(
+      //   "    Updating for\n{}\n      {} ({}) to {} ({})",
+      //   self.game(),
+      //   if self.best_move.is_none() {
+      //     "[None]".to_string()
+      //   } else {
+      //     self.best_move.unwrap().to_string()
+      //   },
+      //   self.best_score,
+      //   self.current_move.unwrap(),
+      //   score
+      // );
       self.best_score = score;
       self.best_move = self.current_move;
     } else {
-      println!(
-        "    Not updating for\n{}\n      {} ({}) vs {} ({})",
-        self.game(),
-        self.best_move.unwrap(),
-        self.best_score,
-        self.current_move.unwrap(),
-        score
-      );
+      // println!(
+      //   "    Not updating for\n{}\n      {} ({}) vs {} ({})",
+      //   self.game(),
+      //   self.best_move.unwrap(),
+      //   self.best_score,
+      //   self.current_move.unwrap(),
+      //   score
+      // );
     }
     self.advance();
   }

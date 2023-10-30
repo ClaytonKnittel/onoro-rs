@@ -122,6 +122,7 @@ version = "0.1.0"
 dependencies = [
  "abstract_game",
  "dashmap",
+ "rand 0.8.5",
  "seize",
 ]
 

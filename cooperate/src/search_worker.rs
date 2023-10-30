@@ -74,11 +74,11 @@ where
         break;
       }
 
-      println!(
-        "\nExploring\n{}\n(depth {})",
-        stack.bottom_frame().unwrap().game(),
-        unsafe { &mut *stack_ptr }.bottom_depth()
-      );
+      // println!(
+      //   "\nExploring\n{}\n(depth {})",
+      //   stack.bottom_frame().unwrap().game(),
+      //   unsafe { &mut *stack_ptr }.bottom_depth()
+      // );
 
       let game = stack.bottom_frame().unwrap().game();
       let game_result = game.finished();
@@ -101,25 +101,25 @@ where
         } else {
           Score::guaranteed_tie()
         };
-        println!("    parent score is {score_for_parent}");
+        // println!("    parent score is {score_for_parent}");
         stack.pop_with_backstepped_score(score_for_parent);
       } else {
         match data.globals.get_or_queue(stack_ptr) {
           LookupResult::Found { score } => {
             // Update best score in frame
-            println!("    Found",);
+            // println!("    Found",);
             stack.pop_with_score(score);
           }
           // If the state was not found, then we can continue on exploring it.
           LookupResult::NotFound => {
-            println!("    Inserted placeholder in table");
+            // println!("    Inserted placeholder in table");
           }
           // If the state was queued, then it was added to the list of states
           // waiting on the result of some game state. After this result is
           // found, all states which are pending are re-added to some worker's
           // queue (randomly distributed).
           LookupResult::Queued => {
-            println!("    Queued on other state");
+            // println!("    Queued on other state");
             break;
           }
         }
@@ -188,6 +188,12 @@ mod tests {
       thread_idx: 0,
       globals: globals.clone(),
     });
+
+    // The table should contain the completed initial state.
+    assert!(globals
+      .resolved_states_table()
+      .table()
+      .contains(&Ttt::new()));
 
     for state in globals.resolved_states_table().table().iter() {
       // Terminal states should not be stored in the table.
