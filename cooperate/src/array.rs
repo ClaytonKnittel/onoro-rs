@@ -1,5 +1,6 @@
 use std::{
   alloc::{alloc, dealloc, Layout},
+  hash::Hash,
   marker::PhantomData,
   mem::{align_of, size_of},
 };
@@ -78,7 +79,7 @@ where
     debug_assert!(self.size != self.capacity);
 
     unsafe {
-      *self.slot_mut(self.size) = el;
+      self.slot_mut(self.size).write(el);
     }
     self.size += 1;
   }
@@ -105,10 +106,31 @@ where
 
     Some(unsafe { &mut *self.slot_mut(self.size - 1) })
   }
+
+  pub fn iter(&self) -> impl Iterator<Item = &T> {
+    (0..self.size).map(|idx| self.get(idx))
+  }
+}
+
+impl<T> Clone for Array<T>
+where
+  T: Clone,
+{
+  fn clone(&self) -> Self {
+    let mut clone = Self::new(self.capacity);
+    for item in self.iter() {
+      clone.push(item.clone());
+    }
+    clone
+  }
 }
 
 impl<T> Drop for Array<T> {
   fn drop(&mut self) {
+    if std::mem::needs_drop::<T>() {
+      (0..self.size).for_each(|idx| unsafe { self.slot_mut(idx).drop_in_place() });
+    }
+
     let t_size = size_of::<T>();
     let t_align = align_of::<T>();
     unsafe {
@@ -117,5 +139,38 @@ impl<T> Drop for Array<T> {
         Layout::from_size_align(t_size * self.capacity(), t_align).unwrap(),
       );
     }
+  }
+}
+
+impl<T> Hash for Array<T>
+where
+  T: Hash,
+{
+  fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+    self.size.hash(state);
+    self.iter().for_each(|el| el.hash(state));
+  }
+}
+
+impl<T> PartialEq for Array<T>
+where
+  T: PartialEq,
+{
+  fn eq(&self, other: &Self) -> bool {
+    self.size == other.size && self.iter().zip(other.iter()).all(|(l, r)| l == r)
+  }
+}
+
+impl<T> Eq for Array<T> where T: Eq {}
+
+#[cfg(test)]
+mod tests {
+  use super::Array;
+
+  #[test]
+  fn test_nontrivial_destructor() {
+    let mut a: Array<Vec<_>> = Array::new(8);
+
+    (0..8).for_each(|idx| a.push((0..(idx * 10000 + 1)).collect()));
   }
 }
