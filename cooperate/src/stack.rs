@@ -64,7 +64,7 @@ where
   Child { parent: AtomicPtr<Stack<G>> },
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum StackState {
   /// Live states are states that can currently be worked on.
   Live,
@@ -310,6 +310,10 @@ where
     let completed_frame = self.frames.last().unwrap();
     debug_assert!(completed_frame.current_move().is_none());
     self.pop_with_score(completed_frame.best_score().0.clone())
+  }
+
+  pub fn stack_state(&self) -> StackState {
+    self.state
   }
 
   pub fn revive(&mut self) {

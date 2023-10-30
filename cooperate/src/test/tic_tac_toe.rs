@@ -2,7 +2,9 @@ use std::{fmt::Display, hash::Hash};
 
 use abstract_game::{Game, GameMoveGenerator, GameResult, Score};
 
-use crate::table::TableEntry;
+use crate::{table::TableEntry, Metrics};
+
+use super::search::find_best_move_serial;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum TttPlayer {
@@ -120,8 +122,10 @@ impl Ttt {
     Self::player_for_mask(self.tile_mask & mask)
   }
 
-  pub fn compute_expected_score(&self) -> Score {
-    todo!();
+  pub fn compute_expected_score(&self, depth: u32) -> Score {
+    find_best_move_serial(self, depth, &mut Metrics::new())
+      .0
+      .unwrap()
   }
 }
 
@@ -210,7 +214,7 @@ impl Display for Ttt {
         write!(f, "{} ", self.tile_at(x, y))?;
       }
       if y != 0 {
-        write!(f, "\n")?;
+        writeln!(f)?;
       }
     }
     Ok(())

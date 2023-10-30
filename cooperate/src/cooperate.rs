@@ -73,14 +73,6 @@ where
   let mut rng = thread_rng();
   for stack in generate_frontier(game.clone(), &options, globals.collector()).into_iter() {
     let rand_idx = rng.gen_range(0..options.num_threads);
-    println!(
-      "Assigning to {}\n{}\n",
-      rand_idx,
-      unsafe { &*stack.load(Ordering::Relaxed) }
-        .bottom_frame()
-        .unwrap()
-        .game()
-    );
     globals.queue(rand_idx).push(stack.load(Ordering::Relaxed));
   }
 
@@ -98,13 +90,19 @@ where
 
 #[cfg(test)]
 mod tests {
-  use std::thread;
+  use std::{
+    sync::{atomic::Ordering, Arc},
+    thread,
+    time::SystemTime,
+  };
 
   use abstract_game::{Game, GameResult};
 
   use crate::{
-    cooperate::construct_globals,
+    cooperate::{construct_globals, generate_frontier},
+    global_data::GlobalData,
     search_worker::{start_worker, WorkerData},
+    stack::StackState,
     table::TableEntry,
     test::{nim::Nim, search::find_best_move_serial, tic_tac_toe::Ttt},
     Metrics,
@@ -112,12 +110,12 @@ mod tests {
 
   #[test]
   fn test_nim_serial() {
-    const STICKS: usize = 100;
+    const STICKS: u32 = 100;
 
     let globals = construct_globals(
-      &Nim::new(STICKS as u32),
+      &Nim::new(STICKS),
       crate::Options {
-        search_depth: STICKS as u32 + 1,
+        search_depth: STICKS + 1,
         num_threads: 1,
         unit_depth: 0,
       },
@@ -125,7 +123,7 @@ mod tests {
 
     start_worker(WorkerData::new(0, globals.clone()));
 
-    for sticks in 1..=STICKS as u32 {
+    for sticks in 1..=STICKS {
       let game = globals.resolved_states_table().get(&Nim::new(sticks));
       assert!(game.is_some());
       let game = game.unwrap();
@@ -135,12 +133,12 @@ mod tests {
 
   #[test]
   fn test_nim_p2() {
-    const STICKS: usize = 100;
+    const STICKS: u32 = 100;
 
     let globals = construct_globals(
-      &Nim::new(STICKS as u32),
+      &Nim::new(STICKS),
       crate::Options {
-        search_depth: STICKS as u32 + 1,
+        search_depth: STICKS + 1,
         num_threads: 2,
         unit_depth: 1,
       },
@@ -159,7 +157,7 @@ mod tests {
       assert!(thread.join().is_ok());
     }
 
-    for sticks in 1..=(STICKS - 1) as u32 {
+    for sticks in 1..=(STICKS - 1) {
       let game = globals.resolved_states_table().get(&Nim::new(sticks));
       assert!(game.is_some());
       let game = game.unwrap();
@@ -170,17 +168,18 @@ mod tests {
   #[test]
   fn test_ttt_p2() {
     const DEPTH: u32 = 10;
+    const THREADS: u32 = 2;
 
     let globals = construct_globals(
       &Ttt::new(),
       crate::Options {
         search_depth: DEPTH,
-        num_threads: 2,
+        num_threads: THREADS,
         unit_depth: 1,
       },
     );
 
-    let thread_handles: Vec<_> = (0..2)
+    let thread_handles: Vec<_> = (0..THREADS)
       .map(|thread_idx| {
         let globals = globals.clone();
         thread::Builder::new()
@@ -203,9 +202,59 @@ mod tests {
       assert_eq!(state.key().finished(), GameResult::NotFinished);
 
       // Compute the score using a simple min-max search.
-      let expected_score = find_best_move_serial(state.key(), DEPTH, &mut Metrics::new())
-        .0
-        .unwrap();
+      let expected_score = state.compute_expected_score(DEPTH);
+
+      // We can't expect the scores to be equal, since the score from the
+      // algorithm may not be complete (i.e. there's a win in X turns, but we're
+      // unsure if there's a way to win in fewer turns). We expect them to be
+      // compatible.
+      assert!(
+        state.score().compatible(&expected_score),
+        "Expect computed score {} to be compatible with true score {}",
+        state.score(),
+        expected_score
+      );
+    }
+  }
+
+  #[test]
+  fn test_ttt_p8() {
+    const DEPTH: u32 = 10;
+    const THREADS: u32 = 8;
+
+    let globals = construct_globals(
+      &Ttt::new(),
+      crate::Options {
+        search_depth: DEPTH,
+        num_threads: THREADS,
+        unit_depth: 2,
+      },
+    );
+
+    let thread_handles: Vec<_> = (0..THREADS)
+      .map(|thread_idx| {
+        let globals = globals.clone();
+        thread::Builder::new()
+          .name(format!("worker_{thread_idx}"))
+          .spawn(move || {
+            start_worker(WorkerData::new(thread_idx, globals));
+          })
+          .unwrap()
+      })
+      .collect();
+
+    let mut any_bad = false;
+    for thread in thread_handles.into_iter() {
+      any_bad = !thread.join().is_ok() || any_bad;
+    }
+    assert!(!any_bad);
+
+    for state in globals.resolved_states_table().table().iter() {
+      // Terminal states should not be stored in the table.
+      assert_eq!(state.key().finished(), GameResult::NotFinished);
+
+      // Compute the score using a simple min-max search.
+      let expected_score = state.compute_expected_score(DEPTH);
 
       // We can't expect the scores to be equal, since the score from the
       // algorithm may not be complete (i.e. there's a win in X turns, but we're

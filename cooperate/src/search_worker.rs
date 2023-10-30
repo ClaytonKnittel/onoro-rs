@@ -149,13 +149,13 @@ mod tests {
 
   #[test]
   fn test_nim_serial() {
-    const STICKS: usize = 100;
-    let globals = Arc::new(GlobalData::new(STICKS as u32 + 1, 1));
+    const STICKS: u32 = 100;
+    let globals = Arc::new(GlobalData::new(STICKS + 1, 1));
 
     let stack = AtomicPtr::new(
       globals
         .collector()
-        .link_boxed(Stack::make_root(Nim::new(STICKS as u32), STICKS as u32 + 1)),
+        .link_boxed(Stack::make_root(Nim::new(STICKS), STICKS + 1)),
     );
     globals.queue(0).push(stack.load(Ordering::Relaxed));
 
@@ -164,7 +164,7 @@ mod tests {
       globals: globals.clone(),
     });
 
-    for sticks in 1..=STICKS as u32 {
+    for sticks in 1..=STICKS {
       let game = globals.resolved_states_table().get(&Nim::new(sticks));
       assert!(game.is_some());
       let game = game.unwrap();
@@ -174,13 +174,13 @@ mod tests {
 
   #[test]
   fn test_ttt_serial() {
-    const DEPTH: usize = 10;
+    const DEPTH: u32 = 10;
     let globals = Arc::new(GlobalData::new(10, 1));
 
     let stack = AtomicPtr::new(
       globals
         .collector()
-        .link_boxed(Stack::make_root(Ttt::new(), DEPTH as u32)),
+        .link_boxed(Stack::make_root(Ttt::new(), DEPTH)),
     );
     globals.queue(0).push(stack.load(Ordering::Relaxed));
 
@@ -200,9 +200,7 @@ mod tests {
       assert_eq!(state.key().finished(), GameResult::NotFinished);
 
       // Compute the score using a simple min-max search.
-      let expected_score = find_best_move_serial(state.key(), DEPTH as u32, &mut Metrics::new())
-        .0
-        .unwrap();
+      let expected_score = state.compute_expected_score(DEPTH);
 
       // We can't expect the scores to be equal, since the score from the
       // algorithm may not be complete (i.e. there's a win in X turns, but we're
