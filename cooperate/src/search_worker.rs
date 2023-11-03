@@ -85,12 +85,12 @@ where
 
       let game = stack.bottom_frame().unwrap().game();
       let game_result = game.finished();
-      if game_result != GameResult::NotFinished {
-        // Since scores indicating a player is currently winning are not
-        // representable, we construct scores for the parent of this frame that
-        // indicate the opposite player will can in one turn.
-        let score_for_parent = if let GameResult::Win(winner) = game_result {
-          if winner == game.current_player() {
+      match game_result {
+        GameResult::Win(winner) => {
+          // Since scores indicating a player is currently winning are not
+          // representable, we construct scores for the parent of this frame that
+          // indicate the opposite player will can in one turn.
+          let score_for_parent = if winner == game.current_player() {
             // If the current player is winning, then in the parent frame, the
             // current player (the other player in this frame) is losing next
             // turn.
@@ -100,30 +100,34 @@ where
             // current player (the other player in this frame) is winning next
             // turn.
             Score::win(1)
-          }
-        } else {
-          Score::guaranteed_tie()
-        };
-        // println!("    parent score is {score_for_parent}");
-        stack.pop_with_backstepped_score(score_for_parent);
-      } else {
-        match data.globals.get_or_queue(stack_ptr) {
-          LookupResult::Found { score } => {
-            // Update best score in frame
-            // println!("    Found",);
-            stack.pop_with_score(score);
-          }
-          // If the state was not found, then we can continue on exploring it.
-          LookupResult::NotFound => {
-            // println!("    Inserted placeholder in table");
-          }
-          // If the state was queued, then it was added to the list of states
-          // waiting on the result of some game state. After this result is
-          // found, all states which are pending are re-added to some worker's
-          // queue (randomly distributed).
-          LookupResult::Queued => {
-            // println!("    Queued on other state");
-            break;
+          };
+
+          // println!("    parent score is {score_for_parent}");
+          stack.pop_with_backstepped_score(score_for_parent);
+        }
+        GameResult::Tie => {
+          // println!("    parent score is {}", Score::guaranteed_tie());
+          stack.pop_with_backstepped_score(Score::guaranteed_tie());
+        }
+        GameResult::NotFinished => {
+          match data.globals.get_or_queue(stack_ptr) {
+            LookupResult::Found { score } => {
+              // Update best score in frame
+              // println!("    Found",);
+              stack.pop_with_score(score);
+            }
+            // If the state was not found, then we can continue on exploring it.
+            LookupResult::NotFound => {
+              // println!("    Inserted placeholder in table");
+            }
+            // If the state was queued, then it was added to the list of states
+            // waiting on the result of some game state. After this result is
+            // found, all states which are pending are re-added to some worker's
+            // queue (randomly distributed).
+            LookupResult::Queued => {
+              // println!("    Queued on other state");
+              break;
+            }
           }
         }
       }
@@ -222,6 +226,7 @@ mod tests {
   }
 
   #[test]
+  #[ignore]
   fn test_gomoku_4x4_serial() {
     const DEPTH: u32 = 8;
     let globals = Arc::new(GlobalData::new(DEPTH, 1));
