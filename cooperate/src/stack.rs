@@ -140,9 +140,18 @@ where
   pub fn best_score(&self) -> (Score, Option<G::Move>) {
     (
       if self.best_move.is_none() {
-        // If there were no possible moves and the game is considered a tie,
-        // then this is a guaranteed tie.
-        Score::guaranteed_tie()
+        // TODO: can generate moves as-needed, then this condition will be
+        // reversed. May not need to do at all if we can just not explore root
+        // states.
+        if self.current_move.is_none() {
+          // If there were no possible moves and the game is considered a tie,
+          // then this is a guaranteed tie.
+          Score::guaranteed_tie()
+        } else {
+          // If no moves have been explored, then this was a bottom frame. We
+          // have no information.
+          Score::no_info()
+        }
       } else {
         self.best_score.clone()
       },

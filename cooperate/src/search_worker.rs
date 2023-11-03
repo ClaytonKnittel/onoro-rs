@@ -65,6 +65,8 @@ where
           }
         }
 
+        // TODO: may be able to get rid of memory reclamation on stack frames if
+        // we can guarantee exclusive access here.
         unsafe {
           data
             .globals
@@ -75,9 +77,10 @@ where
       }
 
       // println!(
-      //   "\nExploring\n{}\n(depth {})",
+      //   "\nExploring\n{}\n(depth {}, cur score: {})",
       //   stack.bottom_frame().unwrap().game(),
-      //   unsafe { &mut *stack_ptr }.bottom_depth()
+      //   unsafe { &mut *stack_ptr }.bottom_depth(),
+      //   stack.bottom_frame().unwrap().best_score().0
       // );
 
       let game = stack.bottom_frame().unwrap().game();
@@ -255,7 +258,7 @@ mod tests {
       }
       last_i = i;
 
-      // Only check 1 in every 1000 states.
+      // Only check 1 in every 5000 states.
       if rand::random::<f32>() < 0.0002 {
         // Compute the score using a simple min-max search.
         let expected_score = state.compute_expected_score(DEPTH);

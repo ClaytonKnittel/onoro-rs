@@ -49,7 +49,7 @@ impl Score {
   /// Construct a `Score` for no possible forcing win in any number of moves
   /// into the future.
   pub const fn guaranteed_tie() -> Self {
-    Score::new(false, Self::MAX_TIE_DEPTH, 0)
+    Score::tie(Self::MAX_TIE_DEPTH)
   }
 
   /// Used to mark a game state as an ancestor of the current tree being
@@ -202,7 +202,7 @@ impl Score {
   /// preemptively checked for immediate wins.
   pub fn break_early(&self) -> Self {
     debug_assert_ne!(self.turn_count_win(), 0);
-    Score::new(self.cur_player_wins(), 1, self.turn_count_win())
+    Score::new(self.cur_player_wins(), 0, self.turn_count_win())
   }
 
   const fn pack(cur_player_wins: bool, turn_count_tie: u32, turn_count_win: u32) -> (u16, u8) {
