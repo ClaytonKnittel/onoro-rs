@@ -168,21 +168,34 @@ where
   pub fn explore_next_state(&self, stack_ptr: *mut Linked<Stack<G>>, queue: &Queue<Stack<G>>) {
     let stack = unsafe { &mut *stack_ptr };
 
+    let mut bottom_depth = stack.bottom_depth();
     // TODO: don't generate moves for bottom stack frames, we will never use them.
-    while let Some(bottom_state) = stack.bottom_frame() {
-      if stack.is_full() {
-        self.commit_score(stack, stack_ptr, queue);
-      } else {
-        match bottom_state.current_move() {
-          Some(m) => {
+    while let Some(bottom_state) = stack.bottom_frame_mut() {
+      match bottom_state.current_move() {
+        Some(m) => {
+          let game = bottom_state.game().with_move(m);
+          // println!("  move {} for\n{}", m, bottom_state.game());
+
+          // First check for an immediate win
+          if game.search_immediate_win().is_some() {
+            let game = bottom_state.game_mut();
+            game.set_score(Score::win(1));
+            self.commit_game_with_score(game);
+            stack.update_parent_score_and_advance(Score::win(1));
+          } else if bottom_depth == 1 {
+            // Don't commit game, since we have no information on it (tie to
+            // depth 1 is not worth committing).
+            stack.update_parent_score_and_advance(Score::no_info());
+          } else {
             // println!("  move {} for\n{}", m, bottom_state.game());
             let next_state = bottom_state.game().with_move(m);
             stack.push(next_state);
             break;
           }
-          None => {
-            self.commit_score(stack, stack_ptr, queue);
-          }
+        }
+        None => {
+          self.commit_score(stack, stack_ptr, queue);
+          bottom_depth += 1
         }
       }
     }
@@ -209,7 +222,7 @@ where
     //   game.score(),
     //   game
     // );
-    self.resolved_states.update(game);
+    self.commit_game_with_score(game);
 
     // Remove the state from the pending states.
     // println!("    removing at {depth_idx}");
@@ -235,5 +248,9 @@ where
 
     // Pop this state from the stack.
     stack.pop();
+  }
+
+  fn commit_game_with_score(&self, game: &mut G) {
+    self.resolved_states.update(game);
   }
 }

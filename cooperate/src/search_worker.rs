@@ -77,13 +77,13 @@ where
       }
 
       // println!(
-      //   "\nExploring\n{}\n(depth {}, cur score: {})",
+      //   "\nExploring\n{}\n(depth {})",
       //   stack.bottom_frame().unwrap().game(),
-      //   unsafe { &mut *stack_ptr }.bottom_depth(),
-      //   stack.bottom_frame().unwrap().best_score().0
+      //   unsafe { &mut *stack_ptr }.bottom_depth()
       // );
 
-      let game = stack.bottom_frame().unwrap().game();
+      let bottom_frame = stack.bottom_frame().unwrap();
+      let game = bottom_frame.game();
       let game_result = game.finished();
       match game_result {
         GameResult::Win(winner) => {
@@ -110,6 +110,8 @@ where
           stack.pop_with_backstepped_score(Score::guaranteed_tie());
         }
         GameResult::NotFinished => {
+          // First, check if there is an immediate winning move.
+
           match data.globals.get_or_queue(stack_ptr) {
             LookupResult::Found { score } => {
               // Update best score in frame

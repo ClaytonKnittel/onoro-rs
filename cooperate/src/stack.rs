@@ -1,4 +1,4 @@
-use abstract_game::GameMoveGenerator;
+use abstract_game::{GameMoveGenerator, GameResult};
 use std::{
   fmt::Display,
   ptr::null_mut,
@@ -138,20 +138,12 @@ where
   }
 
   pub fn best_score(&self) -> (Score, Option<G::Move>) {
+    // The state should have been fully explored.
+    debug_assert!(self.current_move.is_none());
     (
       if self.best_move.is_none() {
-        // TODO: can generate moves as-needed, then this condition will be
-        // reversed. May not need to do at all if we can just not explore root
-        // states.
-        if self.current_move.is_none() {
-          // If there were no possible moves and the game is considered a tie,
-          // then this is a guaranteed tie.
-          Score::guaranteed_tie()
-        } else {
-          // If no moves have been explored, then this was a bottom frame. We
-          // have no information.
-          Score::no_info()
-        }
+        // If there were no possible moves, then the game is considered a tie.
+        Score::guaranteed_tie()
       } else {
         self.best_score.clone()
       },
@@ -293,15 +285,18 @@ where
     self.frames.push(StackFrame::new(game));
   }
 
+  pub fn update_parent_score_and_advance(&mut self, score: Score) {
+    if let Some(parent_frame) = self.frames.last_mut() {
+      parent_frame.update_score_and_advance(score);
+    }
+  }
+
   /// To be called to resolve the bottom frame to the given score which is
   /// already relative to the parent frame. This will remove the bottom stack
   /// frame and update the score/current move of the parent stack frame.
   pub fn pop_with_backstepped_score(&mut self, score: Score) -> StackFrame<G> {
     let completed_frame = self.frames.pop();
-    if let Some(parent_frame) = self.frames.last_mut() {
-      parent_frame.update_score_and_advance(score);
-    }
-
+    self.update_parent_score_and_advance(score);
     completed_frame
   }
 

@@ -59,4 +59,16 @@ pub trait Game: Clone + Sized {
     copy.make_move(m);
     copy
   }
+
+  /// Checks each possible move of this game, and returns any move that is an
+  /// immediate win for the current player, or `None` if no such move exists.
+  fn search_immediate_win(&self) -> Option<Self::Move> {
+    self.each_move().find_map(|m| {
+      if self.with_move(m).finished() == GameResult::Win(self.current_player()) {
+        Some(m)
+      } else {
+        None
+      }
+    })
+  }
 }
