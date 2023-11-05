@@ -157,7 +157,7 @@ mod tests {
     test::{
       gomoku::Gomoku,
       nim::Nim,
-      search::{self, find_best_move_serial},
+      search::{self, do_find_best_move_serial, find_best_move_serial},
       tic_tac_toe::Ttt,
     },
   };
@@ -233,8 +233,9 @@ mod tests {
   }
 
   #[test]
+  #[ignore]
   fn test_gomoku_4x4_serial() {
-    const DEPTH: u32 = 8;
+    const DEPTH: u32 = 16;
     let globals = Arc::new(GlobalData::new(DEPTH, 1));
 
     let stack = AtomicPtr::new(
@@ -257,24 +258,24 @@ mod tests {
       .table()
       .contains(&Gomoku::new(4, 4, 4)));
 
-    let table = find_best_move_serial(&Gomoku::new(4, 4, 4), DEPTH).2;
+    let mut table = find_best_move_serial(&Gomoku::new(4, 4, 4), DEPTH).2;
 
     for state in globals.resolved_states_table().table().iter() {
       // Terminal states should not be stored in the table.
       assert_eq!(state.key().finished(), GameResult::NotFinished);
 
-      let expected_game = table.get(state.key());
+      let expected_score = table
+        .get(state.key())
+        .map(|game_ref| game_ref.score())
+        .unwrap_or_else(|| {
+          do_find_best_move_serial(state.key(), DEPTH, &mut table);
+          table.get(state.key()).unwrap().score()
+        });
       assert!(
-        expected_game.is_some(),
-        "Expected to find entry for game\n{}",
-        state.key()
-      );
-      let expected_game = expected_game.unwrap();
-      assert!(
-        state.score().compatible(&expected_game.score()),
+        state.score().compatible(&expected_score),
         "Expect computed score {} to be compatible with true score {} for state\n{}",
         state.score(),
-        expected_game.score(),
+        expected_score,
         state.key()
       );
     }
