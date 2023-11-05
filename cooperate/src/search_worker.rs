@@ -138,6 +138,8 @@ where
       data.globals.explore_next_state(stack_ptr, queue);
     }
   }
+
+  println!("Worker {} done", data.thread_idx);
 }
 
 #[cfg(test)]

@@ -1,4 +1,4 @@
-use std::{marker::PhantomData, mem::replace};
+use std::marker::PhantomData;
 
 /// A simple iterator which performs a function when iterated over, but yields
 /// no elements.
@@ -11,7 +11,7 @@ impl<Fn: FnOnce(), T> TransparentIterator<Fn, T> {
   pub fn new(function: Fn) -> Self {
     Self {
       function: Some(function),
-      _p: PhantomData::default(),
+      _p: PhantomData,
     }
   }
 }
@@ -20,9 +20,8 @@ impl<Fn: FnOnce(), T> Iterator for TransparentIterator<Fn, T> {
   type Item = T;
 
   fn next(&mut self) -> Option<Self::Item> {
-    match replace(&mut self.function, None) {
-      Some(function) => function(),
-      None => {}
+    if let Some(function) = self.function.take() {
+      function();
     }
     None
   }

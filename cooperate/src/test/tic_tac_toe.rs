@@ -96,10 +96,6 @@ impl Ttt {
     }
   }
 
-  pub fn get_turn(&self) -> u32 {
-    self.turn
-  }
-
   fn idx(x: u32, y: u32) -> usize {
     (x + 4 * y) as usize
   }
@@ -139,7 +135,7 @@ impl Game for Ttt {
   fn make_move(&mut self, m: Self::Move) {
     let mut mask = 1u32 << Self::idx(m.x, m.y);
     if self.turn % 2 != 0 {
-      mask = mask << 16;
+      mask <<= 16;
     }
     self.tile_mask |= mask;
     self.turn += 1;

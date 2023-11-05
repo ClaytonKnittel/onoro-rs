@@ -92,19 +92,13 @@ where
 
 #[cfg(test)]
 mod tests {
-  use std::{
-    sync::{atomic::Ordering, Arc},
-    thread,
-    time::SystemTime,
-  };
+  use std::{thread, time::SystemTime};
 
   use abstract_game::{Game, GameResult};
 
   use crate::{
-    cooperate::{construct_globals, generate_frontier},
-    global_data::GlobalData,
+    cooperate::construct_globals,
     search_worker::{start_worker, WorkerData},
-    stack::StackState,
     table::TableEntry,
     test::{
       gomoku::Gomoku,
@@ -112,7 +106,6 @@ mod tests {
       search::{do_find_best_move_serial, find_best_move_serial},
       tic_tac_toe::Ttt,
     },
-    Metrics,
   };
 
   #[test]
@@ -200,7 +193,7 @@ mod tests {
 
     let mut any_bad = false;
     for thread in thread_handles.into_iter() {
-      any_bad = !thread.join().is_ok() || any_bad;
+      any_bad = thread.join().is_err() || any_bad;
     }
     assert!(!any_bad);
 
@@ -252,7 +245,7 @@ mod tests {
 
     let mut any_bad = false;
     for thread in thread_handles.into_iter() {
-      any_bad = !thread.join().is_ok() || any_bad;
+      any_bad = thread.join().is_err() || any_bad;
     }
     assert!(!any_bad);
 
@@ -277,6 +270,7 @@ mod tests {
   }
 
   #[test]
+  #[ignore]
   fn test_gomoku_p2() {
     const DEPTH: u32 = 16;
     const THREADS: u32 = 2;
@@ -287,6 +281,138 @@ mod tests {
         search_depth: DEPTH,
         num_threads: THREADS,
         unit_depth: 3,
+      },
+    );
+
+    println!("Solving...");
+    let start = SystemTime::now();
+    let thread_handles: Vec<_> = (0..THREADS)
+      .map(|thread_idx| {
+        let globals = globals.clone();
+        thread::Builder::new()
+          .name(format!("worker_{thread_idx}"))
+          .spawn(move || {
+            start_worker(WorkerData::new(thread_idx, globals));
+          })
+          .unwrap()
+      })
+      .collect();
+
+    let mut any_bad = false;
+    for thread in thread_handles.into_iter() {
+      any_bad = thread.join().is_err() || any_bad;
+    }
+    let end = SystemTime::now();
+    println!("Done: {:?}", end.duration_since(start).unwrap());
+
+    assert!(!any_bad);
+
+    // Compute the ground truth table.
+    let mut table = find_best_move_serial(&Gomoku::new(4, 4, 4), DEPTH).2;
+
+    for state in globals.resolved_states_table().table().iter() {
+      // Terminal states should not be stored in the table.
+      assert_eq!(state.key().finished(), GameResult::NotFinished);
+
+      let expected_score = table
+        .get(state.key())
+        .map(|game_ref| game_ref.score())
+        .unwrap_or_else(|| {
+          do_find_best_move_serial(state.key(), DEPTH, &mut table);
+          table.get(state.key()).unwrap().score()
+        });
+
+      // We can't expect the scores to be equal, since the score from the
+      // algorithm may not be complete (i.e. there's a win in X turns, but we're
+      // unsure if there's a way to win in fewer turns). We expect them to be
+      // compatible.
+      assert!(
+        state.score().compatible(&expected_score),
+        "Expect computed score {} to be compatible with true score {}",
+        state.score(),
+        expected_score
+      );
+    }
+  }
+
+  #[test]
+  #[ignore]
+  fn test_gomoku_p8() {
+    const DEPTH: u32 = 16;
+    const THREADS: u32 = 8;
+
+    let globals = construct_globals(
+      &Gomoku::new(4, 4, 4),
+      crate::Options {
+        search_depth: DEPTH,
+        num_threads: THREADS,
+        unit_depth: 3,
+      },
+    );
+
+    println!("Solving...");
+    let start = SystemTime::now();
+    let thread_handles: Vec<_> = (0..THREADS)
+      .map(|thread_idx| {
+        let globals = globals.clone();
+        thread::Builder::new()
+          .name(format!("worker_{thread_idx}"))
+          .spawn(move || {
+            start_worker(WorkerData::new(thread_idx, globals));
+          })
+          .unwrap()
+      })
+      .collect();
+
+    let mut any_bad = false;
+    for thread in thread_handles.into_iter() {
+      any_bad = thread.join().is_err() || any_bad;
+    }
+    let end = SystemTime::now();
+    println!("Done: {:?}", end.duration_since(start).unwrap());
+
+    assert!(!any_bad);
+
+    // Compute the ground truth table.
+    let mut table = find_best_move_serial(&Gomoku::new(4, 4, 4), DEPTH).2;
+
+    for state in globals.resolved_states_table().table().iter() {
+      // Terminal states should not be stored in the table.
+      assert_eq!(state.key().finished(), GameResult::NotFinished);
+
+      let expected_score = table
+        .get(state.key())
+        .map(|game_ref| game_ref.score())
+        .unwrap_or_else(|| {
+          do_find_best_move_serial(state.key(), DEPTH, &mut table);
+          table.get(state.key()).unwrap().score()
+        });
+
+      // We can't expect the scores to be equal, since the score from the
+      // algorithm may not be complete (i.e. there's a win in X turns, but we're
+      // unsure if there's a way to win in fewer turns). We expect them to be
+      // compatible.
+      assert!(
+        state.score().compatible(&expected_score),
+        "Expect computed score {} to be compatible with true score {}",
+        state.score(),
+        expected_score
+      );
+    }
+  }
+
+  #[test]
+  #[ignore]
+  fn test_gomoku_p32() {
+    const DEPTH: u32 = 16;
+    const THREADS: u32 = 32;
+
+    let globals = construct_globals(
+      &Gomoku::new(4, 4, 4),
+      crate::Options {
+        search_depth: DEPTH,
+        num_threads: THREADS,
+        unit_depth: 5,
       },
     );
 

@@ -4,8 +4,6 @@ use abstract_game::{Game, GameMoveGenerator, GameResult, Score};
 
 use crate::{array::Array, table::TableEntry};
 
-use super::search::find_best_move_serial;
-
 #[derive(Debug, PartialEq, Eq)]
 pub enum GomokuPlayer {
   First,
