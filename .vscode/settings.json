@@ -1,10 +1,10 @@
 {
   "rust-analyzer.linkedProjects": [
     "./Cargo.toml",
-    "./onoro/Cargo.toml",
     "./algebra/Cargo.toml",
     "./abstract_game/Cargo.toml",
-    "./cooperate/Cargo.toml"
+    "./cooperate/Cargo.toml",
+    "./onoro/Cargo.toml"
   ],
   "rust-analyzer.check.command": "clippy"
 }
