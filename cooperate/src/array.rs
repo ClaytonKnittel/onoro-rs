@@ -27,7 +27,7 @@ where
       size: 0,
       capacity,
       els: array,
-      _p: PhantomData::default(),
+      _p: PhantomData,
     }
   }
 

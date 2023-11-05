@@ -154,8 +154,8 @@ mod tests {
       unsafe { collector.retire(test_item, reclaim::boxed::<TestItem>) };
     }
 
-    for i in 0..NUM_THREADS as usize {
-      assert_eq!(last_vals[i], 0);
-    }
+    last_vals.iter().for_each(|&val| {
+      assert_eq!(val, 0);
+    });
   }
 }
