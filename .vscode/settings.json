@@ -2,7 +2,8 @@
   "rust-analyzer.linkedProjects": [
     "./Cargo.toml",
     "./onoro/Cargo.toml",
-    "./algebra/Cargo.toml"
+    "./algebra/Cargo.toml",
+    "./cooperate/Cargo.toml"
   ],
   "rust-analyzer.check.command": "clippy"
 }

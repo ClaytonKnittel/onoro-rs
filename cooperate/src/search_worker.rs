@@ -144,7 +144,7 @@ where
 mod tests {
   use std::{
     sync::{atomic::Ordering, Arc},
-    thread,
+    time::SystemTime,
   };
 
   use abstract_game::{Game, GameResult};
@@ -157,7 +157,7 @@ mod tests {
     test::{
       gomoku::Gomoku,
       nim::Nim,
-      search::{self, do_find_best_move_serial, find_best_move_serial},
+      search::{do_find_best_move_serial, find_best_move_serial},
       tic_tac_toe::Ttt,
     },
   };
@@ -246,11 +246,13 @@ mod tests {
     globals.queue(0).push(stack.load(Ordering::Relaxed));
 
     println!("Solving...");
+    let start = SystemTime::now();
     start_worker(WorkerData {
       thread_idx: 0,
       globals: globals.clone(),
     });
-    println!("Done.");
+    let end = SystemTime::now();
+    println!("Done: {:?}", end.duration_since(start).unwrap());
 
     // The table should contain the completed initial state.
     assert!(globals

@@ -6,8 +6,10 @@ mod queue;
 mod search_worker;
 mod stack;
 mod table;
-mod test;
 mod util;
+
+#[cfg(test)]
+mod test;
 
 pub use cooperate::*;
 pub use metrics::*;

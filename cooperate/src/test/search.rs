@@ -6,10 +6,7 @@ use std::{
 
 use abstract_game::{Game, GameResult, Score, ScoreValue};
 
-use crate::{
-  table::{Table, TableEntry},
-  Metrics,
-};
+use crate::table::{Table, TableEntry};
 
 fn check_score<G, H>(mut game: G, score: Score, table: &mut Table<G, H>)
 where
@@ -42,7 +39,7 @@ where
     return (Some(Score::no_info()), None);
   }
 
-  if let Some(cached_game) = table.get(&game) {
+  if let Some(cached_game) = table.get(game) {
     if cached_game.score().determined(depth) {
       return (Some(cached_game.score()), None);
     }

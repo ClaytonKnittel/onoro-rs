@@ -116,22 +116,14 @@ impl Gomoku {
     }
   }
 
-  pub fn get_turn(&self) -> u32 {
-    self.turn
-  }
-
   fn idx(&self, x: u32, y: u32) -> u32 {
-    (x + self.width * y) as u32
+    x + self.width * y
   }
 
   pub fn tile_at(&self, x: u32, y: u32) -> GomokuTile {
     debug_assert!(x < self.width);
     debug_assert!(y < self.height);
     *self.tiles.get(self.idx(x, y))
-  }
-
-  pub fn compute_expected_score(&self, depth: u32) -> Score {
-    find_best_move_serial(self, depth).0.unwrap()
   }
 }
 
