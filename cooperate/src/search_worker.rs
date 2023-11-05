@@ -154,8 +154,12 @@ mod tests {
     global_data::GlobalData,
     stack::Stack,
     table::TableEntry,
-    test::{gomoku::Gomoku, nim::Nim, search::find_best_move_serial, tic_tac_toe::Ttt},
-    Metrics,
+    test::{
+      gomoku::Gomoku,
+      nim::Nim,
+      search::{self, find_best_move_serial},
+      tic_tac_toe::Ttt,
+    },
   };
 
   use super::{start_worker, WorkerData};
@@ -229,7 +233,6 @@ mod tests {
   }
 
   #[test]
-  #[ignore]
   fn test_gomoku_4x4_serial() {
     const DEPTH: u32 = 8;
     let globals = Arc::new(GlobalData::new(DEPTH, 1));
@@ -254,35 +257,26 @@ mod tests {
       .table()
       .contains(&Gomoku::new(4, 4, 4)));
 
-    let mut last_i = 0;
-    for (i, state) in globals.resolved_states_table().table().iter().enumerate() {
+    let table = find_best_move_serial(&Gomoku::new(4, 4, 4), DEPTH).2;
+
+    for state in globals.resolved_states_table().table().iter() {
       // Terminal states should not be stored in the table.
       assert_eq!(state.key().finished(), GameResult::NotFinished);
 
-      if last_i * 100 / globals.resolved_states_table().len()
-        != i * 100 / globals.resolved_states_table().len()
-      {
-        println!("{}%", i * 100 / globals.resolved_states_table().len());
-      }
-      last_i = i;
-
-      // Only check 1 in every 5000 states.
-      if rand::random::<f32>() < 0.0002 {
-        // Compute the score using a simple min-max search.
-        let expected_score = state.compute_expected_score(DEPTH);
-
-        // We can't expect the scores to be equal, since the score from the
-        // algorithm may not be complete (i.e. there's a win in X turns, but we're
-        // unsure if there's a way to win in fewer turns). We expect them to be
-        // compatible.
-        assert!(
-          state.score().compatible(&expected_score),
-          "Expect computed score {} to be compatible with true score {} for state\n{}",
-          state.score(),
-          expected_score,
-          state.key()
-        );
-      }
+      let expected_game = table.get(state.key());
+      assert!(
+        expected_game.is_some(),
+        "Expected to find entry for game\n{}",
+        state.key()
+      );
+      let expected_game = expected_game.unwrap();
+      assert!(
+        state.score().compatible(&expected_game.score()),
+        "Expect computed score {} to be compatible with true score {} for state\n{}",
+        state.score(),
+        expected_game.score(),
+        state.key()
+      );
     }
   }
 }
