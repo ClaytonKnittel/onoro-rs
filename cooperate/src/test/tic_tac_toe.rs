@@ -2,7 +2,7 @@ use std::{fmt::Display, hash::Hash};
 
 use abstract_game::{Game, GameMoveGenerator, GameResult, Score};
 
-use crate::{table::TableEntry, Metrics};
+use crate::table::TableEntry;
 
 use super::search::find_best_move_serial;
 
@@ -123,9 +123,7 @@ impl Ttt {
   }
 
   pub fn compute_expected_score(&self, depth: u32) -> Score {
-    find_best_move_serial(self, depth, &mut Metrics::new())
-      .0
-      .unwrap()
+    find_best_move_serial(self, depth).0.unwrap()
   }
 }
 
