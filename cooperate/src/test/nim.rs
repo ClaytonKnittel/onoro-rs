@@ -30,7 +30,7 @@ impl GameMoveGenerator for NimMoveIter {
   type Item = NimMove;
   type Game = Nim;
 
-  fn next(&mut self, nim: &Nim) -> Option<Self::Item> {
+  fn next(&mut self, _nim: &Nim) -> Option<Self::Item> {
     if self.sticks > self.max_sticks {
       None
     } else {

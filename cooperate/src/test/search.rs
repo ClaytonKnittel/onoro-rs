@@ -26,7 +26,7 @@ where
 /// A serial, non-cached min-max search of the game state.
 ///
 /// TODO: make this alpha-beta search.
-fn do_find_best_move_serial<G: Clone + Game, H>(
+pub fn do_find_best_move_serial<G: Clone + Game, H>(
   game: &G,
   depth: u32,
   table: &mut Table<G, H>,

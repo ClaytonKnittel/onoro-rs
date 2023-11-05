@@ -178,12 +178,15 @@ where
           // println!("  move {} for\n{}", m, bottom_state.game());
 
           if bottom_depth == 1 {
-            match game.finished() {
+            let score = match game.finished() {
               GameResult::Win(winner) => {
-                debug_assert_eq!(winner, bottom_state.game().current_player());
-                stack.update_parent_score_and_advance(Score::win(1));
+                if winner == bottom_state.game().current_player() {
+                  Score::win(1)
+                } else {
+                  Score::lose(1)
+                }
               }
-              GameResult::Tie => unreachable!(),
+              GameResult::Tie => Score::tie(1),
               GameResult::NotFinished => {
                 if game.search_immediate_win().is_some() {
                   let game = bottom_state.game_mut();
@@ -191,14 +194,16 @@ where
                   self.commit_game_with_score(game);
                   // If this game is a win for the current player, it's a lose for the
                   // player of the previous turn.
-                  stack.update_parent_score_and_advance(Score::lose(2));
+                  Score::lose(2)
                 } else {
                   // Don't commit game, since we have no information on it (tie to
                   // depth 1 is not worth committing).
-                  stack.update_parent_score_and_advance(Score::tie(1));
+                  Score::tie(1)
                 }
               }
-            }
+            };
+
+            stack.update_parent_score_and_advance(score);
           } else {
             // println!("  move {} for\n{}", m, bottom_state.game());
             let next_state = bottom_state.game().with_move(m);
