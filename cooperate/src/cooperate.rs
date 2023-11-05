@@ -1,6 +1,6 @@
 use std::{
   collections::{hash_map::RandomState, HashSet},
-  fmt::Display,
+  fmt::{Debug, Display},
   hash::Hash,
   sync::{atomic::Ordering, Arc},
 };
@@ -67,6 +67,7 @@ fn construct_globals<G>(game: &G, options: Options) -> Arc<GlobalData<G, RandomS
 where
   G: Game + TableEntry + Display + Hash + PartialEq + Eq + 'static,
   G::Move: Display,
+  G::PlayerIdentifier: Debug,
 {
   let globals = Arc::new(GlobalData::new(options.search_depth, options.num_threads));
 
@@ -83,6 +84,7 @@ pub fn solve<G>(game: &G, options: Options)
 where
   G: Game + TableEntry + Display + Hash + PartialEq + Eq + 'static,
   G::Move: Display,
+  G::PlayerIdentifier: Debug,
 {
   let globals = construct_globals(game, options);
   start_worker(WorkerData::new(0, globals.clone()));

@@ -1,5 +1,5 @@
 use std::{
-  fmt::Display,
+  fmt::{Debug, Display},
   hash::{BuildHasher, Hash},
   sync::Arc,
 };
@@ -40,6 +40,7 @@ pub fn start_worker<G, H>(data: WorkerData<G, H>)
 where
   G: Display + Game + Hash + Eq + TableEntry + 'static,
   G::Move: Display,
+  G::PlayerIdentifier: Debug,
   H: BuildHasher + Clone,
 {
   let queue = data.globals.queue(data.thread_idx);

@@ -4,7 +4,7 @@ use abstract_game::{Game, GameMoveGenerator, GameResult, Score};
 
 use crate::table::TableEntry;
 
-#[derive(PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum NimPlayer {
   First,
   Second,
