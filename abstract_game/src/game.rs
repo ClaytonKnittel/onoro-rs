@@ -4,7 +4,7 @@ pub trait GameMoveGenerator: Sized {
 
   fn next(&mut self, game: &Self::Game) -> Option<Self::Item>;
 
-  fn to_iter<'a>(self, game: &'a Self::Game) -> GameIterator<'a, Self, Self::Game> {
+  fn to_iter(self, game: &Self::Game) -> GameIterator<'_, Self, Self::Game> {
     GameIterator {
       game,
       game_iter: self,
@@ -41,7 +41,7 @@ pub trait Game: Clone + Sized {
   type PlayerIdentifier: Eq;
 
   fn move_generator(&self) -> Self::MoveGenerator;
-  fn each_move<'a>(&'a self) -> GameIterator<'a, Self::MoveGenerator, Self> {
+  fn each_move(&self) -> GameIterator<'_, Self::MoveGenerator, Self> {
     self.move_generator().to_iter(self)
   }
 
@@ -63,12 +63,8 @@ pub trait Game: Clone + Sized {
   /// Checks each possible move of this game, and returns any move that is an
   /// immediate win for the current player, or `None` if no such move exists.
   fn search_immediate_win(&self) -> Option<Self::Move> {
-    self.each_move().find_map(|m| {
-      if self.with_move(m).finished() == GameResult::Win(self.current_player()) {
-        Some(m)
-      } else {
-        None
-      }
-    })
+    self
+      .each_move()
+      .find(|&m| self.with_move(m).finished() == GameResult::Win(self.current_player()))
   }
 }
