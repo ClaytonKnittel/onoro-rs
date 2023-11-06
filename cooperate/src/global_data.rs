@@ -115,9 +115,6 @@ where
     // If the state wasn't found in the resolved table, then try to insert it
     // into its respective pending table.
     let depth_idx = stack.bottom_depth() as usize - 1;
-    // for x in self.pending_states[depth_idx].iter() {
-    //   println!("      found guy at {depth_idx}:\n{}\n", x.key());
-    // }
     match self.pending_states[depth_idx].entry(game.clone()) {
       Entry::Occupied(entry) => {
         // If there is already a pending computation, then queue ourselves on it.
@@ -138,8 +135,6 @@ where
           stack: unsafe { NullLock::new(stack_ptr) },
           frame_idx: stack.bottom_frame_idx() as u32,
         });
-
-        // println!("    inserting at {depth_idx}");
 
         // We claimed the pending slot.
         LookupResult::NotFound

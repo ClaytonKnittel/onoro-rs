@@ -71,7 +71,8 @@ where
       }
 
       // println!(
-      //   "\nExploring\n{}\n(depth {})",
+      //   "\n[{}] Exploring\n{}\n(depth {})",
+      //   data.thread_idx,
       //   stack.bottom_frame().unwrap().game(),
       //   unsafe { &mut *stack_ptr }.bottom_depth()
       // );
@@ -96,11 +97,18 @@ where
             Score::win(1)
           };
 
-          // println!("    parent score is {score_for_parent}");
+          // println!(
+          //   "    [{}] parent score is {score_for_parent}",
+          //   data.thread_idx
+          // );
           stack.pop_with_backstepped_score(score_for_parent);
         }
         GameResult::Tie => {
-          // println!("    parent score is {}", Score::guaranteed_tie());
+          // println!(
+          //   "    [{}] parent score is {}",
+          //   data.thread_idx,
+          //   Score::guaranteed_tie()
+          // );
           stack.pop_with_backstepped_score(Score::guaranteed_tie());
         }
         GameResult::NotFinished => {
@@ -109,19 +117,19 @@ where
           match data.globals.get_or_queue(stack_ptr) {
             LookupResult::Found { score } => {
               // Update best score in frame
-              // println!("    Found",);
+              // println!("    [{}] Found", data.thread_idx);
               stack.pop_with_score(score);
             }
             // If the state was not found, then we can continue on exploring it.
             LookupResult::NotFound => {
-              // println!("    Inserted placeholder in table");
+              // println!("    [{}] Inserted placeholder in table", data.thread_idx);
             }
             // If the state was queued, then it was added to the list of states
             // waiting on the result of some game state. After this result is
             // found, all states which are pending are re-added to some worker's
             // queue (randomly distributed).
             LookupResult::Queued => {
-              // println!("    Queued on other state");
+              // println!("    [{}] Queued on other state", data.thread_idx);
               break;
             }
           }
