@@ -5,7 +5,6 @@ use std::{
 };
 
 use abstract_game::{Game, GameResult, Score};
-use seize::reclaim;
 
 use crate::{
   global_data::{GlobalData, LookupResult},
@@ -46,11 +45,11 @@ where
   let queue = data.globals.queue(data.thread_idx);
 
   loop {
-    let guard = data.globals.collector().enter();
-    let unit = queue.pop(&guard);
+    let unit = queue.pop();
 
     let stack_ptr = match unit {
-      Some(stack_ptr) => stack_ptr,
+      Some(stack_ptr) => *stack_ptr,
+      // TODO: steal
       None => break,
     };
     // We own stack here, so we can access it without atomics.
@@ -62,18 +61,12 @@ where
         match stack.stack_type() {
           StackType::Root => {}
           StackType::Child { parent } => {
-            Stack::resolve_outstanding_child(parent);
+            Stack::resolve_outstanding_child(*parent);
           }
         }
 
-        // TODO: may be able to get rid of memory reclamation on stack frames if
-        // we can guarantee exclusive access here.
-        unsafe {
-          data
-            .globals
-            .collector()
-            .retire(stack_ptr, reclaim::boxed::<Stack<G>>);
-        }
+        // Delete the stack pointer.
+        unsafe { drop(Box::from_raw(stack_ptr)) };
         break;
       }
 
@@ -144,16 +137,13 @@ where
 
 #[cfg(test)]
 mod tests {
-  use std::{
-    sync::{atomic::Ordering, Arc},
-    time::SystemTime,
-  };
+  use std::{sync::Arc, time::SystemTime};
 
   use abstract_game::{Game, GameResult};
-  use seize::AtomicPtr;
 
   use crate::{
     global_data::GlobalData,
+    null_lock::NullLock,
     stack::Stack,
     table::TableEntry,
     test::{
@@ -170,13 +160,12 @@ mod tests {
   fn test_nim_serial() {
     const STICKS: u32 = 100;
     let globals = Arc::new(GlobalData::new(STICKS + 1, 1));
-
-    let stack = AtomicPtr::new(
-      globals
-        .collector()
-        .link_boxed(Stack::make_root(Nim::new(STICKS), STICKS + 1)),
-    );
-    globals.queue(0).push(stack.load(Ordering::Relaxed));
+    globals.queue(0).push(unsafe {
+      NullLock::new(Box::into_raw(Box::new(Stack::make_root(
+        Nim::new(STICKS),
+        STICKS + 1,
+      ))))
+    });
 
     start_worker(WorkerData {
       thread_idx: 0,
@@ -195,13 +184,9 @@ mod tests {
   fn test_ttt_serial() {
     const DEPTH: u32 = 10;
     let globals = Arc::new(GlobalData::new(DEPTH, 1));
-
-    let stack = AtomicPtr::new(
-      globals
-        .collector()
-        .link_boxed(Stack::make_root(Ttt::new(), DEPTH)),
-    );
-    globals.queue(0).push(stack.load(Ordering::Relaxed));
+    globals
+      .queue(0)
+      .push(unsafe { NullLock::new(Box::into_raw(Box::new(Stack::make_root(Ttt::new(), DEPTH)))) });
 
     start_worker(WorkerData {
       thread_idx: 0,
@@ -239,13 +224,12 @@ mod tests {
   fn test_gomoku_4x4_serial() {
     const DEPTH: u32 = 16;
     let globals = Arc::new(GlobalData::new(DEPTH, 1));
-
-    let stack = AtomicPtr::new(
-      globals
-        .collector()
-        .link_boxed(Stack::make_root(Gomoku::new(4, 4, 4), DEPTH)),
-    );
-    globals.queue(0).push(stack.load(Ordering::Relaxed));
+    globals.queue(0).push(unsafe {
+      NullLock::new(Box::into_raw(Box::new(Stack::make_root(
+        Gomoku::new(4, 4, 4),
+        DEPTH,
+      ))))
+    });
 
     println!("Solving...");
     let start = SystemTime::now();
