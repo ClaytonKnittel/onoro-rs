@@ -2,8 +2,6 @@ use std::{fmt::Display, hash::Hash};
 
 use abstract_game::{Game, GameMoveGenerator, GameResult, Score};
 
-use crate::table::TableEntry;
-
 use super::search::find_best_move_serial;
 
 #[derive(Debug, PartialEq, Eq)]
@@ -84,7 +82,6 @@ pub struct Ttt {
   /// the Os.
   tile_mask: u32,
   turn: u32,
-  score: Score,
 }
 
 impl Ttt {
@@ -92,7 +89,6 @@ impl Ttt {
     Self {
       tile_mask: 0,
       turn: 0,
-      score: Score::no_info(),
     }
   }
 
@@ -169,20 +165,6 @@ impl Game for Ttt {
     } else {
       GameResult::NotFinished
     }
-  }
-}
-
-impl TableEntry for Ttt {
-  fn score(&self) -> abstract_game::Score {
-    self.score.clone()
-  }
-
-  fn set_score(&mut self, score: Score) {
-    self.score = score;
-  }
-
-  fn merge(&mut self, other: &Self) {
-    self.score.merge(&other.score);
   }
 }
 

@@ -7,7 +7,7 @@ use std::{
 
 use abstract_game::{Game, Score};
 
-use crate::{array::Array, table::TableEntry, transparent_iterator::TransparentIterator};
+use crate::{array::Array, transparent_iterator::TransparentIterator};
 
 /// Algorithm:
 /// ```rs
@@ -241,7 +241,7 @@ where
 
 impl<G> Stack<G>
 where
-  G: Game + TableEntry + Display + 'static,
+  G: Game + Display + 'static,
   G::Move: Display,
 {
   pub fn make_root(initial_game: G, depth: u32) -> Self {

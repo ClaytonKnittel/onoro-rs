@@ -1,8 +1,8 @@
 use std::{fmt::Display, hash::Hash};
 
-use abstract_game::{Game, GameMoveGenerator, GameResult, Score};
+use abstract_game::{Game, GameMoveGenerator, GameResult};
 
-use crate::{array::Array, table::TableEntry};
+use crate::array::Array;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum GomokuPlayer {
@@ -94,7 +94,6 @@ pub struct Gomoku {
   /// The number of pieces needed in a straight/diagonal line to win.
   to_win: u32,
   turn: u32,
-  score: Score,
 }
 
 impl Gomoku {
@@ -110,7 +109,6 @@ impl Gomoku {
       height,
       to_win,
       turn: 0,
-      score: Score::no_info(),
     }
   }
 
@@ -203,20 +201,6 @@ impl Game for Gomoku {
     } else {
       GameResult::NotFinished
     }
-  }
-}
-
-impl TableEntry for Gomoku {
-  fn score(&self) -> abstract_game::Score {
-    self.score.clone()
-  }
-
-  fn set_score(&mut self, score: Score) {
-    self.score = score;
-  }
-
-  fn merge(&mut self, other: &Self) {
-    self.score.merge(&other.score);
   }
 }
 

@@ -13,7 +13,6 @@ use crate::{
   null_lock::NullLock,
   search_worker::{start_worker, WorkerData},
   stack::Stack,
-  table::TableEntry,
 };
 
 pub struct Options {
@@ -27,7 +26,7 @@ pub struct Options {
 
 fn generate_frontier<G>(initial_state: G, options: &Options) -> Vec<*mut Stack<G>>
 where
-  G: Game + TableEntry + Hash + PartialEq + Eq + Display + 'static,
+  G: Game + Hash + PartialEq + Eq + Display + 'static,
   G::Move: Display,
 {
   let mut visited_states = HashSet::new();
@@ -61,7 +60,7 @@ where
 
 fn construct_globals<G>(game: &G, options: Options) -> Arc<GlobalData<G, RandomState>>
 where
-  G: Game + TableEntry + Display + Hash + PartialEq + Eq + 'static,
+  G: Game + Display + Hash + PartialEq + Eq + 'static,
   G::Move: Display,
   G::PlayerIdentifier: Debug,
 {
@@ -80,7 +79,7 @@ where
 
 pub fn solve<G>(game: &G, options: Options)
 where
-  G: Game + TableEntry + Display + Hash + PartialEq + Eq + 'static,
+  G: Game + Display + Hash + PartialEq + Eq + 'static,
   G::Move: Display,
   G::PlayerIdentifier: Debug,
 {
@@ -97,7 +96,6 @@ mod tests {
   use crate::{
     cooperate::construct_globals,
     search_worker::{start_worker, WorkerData},
-    table::TableEntry,
     test::{
       gomoku::Gomoku,
       nim::Nim,
@@ -122,10 +120,9 @@ mod tests {
     start_worker(WorkerData::new(0, globals.clone()));
 
     for sticks in 1..=STICKS {
-      let game = globals.resolved_states_table().get(&Nim::new(sticks));
-      assert!(game.is_some());
-      let game = game.unwrap();
-      assert_eq!(game.score(), game.expected_score());
+      let cached_score = globals.resolved_states_table().get(&Nim::new(sticks));
+      assert!(cached_score.is_some());
+      assert_eq!(cached_score.unwrap(), Nim::new(sticks).expected_score());
     }
   }
 
@@ -156,10 +153,9 @@ mod tests {
     }
 
     for sticks in 1..=(STICKS - 1) {
-      let game = globals.resolved_states_table().get(&Nim::new(sticks));
-      assert!(game.is_some());
-      let game = game.unwrap();
-      assert_eq!(game.score(), game.expected_score());
+      let cached_score = globals.resolved_states_table().get(&Nim::new(sticks));
+      assert!(cached_score.is_some());
+      assert_eq!(cached_score.unwrap(), Nim::new(sticks).expected_score());
     }
   }
 
@@ -200,16 +196,16 @@ mod tests {
       assert_eq!(state.key().finished(), GameResult::NotFinished);
 
       // Compute the score using a simple min-max search.
-      let expected_score = state.compute_expected_score(DEPTH);
+      let expected_score = state.key().compute_expected_score(DEPTH);
 
       // We can't expect the scores to be equal, since the score from the
       // algorithm may not be complete (i.e. there's a win in X turns, but we're
       // unsure if there's a way to win in fewer turns). We expect them to be
       // compatible.
       assert!(
-        state.score().compatible(&expected_score),
+        state.value().compatible(&expected_score),
         "Expect computed score {} to be compatible with true score {}",
-        state.score(),
+        state.value(),
         expected_score
       );
     }
@@ -252,16 +248,16 @@ mod tests {
       assert_eq!(state.key().finished(), GameResult::NotFinished);
 
       // Compute the score using a simple min-max search.
-      let expected_score = state.compute_expected_score(DEPTH);
+      let expected_score = state.key().compute_expected_score(DEPTH);
 
       // We can't expect the scores to be equal, since the score from the
       // algorithm may not be complete (i.e. there's a win in X turns, but we're
       // unsure if there's a way to win in fewer turns). We expect them to be
       // compatible.
       assert!(
-        state.score().compatible(&expected_score),
+        state.value().compatible(&expected_score),
         "Expect computed score {} to be compatible with true score {}",
-        state.score(),
+        state.value(),
         expected_score
       );
     }
@@ -312,22 +308,19 @@ mod tests {
       // Terminal states should not be stored in the table.
       assert_eq!(state.key().finished(), GameResult::NotFinished);
 
-      let expected_score = table
-        .get(state.key())
-        .map(|game_ref| game_ref.score())
-        .unwrap_or_else(|| {
-          do_find_best_move_serial(state.key(), DEPTH, &mut table);
-          table.get(state.key()).unwrap().score()
-        });
+      let expected_score = table.get(state.key()).unwrap_or_else(|| {
+        do_find_best_move_serial(state.key(), DEPTH, &mut table);
+        table.get(state.key()).unwrap()
+      });
 
       // We can't expect the scores to be equal, since the score from the
       // algorithm may not be complete (i.e. there's a win in X turns, but we're
       // unsure if there's a way to win in fewer turns). We expect them to be
       // compatible.
       assert!(
-        state.score().compatible(&expected_score),
+        state.value().compatible(&expected_score),
         "Expect computed score {} to be compatible with true score {}",
-        state.score(),
+        state.value(),
         expected_score
       );
     }
@@ -378,22 +371,19 @@ mod tests {
       // Terminal states should not be stored in the table.
       assert_eq!(state.key().finished(), GameResult::NotFinished);
 
-      let expected_score = table
-        .get(state.key())
-        .map(|game_ref| game_ref.score())
-        .unwrap_or_else(|| {
-          do_find_best_move_serial(state.key(), DEPTH, &mut table);
-          table.get(state.key()).unwrap().score()
-        });
+      let expected_score = table.get(state.key()).unwrap_or_else(|| {
+        do_find_best_move_serial(state.key(), DEPTH, &mut table);
+        table.get(state.key()).unwrap()
+      });
 
       // We can't expect the scores to be equal, since the score from the
       // algorithm may not be complete (i.e. there's a win in X turns, but we're
       // unsure if there's a way to win in fewer turns). We expect them to be
       // compatible.
       assert!(
-        state.score().compatible(&expected_score),
+        state.value().compatible(&expected_score),
         "Expect computed score {} to be compatible with true score {}",
-        state.score(),
+        state.value(),
         expected_score
       );
     }
@@ -455,22 +445,19 @@ mod tests {
       // Terminal states should not be stored in the table.
       assert_eq!(state.key().finished(), GameResult::NotFinished);
 
-      let expected_score = table
-        .get(state.key())
-        .map(|game_ref| game_ref.score())
-        .unwrap_or_else(|| {
-          do_find_best_move_serial(state.key(), DEPTH, &mut table);
-          table.get(state.key()).unwrap().score()
-        });
+      let expected_score = table.get(state.key()).unwrap_or_else(|| {
+        do_find_best_move_serial(state.key(), DEPTH, &mut table);
+        table.get(state.key()).unwrap()
+      });
 
       // We can't expect the scores to be equal, since the score from the
       // algorithm may not be complete (i.e. there's a win in X turns, but we're
       // unsure if there's a way to win in fewer turns). We expect them to be
       // compatible.
       assert!(
-        state.score().compatible(&expected_score),
+        state.value().compatible(&expected_score),
         "Expect computed score {} to be compatible with true score {}",
-        state.score(),
+        state.value(),
         expected_score
       );
     }

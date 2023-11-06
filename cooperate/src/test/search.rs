@@ -6,18 +6,17 @@ use std::{
 
 use abstract_game::{Game, GameResult, Score, ScoreValue};
 
-use crate::table::{Table, TableEntry};
+use crate::table::Table;
 
-fn check_score<G, H>(mut game: G, score: Score, table: &mut Table<G, H>)
+fn check_score<G, H>(game: G, score: Score, table: &mut Table<G, H>)
 where
-  G: Game + Hash + Eq + TableEntry,
+  G: Game + Hash + Eq,
   H: BuildHasher + Clone,
 {
-  if let Some(other_game) = table.get(&game) {
-    debug_assert!(other_game.score().compatible(&score));
+  if let Some(cached_score) = table.get(&game) {
+    debug_assert!(cached_score.compatible(&score));
   }
-  game.set_score(score);
-  table.update(&mut game);
+  table.update(game, score);
 }
 
 /// A serial, non-cached min-max search of the game state.
@@ -29,7 +28,7 @@ pub fn do_find_best_move_serial<G: Clone + Game, H>(
   table: &mut Table<G, H>,
 ) -> (Option<Score>, Option<G::Move>)
 where
-  G: Display + Game + Hash + Eq + TableEntry,
+  G: Display + Game + Hash + Eq,
   H: BuildHasher + Clone,
 {
   // Can't score games that are already over.
@@ -39,9 +38,9 @@ where
     return (Some(Score::no_info()), None);
   }
 
-  if let Some(cached_game) = table.get(game) {
-    if cached_game.score().determined(depth) {
-      return (Some(cached_game.score()), None);
+  if let Some(cached_score) = table.get(game) {
+    if cached_score.determined(depth) {
+      return (Some(cached_score), None);
     }
   }
 
@@ -109,7 +108,7 @@ pub fn find_best_move_serial<G>(
   depth: u32,
 ) -> (Option<Score>, Option<G::Move>, Table<G, RandomState>)
 where
-  G: Display + Clone + Game + Hash + TableEntry + PartialEq + Eq,
+  G: Display + Clone + Game + Hash + PartialEq + Eq,
 {
   let mut table = Table::new();
 

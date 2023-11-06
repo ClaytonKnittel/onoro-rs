@@ -8,11 +8,7 @@ use abstract_game::{Game, GameResult, Score};
 use crossbeam_queue::SegQueue;
 use dashmap::{mapref::entry::Entry, DashMap};
 
-use crate::{
-  null_lock::NullLock,
-  stack::Stack,
-  table::{Table, TableEntry},
-};
+use crate::{null_lock::NullLock, stack::Stack, table::Table};
 
 struct PendingFrame<G>
 where
@@ -55,7 +51,7 @@ where
 
 impl<G> GlobalData<G, RandomState>
 where
-  G: Display + Game + Clone + Hash + Eq + TableEntry + 'static,
+  G: Display + Game + Clone + Hash + Eq + 'static,
   G::Move: Display,
 {
   pub fn new(search_depth: u32, num_threads: u32) -> Self {
@@ -71,7 +67,7 @@ where
 
 impl<G, H> GlobalData<G, H>
 where
-  G: Display + Game + Clone + Hash + Eq + TableEntry + 'static,
+  G: Display + Game + Clone + Hash + Eq + 'static,
   G::Move: Display,
   G::PlayerIdentifier: Debug,
   H: BuildHasher + Clone,
@@ -104,11 +100,9 @@ where
     let stack = unsafe { &mut *stack_ptr };
     let bottom_state = stack.bottom_frame().unwrap();
     let game = bottom_state.game();
-    if let Some(resolved_state) = self.resolved_states.get(game) {
-      if resolved_state.score().determined(stack.bottom_depth()) {
-        return LookupResult::Found {
-          score: resolved_state.score(),
-        };
+    if let Some(score) = self.resolved_states.get(game) {
+      if score.determined(stack.bottom_depth()) {
+        return LookupResult::Found { score };
       }
     }
 
@@ -179,9 +173,7 @@ where
               GameResult::Tie => Score::tie(1),
               GameResult::NotFinished => {
                 if game.search_immediate_win().is_some() {
-                  let game = bottom_state.game_mut();
-                  game.set_score(Score::win(1));
-                  self.commit_game_with_score(game);
+                  self.commit_game_with_score(bottom_state.game().clone(), Score::win(1));
                   // If this game is a win for the current player, it's a lose for the
                   // player of the previous turn.
                   Score::lose(2)
@@ -223,18 +215,13 @@ where
 
     let bottom_state = stack.bottom_frame_mut().unwrap();
     let score = bottom_state.best_score().0.clone();
-    let game = bottom_state.game_mut();
-    game.set_score(score);
-    // println!(
-    //   "  Out of moves, committing score {} for\n{}",
-    //   game.score(),
-    //   game
-    // );
-    self.commit_game_with_score(game);
+    let game = bottom_state.game().clone();
+    // println!("  Out of moves, committing score {} for\n{}", score, game);
+    self.commit_game_with_score(game.clone(), score);
 
     // Remove the state from the pending states.
     // println!("    removing at {depth_idx}");
-    match self.pending_states[depth_idx].entry(game.clone()) {
+    match self.pending_states[depth_idx].entry(game) {
       Entry::Occupied(entry) => {
         let pending_frame = entry.remove();
         debug_assert_eq!(*pending_frame.stack, stack_ptr);
@@ -258,7 +245,7 @@ where
     stack.pop();
   }
 
-  fn commit_game_with_score(&self, game: &mut G) {
-    self.resolved_states.update(game);
+  fn commit_game_with_score(&self, game: G, score: Score) {
+    self.resolved_states.update(game, score);
   }
 }

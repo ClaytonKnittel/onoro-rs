@@ -2,8 +2,6 @@ use std::{fmt::Display, hash::Hash};
 
 use abstract_game::{Game, GameMoveGenerator, GameResult, Score};
 
-use crate::table::TableEntry;
-
 #[derive(Debug, PartialEq, Eq)]
 pub enum NimPlayer {
   First,
@@ -46,16 +44,11 @@ impl GameMoveGenerator for NimMoveIter {
 pub struct Nim {
   sticks: u32,
   turn: u32,
-  score: Score,
 }
 
 impl Nim {
   pub fn new(sticks: u32) -> Self {
-    Self {
-      sticks,
-      turn: 0,
-      score: Score::no_info(),
-    }
+    Self { sticks, turn: 0 }
   }
 
   pub fn expected_score(&self) -> Score {
@@ -105,20 +98,6 @@ impl Game for Nim {
     } else {
       GameResult::NotFinished
     }
-  }
-}
-
-impl TableEntry for Nim {
-  fn score(&self) -> abstract_game::Score {
-    self.score.clone()
-  }
-
-  fn set_score(&mut self, score: Score) {
-    self.score = score;
-  }
-
-  fn merge(&mut self, other: &Self) {
-    self.score.merge(&other.score);
   }
 }
 

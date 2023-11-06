@@ -9,7 +9,6 @@ use abstract_game::{Game, GameResult, Score};
 use crate::{
   global_data::{GlobalData, LookupResult},
   stack::{Stack, StackType},
-  table::TableEntry,
 };
 
 pub struct WorkerData<G, H>
@@ -37,7 +36,7 @@ where
 
 pub fn start_worker<G, H>(data: WorkerData<G, H>)
 where
-  G: Display + Game + Hash + Eq + TableEntry + 'static,
+  G: Display + Game + Hash + Eq + 'static,
   G::Move: Display,
   G::PlayerIdentifier: Debug,
   H: BuildHasher + Clone,
@@ -153,7 +152,6 @@ mod tests {
     global_data::GlobalData,
     null_lock::NullLock,
     stack::Stack,
-    table::TableEntry,
     test::{
       gomoku::Gomoku,
       nim::Nim,
@@ -181,10 +179,9 @@ mod tests {
     });
 
     for sticks in 1..=STICKS {
-      let game = globals.resolved_states_table().get(&Nim::new(sticks));
-      assert!(game.is_some());
-      let game = game.unwrap();
-      assert_eq!(game.score(), game.expected_score());
+      let cached_score = globals.resolved_states_table().get(&Nim::new(sticks));
+      assert!(cached_score.is_some());
+      assert_eq!(cached_score.unwrap(), Nim::new(sticks).expected_score());
     }
   }
 
@@ -205,23 +202,23 @@ mod tests {
     assert!(globals
       .resolved_states_table()
       .table()
-      .contains(&Ttt::new()));
+      .contains_key(&Ttt::new()));
 
     for state in globals.resolved_states_table().table().iter() {
       // Terminal states should not be stored in the table.
       assert_eq!(state.key().finished(), GameResult::NotFinished);
 
       // Compute the score using a simple min-max search.
-      let expected_score = state.compute_expected_score(DEPTH);
+      let expected_score = state.key().compute_expected_score(DEPTH);
 
       // We can't expect the scores to be equal, since the score from the
       // algorithm may not be complete (i.e. there's a win in X turns, but we're
       // unsure if there's a way to win in fewer turns). We expect them to be
       // compatible.
       assert!(
-        state.score().compatible(&expected_score),
+        state.value().compatible(&expected_score),
         "Expect computed score {} to be compatible with true score {}",
-        state.score(),
+        state.value(),
         expected_score
       );
     }
@@ -252,7 +249,7 @@ mod tests {
     assert!(globals
       .resolved_states_table()
       .table()
-      .contains(&Gomoku::new(4, 4, 4)));
+      .contains_key(&Gomoku::new(4, 4, 4)));
 
     let mut table = find_best_move_serial(&Gomoku::new(4, 4, 4), DEPTH).2;
 
@@ -260,17 +257,15 @@ mod tests {
       // Terminal states should not be stored in the table.
       assert_eq!(state.key().finished(), GameResult::NotFinished);
 
-      let expected_score = table
-        .get(state.key())
-        .map(|game_ref| game_ref.score())
-        .unwrap_or_else(|| {
-          do_find_best_move_serial(state.key(), DEPTH, &mut table);
-          table.get(state.key()).unwrap().score()
-        });
+      let expected_score = table.get(state.key()).unwrap_or_else(|| {
+        do_find_best_move_serial(state.key(), DEPTH, &mut table);
+        table.get(state.key()).unwrap()
+      });
+
       assert!(
-        state.score().compatible(&expected_score),
+        state.value().compatible(&expected_score),
         "Expect computed score {} to be compatible with true score {} for state\n{}",
-        state.score(),
+        state.value(),
         expected_score,
         state.key()
       );
