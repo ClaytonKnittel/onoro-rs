@@ -2,15 +2,15 @@ use std::{
   collections::{hash_map::RandomState, HashSet},
   fmt::{Debug, Display},
   hash::Hash,
-  sync::{atomic::Ordering, Arc},
+  sync::Arc,
 };
 
 use abstract_game::Game;
 use rand::prelude::*;
-use seize::{AtomicPtr, Collector};
 
 use crate::{
   global_data::GlobalData,
+  null_lock::NullLock,
   search_worker::{start_worker, WorkerData},
   stack::Stack,
   table::TableEntry,
@@ -25,11 +25,7 @@ pub struct Options {
   unit_depth: u32,
 }
 
-fn generate_frontier<G>(
-  initial_state: G,
-  options: &Options,
-  collector: &Collector,
-) -> Vec<AtomicPtr<Stack<G>>>
+fn generate_frontier<G>(initial_state: G, options: &Options) -> Vec<*mut Stack<G>>
 where
   G: Game + TableEntry + Hash + PartialEq + Eq + Display + 'static,
   G::Move: Display,
@@ -55,7 +51,7 @@ where
   frontier
     .into_iter()
     .map(|state| {
-      AtomicPtr::new(collector.link_boxed(Stack::make_root(
+      Box::into_raw(Box::new(Stack::make_root(
         state,
         options.search_depth - options.unit_depth,
       )))
@@ -72,9 +68,11 @@ where
   let globals = Arc::new(GlobalData::new(options.search_depth, options.num_threads));
 
   let mut rng = thread_rng();
-  for stack in generate_frontier(game.clone(), &options, globals.collector()).into_iter() {
+  for stack in generate_frontier(game.clone(), &options).into_iter() {
     let rand_idx = rng.gen_range(0..options.num_threads);
-    globals.queue(rand_idx).push(stack.load(Ordering::Relaxed));
+    globals
+      .queue(rand_idx)
+      .push(unsafe { NullLock::new(stack) });
   }
 
   globals

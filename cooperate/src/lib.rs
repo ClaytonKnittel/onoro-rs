@@ -2,11 +2,11 @@ mod array;
 mod cooperate;
 mod global_data;
 mod metrics;
-mod queue;
+mod null_lock;
 mod search_worker;
 mod stack;
 mod table;
-mod util;
+mod transparent_iterator;
 
 #[cfg(test)]
 mod test;

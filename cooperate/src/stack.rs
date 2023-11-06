@@ -1,4 +1,4 @@
-use abstract_game::{GameMoveGenerator, GameResult};
+use abstract_game::GameMoveGenerator;
 use std::{
   fmt::Display,
   ptr::null_mut,
@@ -6,9 +6,8 @@ use std::{
 };
 
 use abstract_game::{Game, Score};
-use seize::{AtomicPtr, Linked};
 
-use crate::{array::Array, queue::QueueItem, table::TableEntry, util::TransparentIterator};
+use crate::{array::Array, table::TableEntry, transparent_iterator::TransparentIterator};
 
 /// Algorithm:
 /// ```rs
@@ -61,7 +60,7 @@ where
   G: Game,
 {
   Root,
-  Child { parent: AtomicPtr<Stack<G>> },
+  Child { parent: *mut Stack<G> },
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -103,7 +102,7 @@ where
   /// dependants. This can only be appended to under the bin mutex lock from the
   /// pending states hashmap, and reclaimed for revival after removing this
   /// frame from the pending states hashmap.
-  dependants: AtomicPtr<Stack<G>>,
+  dependants: *mut Stack<G>,
 }
 
 impl<G> StackFrame<G>
@@ -118,7 +117,7 @@ where
       current_move: None,
       best_score: Score::no_info(),
       best_move: None,
-      dependants: AtomicPtr::new(null_mut()),
+      dependants: null_mut(),
     };
     s.advance();
     s
@@ -182,22 +181,20 @@ where
     self.advance();
   }
 
-  pub unsafe fn queue_dependant_unlocked(&self, dependant: *mut Linked<Stack<G>>) {
+  pub unsafe fn queue_dependant_unlocked(&mut self, dependant: *mut Stack<G>) {
     unsafe {
-      (*dependant).next = self.dependants.load(Ordering::Relaxed);
+      (*dependant).next = self.dependants;
     }
-    self.dependants.store(dependant, Ordering::Relaxed);
+    self.dependants = dependant;
   }
 
-  pub unsafe fn pop_dependant_unlocked(&self) -> Option<*mut Linked<Stack<G>>> {
-    let head = self.dependants.load(Ordering::Relaxed);
+  pub unsafe fn pop_dependant_unlocked(&mut self) -> Option<*mut Stack<G>> {
+    let head = self.dependants;
     if head.is_null() {
       return None;
     }
 
-    self
-      .dependants
-      .store(unsafe { (*head).next }, Ordering::Relaxed);
+    self.dependants = unsafe { (*head).next };
     Some(head)
   }
 
@@ -228,16 +225,13 @@ where
   /// TODO: Can remove state? Implicit from where the stack lies in the data
   /// structure.
   state: StackState,
-  /// For live states that are queued for execution, this is a pointer to the
-  /// next queued item.
-  ///
   /// For suspended states, this is a pointer to the next dependant suspended
   /// state of "dependant", forming a singly-linked list of the dependent
   /// states. This `next` pointer is modified under the bin-lock of the state
   /// that this stack is suspended on in `DashMap`. When the stack is
   /// unsuspended, there will not be any other threads that have references to
   /// this frame since queueing is done under a lock.
-  next: *mut Linked<Stack<G>>,
+  next: *mut Stack<G>,
   /// A split state is a state with split children, upon whose completion will
   /// resolve the state at the bottom of the stack. It only tracks the number of
   /// outstanding children. The child to decrease this number to 0 is the one to
@@ -263,7 +257,7 @@ where
     root
   }
 
-  fn make_child(game: G, depth: u32, parent: AtomicPtr<Self>) -> Self {
+  fn make_child(game: G, depth: u32, parent: *mut Self) -> Self {
     let mut root = Self {
       root_depth: depth,
       frames: Array::new(depth),
@@ -334,11 +328,7 @@ where
   /// each child. The iterator must be consumed completely.
   ///
   /// TODO: may want to split at the first frame, not the last.
-  pub fn split(self_ptr: &AtomicPtr<Self>) -> impl Iterator<Item = Self> {
-    // Load the pointer directly without lifetime-protecting, since at this
-    // point no other thread can be referencing this stack.
-    let self_ptr = self_ptr.load(Ordering::Relaxed);
-
+  pub fn split(self_ptr: *mut Self) -> impl Iterator<Item = Self> {
     let stack = unsafe { &mut *self_ptr };
     debug_assert_eq!(stack.state, StackState::Live);
     debug_assert_eq!(stack.outstanding_children.load(Ordering::Relaxed), 0);
@@ -359,7 +349,7 @@ where
         stack.outstanding_children.fetch_add(1, Ordering::Relaxed);
         let mut game = stack.bottom_frame().unwrap().game().clone();
         game.make_move(m);
-        Self::make_child(game, stack.bottom_depth() - 1, AtomicPtr::new(self_ptr))
+        Self::make_child(game, stack.bottom_depth() - 1, self_ptr)
       })
       .chain(TransparentIterator::new(move || {
         let stack = unsafe { &mut *self_ptr };
@@ -372,8 +362,7 @@ where
   /// TODO: try tracking the best score/move in the parent stack frame, protect
   /// those and outstanding_children with a lock, instead of re-iterating over
   /// the parent and relying on the children states to be in the resolved table.
-  pub fn resolve_outstanding_child(self_ptr: &AtomicPtr<Self>) {
-    let self_ptr = self_ptr.load(Ordering::Relaxed);
+  pub fn resolve_outstanding_child(self_ptr: *mut Self) {
     let stack = unsafe { &mut *self_ptr };
     if stack.outstanding_children.fetch_sub(1, Ordering::Relaxed) == 0 {
       // TODO: All children have finished, revive this frame.
@@ -407,18 +396,5 @@ where
   /// The search depth of the bottom frame of this stack.
   pub fn bottom_depth(&self) -> u32 {
     self.root_depth - (self.frames.len() as u32 - 1)
-  }
-}
-
-impl<G> QueueItem for Stack<G>
-where
-  G: Game,
-{
-  fn next(&self) -> *mut Linked<Self> {
-    self.next
-  }
-
-  fn set_next(&mut self, next: *mut Linked<Self>) {
-    self.next = next;
   }
 }
