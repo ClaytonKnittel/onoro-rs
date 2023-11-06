@@ -2,8 +2,6 @@ use std::{fmt::Display, hash::Hash};
 
 use abstract_game::{Game, GameMoveGenerator, GameResult};
 
-use crate::array::Array;
-
 #[derive(Debug, PartialEq, Eq)]
 pub enum GomokuPlayer {
   First,
@@ -88,7 +86,7 @@ impl Display for GomokuTile {
 
 #[derive(Clone)]
 pub struct Gomoku {
-  tiles: Array<GomokuTile>,
+  tiles: Vec<GomokuTile>,
   width: u32,
   height: u32,
   /// The number of pieces needed in a straight/diagonal line to win.
@@ -98,13 +96,8 @@ pub struct Gomoku {
 
 impl Gomoku {
   pub fn new(width: u32, height: u32, to_win: u32) -> Self {
-    let mut tiles = Array::new(width * height);
-    for _ in 0..tiles.capacity() {
-      tiles.push(GomokuTile::Empty);
-    }
-
     Self {
-      tiles,
+      tiles: (0..(width * height)).map(|_| GomokuTile::Empty).collect(),
       width,
       height,
       to_win,
@@ -112,14 +105,14 @@ impl Gomoku {
     }
   }
 
-  fn idx(&self, x: u32, y: u32) -> u32 {
-    x + self.width * y
+  fn idx(&self, x: u32, y: u32) -> usize {
+    (x + self.width * y) as usize
   }
 
   pub fn tile_at(&self, x: u32, y: u32) -> GomokuTile {
     debug_assert!(x < self.width);
     debug_assert!(y < self.height);
-    *self.tiles.get(self.idx(x, y))
+    *self.tiles.get(self.idx(x, y)).unwrap()
   }
 }
 
@@ -134,7 +127,8 @@ impl Game for Gomoku {
 
   fn make_move(&mut self, m: Self::Move) {
     debug_assert_eq!(self.tile_at(m.x, m.y), GomokuTile::Empty);
-    *self.tiles.get_mut(self.idx(m.x, m.y)) = if self.turn % 2 == 0 {
+    let idx = self.idx(m.x, m.y);
+    *self.tiles.get_mut(idx).unwrap() = if self.turn % 2 == 0 {
       GomokuTile::X
     } else {
       GomokuTile::O

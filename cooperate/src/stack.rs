@@ -99,10 +99,10 @@ where
   /// The corresponding best move found for `best_score`.
   best_move: Option<G::Move>,
   /// All stack frames have an unordered list of all of their suspended direct
-  /// dependants. This can only be appended to under the bin mutex lock from the
+  /// dependents. This can only be appended to under the bin mutex lock from the
   /// pending states hashmap, and reclaimed for revival after removing this
   /// frame from the pending states hashmap.
-  dependants: *mut Stack<G>,
+  dependents: *mut Stack<G>,
 }
 
 impl<G> StackFrame<G>
@@ -117,7 +117,7 @@ where
       current_move: None,
       best_score: Score::no_info(),
       best_move: None,
-      dependants: null_mut(),
+      dependents: null_mut(),
     };
     s.advance();
     s
@@ -183,18 +183,18 @@ where
 
   pub unsafe fn queue_dependant_unlocked(&mut self, dependant: *mut Stack<G>) {
     unsafe {
-      (*dependant).next = self.dependants;
+      (*dependant).next = self.dependents;
     }
-    self.dependants = dependant;
+    self.dependents = dependant;
   }
 
   pub unsafe fn pop_dependant_unlocked(&mut self) -> Option<*mut Stack<G>> {
-    let head = self.dependants;
+    let head = self.dependents;
     if head.is_null() {
       return None;
     }
 
-    self.dependants = unsafe { (*head).next };
+    self.dependents = unsafe { (*head).next };
     Some(head)
   }
 
@@ -220,7 +220,7 @@ where
   /// frame.
   root_depth: u32,
   /// The frames of this stack.
-  frames: Array<StackFrame<G>>,
+  frames: Vec<StackFrame<G>>,
   ty: StackType<G>,
   /// TODO: Can remove state? Implicit from where the stack lies in the data
   /// structure.
@@ -247,8 +247,8 @@ where
   pub fn make_root(initial_game: G, depth: u32) -> Self {
     let mut root = Self {
       root_depth: depth,
-      frames: Array::new(depth),
       ty: StackType::Root,
+      frames: Vec::with_capacity(depth as usize),
       state: StackState::Live {},
       next: null_mut(),
       outstanding_children: AtomicU32::new(0),
@@ -260,7 +260,7 @@ where
   fn make_child(game: G, depth: u32, parent: *mut Self) -> Self {
     let mut root = Self {
       root_depth: depth,
-      frames: Array::new(depth),
+      frames: Vec::with_capacity(depth as usize),
       ty: StackType::Child { parent },
       state: StackState::Live {},
       next: null_mut(),
@@ -275,7 +275,7 @@ where
   }
 
   pub fn push(&mut self, game: G) {
-    debug_assert!(!self.frames.is_full());
+    debug_assert!(!self.is_full());
     self.frames.push(StackFrame::new(game));
   }
 
@@ -289,7 +289,7 @@ where
   /// already relative to the parent frame. This will remove the bottom stack
   /// frame and update the score/current move of the parent stack frame.
   pub fn pop_with_backstepped_score(&mut self, score: Score) -> StackFrame<G> {
-    let completed_frame = self.frames.pop();
+    let completed_frame = self.frames.pop().unwrap();
     self.update_parent_score_and_advance(score);
     completed_frame
   }
@@ -370,15 +370,15 @@ where
   }
 
   pub fn is_full(&self) -> bool {
-    self.frames.is_full()
+    self.frames.len() == self.root_depth as usize
   }
 
   pub fn frame(&self, idx: u32) -> &StackFrame<G> {
-    self.frames.get(idx)
+    self.frames.get(idx as usize).unwrap()
   }
 
   pub fn frame_mut(&mut self, idx: u32) -> &mut StackFrame<G> {
-    self.frames.get_mut(idx)
+    self.frames.get_mut(idx as usize).unwrap()
   }
 
   pub fn bottom_frame(&self) -> Option<&StackFrame<G>> {
@@ -395,6 +395,6 @@ where
 
   /// The search depth of the bottom frame of this stack.
   pub fn bottom_depth(&self) -> u32 {
-    self.root_depth - (self.frames.len() as u32 - 1)
+    self.root_depth - self.frames.len() as u32 + 1
   }
 }
