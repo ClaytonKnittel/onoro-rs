@@ -8,16 +8,15 @@ use abstract_game::{Game, GameResult, Score};
 use crossbeam_queue::SegQueue;
 use dashmap::{mapref::entry::Entry, DashMap};
 
-use crate::{null_lock::NullLock, stack::Stack, table::Table};
+use crate::{null_lock::NullLock, stack::Stack, table::Table, Metrics};
 
 struct PendingFrame<G>
 where
   G: Game,
 {
-  /// A pointer to the lifetime-protected stack.
-  ///
-  /// TODO: Do we need to lifetime-protect stacks? Or can we allocate all of
-  /// them up front and free them at the end?
+  /// A pointer to the stack. NullLock allows us to share this value between
+  /// threads, and it's our responsibility to make sure it's only accessed
+  /// behind locks/when a thread has exclusive access to it.
   stack: NullLock<*mut Stack<G>>,
   /// The index of the frame that is being awaited on by this entry in the
   /// pending states map.
@@ -96,12 +95,13 @@ where
   /// stack.
   ///
   /// Stack must be under a seize::Guard for this to be safe.
-  pub fn get_or_queue(&self, stack_ptr: *mut Stack<G>) -> LookupResult {
+  pub fn get_or_queue(&self, stack_ptr: *mut Stack<G>, metrics: &mut Metrics) -> LookupResult {
     let stack = unsafe { &mut *stack_ptr };
     let bottom_state = stack.bottom_frame().unwrap();
     let game = bottom_state.game();
     if let Some(score) = self.resolved_states.get(game) {
       if score.determined(stack.bottom_depth()) {
+        metrics.hits += 1;
         return LookupResult::Found { score };
       }
     }
@@ -122,6 +122,7 @@ where
           frame.queue_dependant_unlocked(stack_ptr);
         }
 
+        metrics.queues += 1;
         LookupResult::Queued
       }
       Entry::Vacant(entry) => {
@@ -131,6 +132,7 @@ where
         });
 
         // We claimed the pending slot.
+        metrics.claims += 1;
         LookupResult::NotFound
       }
     }

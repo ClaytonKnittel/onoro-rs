@@ -9,6 +9,7 @@ use abstract_game::{Game, GameResult, Score};
 use crate::{
   global_data::{GlobalData, LookupResult},
   stack::{Stack, StackType},
+  Metrics,
 };
 
 pub struct WorkerData<G, H>
@@ -20,6 +21,7 @@ where
   thread_idx: u32,
 
   globals: Arc<GlobalData<G, H>>,
+  metrics: Metrics,
 }
 
 impl<G, H> WorkerData<G, H>
@@ -30,11 +32,12 @@ where
     Self {
       thread_idx,
       globals,
+      metrics: Metrics::new(),
     }
   }
 }
 
-pub fn start_worker<G, H>(data: WorkerData<G, H>)
+pub fn start_worker<G, H>(mut data: WorkerData<G, H>)
 where
   G: Display + Game + Hash + Eq + 'static,
   G::Move: Display,
@@ -113,7 +116,7 @@ where
         GameResult::NotFinished => {
           // First, check if there is an immediate winning move.
 
-          match data.globals.get_or_queue(stack_ptr) {
+          match data.globals.get_or_queue(stack_ptr, &mut data.metrics) {
             LookupResult::Found { score } => {
               // Update best score in frame
               // println!("    [{}] Found", data.thread_idx);
@@ -139,7 +142,7 @@ where
     }
   }
 
-  println!("Worker {} done", data.thread_idx);
+  println!("Worker {} done: {:?}", data.thread_idx, data.metrics);
 }
 
 #[cfg(test)]
@@ -173,10 +176,7 @@ mod tests {
       ))))
     });
 
-    start_worker(WorkerData {
-      thread_idx: 0,
-      globals: globals.clone(),
-    });
+    start_worker(WorkerData::new(0, globals.clone()));
 
     for sticks in 1..=STICKS {
       let cached_score = globals.resolved_states_table().get(&Nim::new(sticks));
@@ -193,10 +193,7 @@ mod tests {
       .queue(0)
       .push(unsafe { NullLock::new(Box::into_raw(Box::new(Stack::make_root(Ttt::new(), DEPTH)))) });
 
-    start_worker(WorkerData {
-      thread_idx: 0,
-      globals: globals.clone(),
-    });
+    start_worker(WorkerData::new(0, globals.clone()));
 
     // The table should contain the completed initial state.
     assert!(globals
@@ -238,10 +235,7 @@ mod tests {
 
     println!("Solving...");
     let start = SystemTime::now();
-    start_worker(WorkerData {
-      thread_idx: 0,
-      globals: globals.clone(),
-    });
+    start_worker(WorkerData::new(0, globals.clone()));
     let end = SystemTime::now();
     println!("Done: {:?}", end.duration_since(start).unwrap());
 

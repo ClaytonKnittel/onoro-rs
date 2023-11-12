@@ -1,9 +1,8 @@
 #[derive(Clone, Debug, Default)]
 pub struct Metrics {
-  pub n_states: u64,
-  pub n_misses: u64,
-  pub n_hits: u64,
-  pub n_leaves: u64,
+  pub hits: u64,
+  pub queues: u64,
+  pub claims: u64,
 }
 
 impl Metrics {
@@ -17,10 +16,9 @@ impl std::ops::Add for Metrics {
 
   fn add(self, rhs: Self) -> Self::Output {
     Self {
-      n_states: self.n_states + rhs.n_states,
-      n_misses: self.n_misses + rhs.n_misses,
-      n_hits: self.n_hits + rhs.n_hits,
-      n_leaves: self.n_leaves + rhs.n_leaves,
+      hits: self.hits + rhs.hits,
+      queues: self.queues + rhs.queues,
+      claims: self.claims + rhs.claims,
     }
   }
 }

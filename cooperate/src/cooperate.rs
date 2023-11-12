@@ -404,11 +404,11 @@ mod tests {
       },
     );
 
-    // let guard = pprof::ProfilerGuardBuilder::default()
-    //   .frequency(1000)
-    //   .blocklist(&["libc", "libgcc", "pthread", "vdso"])
-    //   .build()
-    //   .unwrap();
+    let guard = pprof::ProfilerGuardBuilder::default()
+      .frequency(1000)
+      .blocklist(&["libc", "libgcc", "pthread", "vdso"])
+      .build()
+      .unwrap();
 
     println!("Solving...");
     let start = SystemTime::now();
@@ -431,10 +431,10 @@ mod tests {
     let end = SystemTime::now();
     println!("Done: {:?}", end.duration_since(start).unwrap());
 
-    // if let Ok(report) = guard.report().build() {
-    //   let file = std::fs::File::create("flamegraph.svg").unwrap();
-    //   report.flamegraph(file).unwrap();
-    // };
+    if let Ok(report) = guard.report().build() {
+      let file = std::fs::File::create("flamegraph.svg").unwrap();
+      report.flamegraph(file).unwrap();
+    };
 
     assert!(!any_bad);
 
