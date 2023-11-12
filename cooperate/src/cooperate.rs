@@ -467,7 +467,7 @@ mod tests {
   #[test]
   #[ignore]
   fn test_gomoku_5x5_p32() {
-    const DEPTH: u32 = 8;
+    const DEPTH: u32 = 9;
     const THREADS: u32 = 32;
 
     let globals = construct_globals(
