@@ -14,6 +14,7 @@ impl<G> Table<G, RandomState>
 where
   G: Game + Hash + Eq,
 {
+  #[cfg(test)]
   pub fn new() -> Self {
     Self {
       table: DashMap::new(),
@@ -32,12 +33,9 @@ where
     }
   }
 
+  #[cfg(test)]
   pub fn table(&self) -> &DashMap<G, Score, H> {
     &self.table
-  }
-
-  pub fn len(&self) -> usize {
-    self.table.len()
   }
 
   pub fn get(&self, key: &G) -> Option<Score> {

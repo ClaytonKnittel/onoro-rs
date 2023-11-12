@@ -127,10 +127,6 @@ where
     &self.game
   }
 
-  pub fn game_mut(&mut self) -> &mut G {
-    &mut self.game
-  }
-
   /// The current move to explore for this stack frame.
   pub fn current_move(&self) -> Option<G::Move> {
     self.current_move
