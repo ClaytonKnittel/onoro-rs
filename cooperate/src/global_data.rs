@@ -53,6 +53,7 @@ where
   G: Display + Game + Clone + Hash + Eq + 'static,
   G::Move: Display,
 {
+  #[cfg(test)]
   pub fn new(search_depth: u32, num_threads: u32) -> Self {
     Self {
       queues: (0..num_threads).map(|_| SegQueue::new()).collect(),

@@ -7,7 +7,7 @@ use std::{
 
 use abstract_game::{Game, Score};
 
-use crate::{array::Array, transparent_iterator::TransparentIterator};
+use crate::transparent_iterator::TransparentIterator;
 
 /// Algorithm:
 /// ```rs

@@ -1,7 +1,7 @@
 use std::{
   collections::{hash_map::RandomState, HashSet},
   fmt::{Debug, Display},
-  hash::Hash,
+  hash::{BuildHasher, Hash},
   sync::Arc,
 };
 
@@ -58,13 +58,18 @@ where
     .collect()
 }
 
-fn construct_globals<G>(game: &G, options: Options) -> Arc<GlobalData<G, RandomState>>
+fn construct_globals<G, H>(game: &G, options: Options, hasher: H) -> Arc<GlobalData<G, H>>
 where
   G: Game + Display + Hash + PartialEq + Eq + 'static,
   G::Move: Display,
   G::PlayerIdentifier: Debug,
+  H: BuildHasher + Clone,
 {
-  let globals = Arc::new(GlobalData::new(options.search_depth, options.num_threads));
+  let globals = Arc::new(GlobalData::with_hasher(
+    options.search_depth,
+    options.num_threads,
+    hasher,
+  ));
 
   let mut rng = thread_rng();
   for stack in generate_frontier(game.clone(), &options).into_iter() {
@@ -83,13 +88,24 @@ where
   G::Move: Display,
   G::PlayerIdentifier: Debug,
 {
-  let globals = construct_globals(game, options);
+  let globals = construct_globals(game, options, RandomState::new());
+  start_worker(WorkerData::new(0, globals.clone()));
+}
+
+pub fn solve_with_hasher<G, H>(game: &G, options: Options, hasher: H)
+where
+  G: Game + Display + Hash + PartialEq + Eq + 'static,
+  G::Move: Display,
+  G::PlayerIdentifier: Debug,
+  H: BuildHasher + Clone,
+{
+  let globals = construct_globals(game, options, hasher);
   start_worker(WorkerData::new(0, globals.clone()));
 }
 
 #[cfg(test)]
 mod tests {
-  use std::{thread, time::SystemTime};
+  use std::{collections::hash_map::RandomState, thread, time::SystemTime};
 
   use abstract_game::{Game, GameResult};
 
@@ -115,6 +131,7 @@ mod tests {
         num_threads: 1,
         unit_depth: 0,
       },
+      RandomState::new(),
     );
 
     start_worker(WorkerData::new(0, globals.clone()));
@@ -137,6 +154,7 @@ mod tests {
         num_threads: 2,
         unit_depth: 1,
       },
+      RandomState::new(),
     );
 
     let thread_handles: Vec<_> = (0..2)
@@ -171,6 +189,7 @@ mod tests {
         num_threads: THREADS,
         unit_depth: 1,
       },
+      RandomState::new(),
     );
 
     let thread_handles: Vec<_> = (0..THREADS)
@@ -223,6 +242,7 @@ mod tests {
         num_threads: THREADS,
         unit_depth: 2,
       },
+      RandomState::new(),
     );
 
     let thread_handles: Vec<_> = (0..THREADS)
@@ -276,6 +296,7 @@ mod tests {
         num_threads: THREADS,
         unit_depth: 3,
       },
+      RandomState::new(),
     );
 
     println!("Solving...");
@@ -339,6 +360,7 @@ mod tests {
         num_threads: THREADS,
         unit_depth: 3,
       },
+      RandomState::new(),
     );
 
     println!("Solving...");
@@ -402,6 +424,7 @@ mod tests {
         num_threads: THREADS,
         unit_depth: 5,
       },
+      RandomState::new(),
     );
 
     let guard = pprof::ProfilerGuardBuilder::default()
@@ -477,6 +500,7 @@ mod tests {
         num_threads: THREADS,
         unit_depth: 5,
       },
+      RandomState::new(),
     );
 
     let guard = pprof::ProfilerGuardBuilder::default()
