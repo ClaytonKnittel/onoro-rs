@@ -47,6 +47,7 @@ pub enum TileState {
 /// to a limitation in the rust compiler, generic const expressions are still
 /// experimental. See: https://github.com/rust-lang/rust/issues/76560.
 #[derive(Clone)]
+#[repr(align(8))]
 pub struct Onoro<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> {
   /// Array of indexes of pawn positions. Odd entries (even index) are black
   /// pawns, the others are white. Filled from lowest to highest index as the

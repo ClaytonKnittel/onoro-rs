@@ -2,7 +2,7 @@ use std::{fmt::Display, hash::Hash};
 
 use abstract_game::{Game, GameMoveGenerator, GameResult, Score};
 
-use super::search::find_best_move_serial;
+use crate::serial_search::find_best_move_serial;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum TttPlayer {

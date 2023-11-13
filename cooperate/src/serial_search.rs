@@ -8,7 +8,7 @@ use abstract_game::{Game, GameResult, Score, ScoreValue};
 
 use crate::table::Table;
 
-fn check_score<G, H>(game: G, score: Score, table: &mut Table<G, H>)
+fn check_score<G, H>(game: G, score: Score, table: &Table<G, H>)
 where
   G: Game + Hash + Eq,
   H: BuildHasher + Clone,
@@ -22,10 +22,10 @@ where
 /// A serial, non-cached min-max search of the game state.
 ///
 /// TODO: make this alpha-beta search.
-pub fn do_find_best_move_serial<G: Clone + Game, H>(
+pub fn find_best_move_serial_table<G: Clone + Game, H>(
   game: &G,
   depth: u32,
-  table: &mut Table<G, H>,
+  table: &Table<G, H>,
 ) -> (Option<Score>, Option<G::Move>)
 where
   G: Display + Game + Hash + Eq,
@@ -68,7 +68,7 @@ where
       GameResult::NotFinished => {}
     }
 
-    let (score, _) = do_find_best_move_serial(&g, depth - 1, table);
+    let (score, _) = find_best_move_serial_table(&g, depth - 1, table);
     let score = match score {
       Some(score) => score.backstep(),
       // Consider winning by no legal moves as not winning until after the
@@ -110,8 +110,8 @@ pub fn find_best_move_serial<G>(
 where
   G: Display + Clone + Game + Hash + PartialEq + Eq,
 {
-  let mut table = Table::new();
+  let table = Table::new();
 
-  let (score, m) = do_find_best_move_serial(game, depth, &mut table);
+  let (score, m) = find_best_move_serial_table(game, depth, &table);
   (score, m, table)
 }

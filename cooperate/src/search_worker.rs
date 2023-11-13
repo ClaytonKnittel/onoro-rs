@@ -154,13 +154,9 @@ mod tests {
   use crate::{
     global_data::GlobalData,
     null_lock::NullLock,
+    serial_search::{find_best_move_serial, find_best_move_serial_table},
     stack::Stack,
-    test::{
-      gomoku::Gomoku,
-      nim::Nim,
-      search::{do_find_best_move_serial, find_best_move_serial},
-      tic_tac_toe::Ttt,
-    },
+    test::{gomoku::Gomoku, nim::Nim, tic_tac_toe::Ttt},
   };
 
   use super::{start_worker, WorkerData};
@@ -252,7 +248,7 @@ mod tests {
       assert_eq!(state.key().finished(), GameResult::NotFinished);
 
       let expected_score = table.get(state.key()).unwrap_or_else(|| {
-        do_find_best_move_serial(state.key(), DEPTH, &mut table);
+        find_best_move_serial_table(state.key(), DEPTH, &mut table);
         table.get(state.key()).unwrap()
       });
 

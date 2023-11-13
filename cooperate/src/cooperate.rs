@@ -5,23 +5,25 @@ use std::{
   sync::Arc,
 };
 
-use abstract_game::Game;
+use abstract_game::{Game, Score};
 use rand::prelude::*;
 
 use crate::{
   global_data::GlobalData,
   null_lock::NullLock,
   search_worker::{start_worker, WorkerData},
+  serial_search::find_best_move_serial_table,
   stack::Stack,
 };
 
+#[derive(Clone)]
 pub struct Options {
   /// The number of worker threads to use in the thread pool.
-  num_threads: u32,
+  pub num_threads: u32,
   /// The depth to search the game to.
-  search_depth: u32,
+  pub search_depth: u32,
   /// The depth to expand to for generating work units.
-  unit_depth: u32,
+  pub unit_depth: u32,
 }
 
 fn generate_frontier<G>(initial_state: G, options: &Options) -> Vec<*mut Stack<G>>
@@ -82,25 +84,31 @@ where
   globals
 }
 
-pub fn solve<G>(game: &G, options: Options)
+pub fn solve<G>(game: &G, options: Options) -> Score
 where
   G: Game + Display + Hash + PartialEq + Eq + 'static,
   G::Move: Display,
   G::PlayerIdentifier: Debug,
 {
-  let globals = construct_globals(game, options, RandomState::new());
+  let globals = construct_globals(game, options.clone(), RandomState::new());
   start_worker(WorkerData::new(0, globals.clone()));
+  find_best_move_serial_table(game, options.search_depth, globals.resolved_states_table())
+    .0
+    .unwrap()
 }
 
-pub fn solve_with_hasher<G, H>(game: &G, options: Options, hasher: H)
+pub fn solve_with_hasher<G, H>(game: &G, options: Options, hasher: H) -> Score
 where
   G: Game + Display + Hash + PartialEq + Eq + 'static,
   G::Move: Display,
   G::PlayerIdentifier: Debug,
   H: BuildHasher + Clone,
 {
-  let globals = construct_globals(game, options, hasher);
+  let globals = construct_globals(game, options.clone(), hasher);
   start_worker(WorkerData::new(0, globals.clone()));
+  find_best_move_serial_table(game, options.search_depth, globals.resolved_states_table())
+    .0
+    .unwrap()
 }
 
 #[cfg(test)]
@@ -112,12 +120,8 @@ mod tests {
   use crate::{
     cooperate::construct_globals,
     search_worker::{start_worker, WorkerData},
-    test::{
-      gomoku::Gomoku,
-      nim::Nim,
-      search::{do_find_best_move_serial, find_best_move_serial},
-      tic_tac_toe::Ttt,
-    },
+    serial_search::{find_best_move_serial, find_best_move_serial_table},
+    test::{gomoku::Gomoku, nim::Nim, tic_tac_toe::Ttt},
   };
 
   #[test]
@@ -330,7 +334,7 @@ mod tests {
       assert_eq!(state.key().finished(), GameResult::NotFinished);
 
       let expected_score = table.get(state.key()).unwrap_or_else(|| {
-        do_find_best_move_serial(state.key(), DEPTH, &mut table);
+        find_best_move_serial_table(state.key(), DEPTH, &mut table);
         table.get(state.key()).unwrap()
       });
 
@@ -394,7 +398,7 @@ mod tests {
       assert_eq!(state.key().finished(), GameResult::NotFinished);
 
       let expected_score = table.get(state.key()).unwrap_or_else(|| {
-        do_find_best_move_serial(state.key(), DEPTH, &mut table);
+        find_best_move_serial_table(state.key(), DEPTH, &mut table);
         table.get(state.key()).unwrap()
       });
 
@@ -427,12 +431,6 @@ mod tests {
       RandomState::new(),
     );
 
-    let guard = pprof::ProfilerGuardBuilder::default()
-      .frequency(1000)
-      .blocklist(&["libc", "libgcc", "pthread", "vdso"])
-      .build()
-      .unwrap();
-
     println!("Solving...");
     let start = SystemTime::now();
     let thread_handles: Vec<_> = (0..THREADS)
@@ -454,13 +452,7 @@ mod tests {
     let end = SystemTime::now();
     println!("Done: {:?}", end.duration_since(start).unwrap());
 
-    if let Ok(report) = guard.report().build() {
-      let file = std::fs::File::create("flamegraph_4x4_p32.svg").unwrap();
-      report.flamegraph(file).unwrap();
-    };
-
     assert!(!any_bad);
-    return;
 
     // Compute the ground truth table.
     let mut table = find_best_move_serial(&Gomoku::new(4, 4, 4), DEPTH).2;
@@ -470,7 +462,7 @@ mod tests {
       assert_eq!(state.key().finished(), GameResult::NotFinished);
 
       let expected_score = table.get(state.key()).unwrap_or_else(|| {
-        do_find_best_move_serial(state.key(), DEPTH, &mut table);
+        find_best_move_serial_table(state.key(), DEPTH, &mut table);
         table.get(state.key()).unwrap()
       });
 
@@ -503,12 +495,6 @@ mod tests {
       RandomState::new(),
     );
 
-    let guard = pprof::ProfilerGuardBuilder::default()
-      .frequency(1000)
-      .blocklist(&["libc", "libgcc", "pthread", "vdso"])
-      .build()
-      .unwrap();
-
     println!("Solving...");
     let start = SystemTime::now();
     let thread_handles: Vec<_> = (0..THREADS)
@@ -530,13 +516,7 @@ mod tests {
     let end = SystemTime::now();
     println!("Done: {:?}", end.duration_since(start).unwrap());
 
-    if let Ok(report) = guard.report().build() {
-      let file = std::fs::File::create("flamegraph_5x5_p32.svg").unwrap();
-      report.flamegraph(file).unwrap();
-    };
-
     assert!(!any_bad);
-    return;
 
     // Compute the ground truth table.
     let mut table = find_best_move_serial(&Gomoku::new(5, 5, 4), DEPTH).2;
@@ -546,7 +526,7 @@ mod tests {
       assert_eq!(state.key().finished(), GameResult::NotFinished);
 
       let expected_score = table.get(state.key()).unwrap_or_else(|| {
-        do_find_best_move_serial(state.key(), DEPTH, &mut table);
+        find_best_move_serial_table(state.key(), DEPTH, &mut table);
         table.get(state.key()).unwrap()
       });
 

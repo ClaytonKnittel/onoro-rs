@@ -14,7 +14,6 @@ impl<G> Table<G, RandomState>
 where
   G: Game + Hash + Eq,
 {
-  #[cfg(test)]
   pub fn new() -> Self {
     Self {
       table: DashMap::new(),
