@@ -1,6 +1,6 @@
+use crate::metrics::Metrics;
 use std::{sync::Arc, time::Instant};
 
-use cooperate::Metrics;
 use onoro::{Move, Onoro16, OnoroView};
 use rand::Rng;
 
@@ -10,6 +10,7 @@ use crate::{
   search::{find_best_move, find_best_move_par_old, find_best_move_table},
 };
 
+mod metrics;
 mod onoro_table;
 mod par_search;
 mod par_search_opts;
@@ -17,8 +18,8 @@ mod search;
 
 #[allow(dead_code)]
 fn validate_moves(onoro: &Onoro16) {
-  let mut move_iter = onoro.each_p1_move();
-  for m in onoro.each_p1_move() {
+  let mut move_iter = onoro.each_move();
+  for m in onoro.each_move() {
     assert_eq!(move_iter.next().unwrap(), m);
   }
   assert!(move_iter.next().is_none());
@@ -26,17 +27,17 @@ fn validate_moves(onoro: &Onoro16) {
 
 #[allow(dead_code)]
 fn first_move(onoro: &Onoro16) -> Move {
-  onoro.each_p1_move().next().unwrap()
+  onoro.each_move().next().unwrap()
 }
 
 #[allow(dead_code)]
 fn nth_move(onoro: &Onoro16, idx: usize) -> Move {
-  onoro.each_p2_move().nth(idx).unwrap()
+  onoro.each_move().nth(idx).unwrap()
 }
 
 #[allow(dead_code)]
 fn random_move(onoro: &Onoro16) -> Move {
-  let moves = onoro.each_p1_move().collect::<Vec<_>>();
+  let moves = onoro.each_move().collect::<Vec<_>>();
 
   let mut rng = rand::thread_rng();
   let n = rng.gen_range(0..moves.len());
@@ -46,7 +47,7 @@ fn random_move(onoro: &Onoro16) -> Move {
 #[allow(dead_code)]
 fn to_phase2(onoro: &mut Onoro16) {
   while onoro.in_phase1() {
-    for m in onoro.each_p1_move() {
+    for m in onoro.each_move() {
       let mut o2 = onoro.clone();
       o2.make_move(m);
       if o2.finished().is_none() {
@@ -65,7 +66,7 @@ fn explore(onoro: &Onoro16, depth: u32) -> u64 {
     return total_states;
   }
 
-  for m in onoro.each_p1_move() {
+  for m in onoro.each_move() {
     let mut onoro2 = onoro.clone();
     onoro2.make_move(m);
     total_states += explore(&onoro2, depth - 1);
@@ -82,7 +83,7 @@ fn explore_p2(onoro: &Onoro16, depth: u32) -> u64 {
     return total_states;
   }
 
-  for m in onoro.each_p2_move() {
+  for m in onoro.each_move() {
     let mut onoro2 = onoro.clone();
     onoro2.make_move(m);
     total_states += explore_p2(&onoro2, depth - 1);

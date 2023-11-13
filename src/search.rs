@@ -1,11 +1,11 @@
 use std::{collections::HashSet, hash::Hash, sync::Arc, thread};
 
 use abstract_game::{Score, ScoreValue};
-use cooperate::Metrics;
 use onoro::{Move, Onoro16, Onoro16View, OnoroView};
 use rand::{seq::SliceRandom, thread_rng};
 
 use crate::{
+  metrics::Metrics,
   onoro_table::{BuildPassThroughHasher, OnoroTable},
   par_search_opts::ParSearchOptions,
 };

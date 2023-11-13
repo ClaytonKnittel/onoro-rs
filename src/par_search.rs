@@ -1,10 +1,9 @@
 use std::sync::Arc;
 
 use abstract_game::{Score, ScoreValue};
-use cooperate::Metrics;
 use onoro::{Move, Onoro16, OnoroView};
 
-use crate::{onoro_table::OnoroTable, search::find_best_move};
+use crate::{metrics::Metrics, onoro_table::OnoroTable, search::find_best_move};
 
 struct SearchWorker {
   table: Arc<OnoroTable>,

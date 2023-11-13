@@ -1,3 +1,4 @@
+use crate::{Move, MoveGenerator};
 use std::{fmt::Display, hash::Hash};
 
 use algebra::{
@@ -5,6 +6,8 @@ use algebra::{
   monoid::Monoid,
   ordinal::Ordinal,
 };
+
+use abstract_game::{Game, GameMoveGenerator, GameResult};
 
 use crate::{
   canonicalize::{board_symm_state, BoardSymmetryState},
@@ -32,6 +35,7 @@ pub struct OnoroView<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize>
 }
 
 impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroView<N, N2, ADJ_CNT_SIZE> {
+  /// TODO: Make new lazy
   pub fn new(onoro: Onoro<N, N2, ADJ_CNT_SIZE>) -> Self {
     let symm_state = board_symm_state(&onoro);
 
@@ -55,10 +59,6 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroView<N, N2
 
   pub fn onoro(&self) -> &Onoro<N, N2, ADJ_CNT_SIZE> {
     &self.onoro
-  }
-
-  pub fn mut_onoro(&mut self) -> &mut Onoro<N, N2, ADJ_CNT_SIZE> {
-    &mut self.onoro
   }
 
   fn find_canonical_orientation_d6(
@@ -278,6 +278,52 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Display
       },
       self.hash
     )
+  }
+}
+
+pub struct ViewMoveGenerator<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> {
+  move_gen: MoveGenerator<N, N2, ADJ_CNT_SIZE>,
+}
+
+impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> GameMoveGenerator
+  for ViewMoveGenerator<N, N2, ADJ_CNT_SIZE>
+{
+  type Item = Move;
+  type Game = OnoroView<N, N2, ADJ_CNT_SIZE>;
+
+  fn next(&mut self, view: &Self::Game) -> Option<Self::Item> {
+    self.move_gen.next(view.onoro())
+  }
+}
+
+impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Game
+  for OnoroView<N, N2, ADJ_CNT_SIZE>
+{
+  type Move = Move;
+  type MoveGenerator = ViewMoveGenerator<N, N2, ADJ_CNT_SIZE>;
+  type PlayerIdentifier = PawnColor;
+
+  fn move_generator(&self) -> Self::MoveGenerator {
+    ViewMoveGenerator {
+      move_gen: self.onoro().each_move_gen(),
+    }
+  }
+
+  fn make_move(&mut self, m: Self::Move) {
+    let mut onoro = self.onoro().clone();
+    onoro.make_move(m);
+    *self = OnoroView::new(onoro);
+  }
+
+  fn current_player(&self) -> Self::PlayerIdentifier {
+    self.onoro().player_color()
+  }
+
+  fn finished(&self) -> GameResult<Self::PlayerIdentifier> {
+    match self.onoro().finished() {
+      Some(color) => GameResult::Win(color),
+      None => GameResult::NotFinished,
+    }
   }
 }
 

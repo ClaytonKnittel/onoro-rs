@@ -1,0 +1,1526 @@
+
+chdir(/usr/share/vim)
+fchdir() to previous dir
+sourcing "$VIM/vimrc"
+chdir(/usr/share/vim/vim90)
+fchdir() to previous dir
+line 8: sourcing "/usr/share/vim/vim90/debian.vim"
+finished sourcing /usr/share/vim/vim90/debian.vim
+continuing in /usr/share/vim/vimrc
+chdir(/usr/share/vim/vim90/syntax)
+fchdir() to previous dir
+line 25: sourcing "/usr/share/vim/vim90/syntax/syntax.vim"
+chdir(/usr/share/vim/vim90/syntax)
+fchdir() to previous dir
+line 19: sourcing "/usr/share/vim/vim90/syntax/synload.vim"
+chdir(/usr/share/vim/vim90/syntax)
+fchdir() to previous dir
+line 21: sourcing "/usr/share/vim/vim90/syntax/syncolor.vim"
+chdir(/usr/share/vim/vim90/colors/lists)
+fchdir() to previous dir
+line 53: sourcing "/usr/share/vim/vim90/colors/lists/default.vim"
+finished sourcing /usr/share/vim/vim90/colors/lists/default.vim
+continuing in /usr/share/vim/vim90/syntax/syncolor.vim
+finished sourcing /usr/share/vim/vim90/syntax/syncolor.vim
+continuing in /usr/share/vim/vim90/syntax/synload.vim
+finished sourcing /usr/share/vim/vim90/syntax/synload.vim
+continuing in /usr/share/vim/vim90/syntax/syntax.vim
+chdir(/usr/share/vim/vim90)
+fchdir() to previous dir
+line 25: sourcing "/usr/share/vim/vim90/filetype.vim"
+not found in 'runtimepath': "ftdetect/*.vim"
+finished sourcing /usr/share/vim/vim90/filetype.vim
+continuing in /usr/share/vim/vim90/syntax/syntax.vim
+Executing FileType Autocommands for "*"
+autocommand 0verbose exe "set syntax=" . expand("<amatch>")
+
+Executing BufRead Autocommands for "*.rs"
+autocommand setf rust
+
+Executing FileType Autocommands for "*"
+autocommand 0verbose exe "set syntax=" . expand("<amatch>")
+
+Executing BufRead Autocommands for "*"
+autocommand if !did_filetype() && expand("<amatch>") !~ g:ft_ignore_pat | runtime! scripts.vim | endif
+
+Executing BufRead Autocommands for "*"
+autocommand if !did_filetype() && expand("<amatch>") !~ g:ft_ignore_pat    && (getline(1) =~ '^#' || getline(2) =~ '^#' || getline(3) =~ '^#'^I|| getline(4) =~ '^#' || getline(5) =~ '^#') |   setf FALLBACK conf | endif
+
+finished sourcing /usr/share/vim/vim90/syntax/syntax.vim
+continuing in /usr/share/vim/vimrc
+finished sourcing $VIM/vimrc
+chdir(/home/cknittel)
+fchdir() to previous dir
+sourcing "$HOME/.vimrc"
+chdir(/usr/share/vim/vim90)
+fchdir() to previous dir
+line 2: sourcing "/usr/share/vim/vim90/ftoff.vim"
+finished sourcing /usr/share/vim/vim90/ftoff.vim
+continuing in /home/cknittel/.vimrc
+chdir(/home/cknittel/.vim/bundle/Vundle.vim/autoload)
+fchdir() to previous dir
+line 6: sourcing "/home/cknittel/.vim/bundle/Vundle.vim/autoload/vundle.vim"
+finished sourcing /home/cknittel/.vim/bundle/Vundle.vim/autoload/vundle.vim
+continuing in /home/cknittel/.vimrc
+chdir(/home/cknittel/.vim/bundle/Vundle.vim/autoload/vundle)
+fchdir() to previous dir
+line 4: sourcing "/home/cknittel/.vim/bundle/Vundle.vim/autoload/vundle/config.vim"
+finished sourcing /home/cknittel/.vim/bundle/Vundle.vim/autoload/vundle/config.vim
+continuing in vundle#rc
+chdir(/usr/share/vim/vim90)
+fchdir() to previous dir
+line 66: sourcing "/usr/share/vim/vim90/filetype.vim"
+chdir(/home/cknittel/.vim/bundle/vim-glsl/ftdetect)
+fchdir() to previous dir
+line 2626: sourcing "/home/cknittel/.vim/bundle/vim-glsl/ftdetect/glsl.vim"
+finished sourcing /home/cknittel/.vim/bundle/vim-glsl/ftdetect/glsl.vim
+continuing in /usr/share/vim/vim90/filetype.vim
+chdir(/home/cknittel/.vim/bundle/vim-opencl/ftdetect)
+fchdir() to previous dir
+line 2626: sourcing "/home/cknittel/.vim/bundle/vim-opencl/ftdetect/cl.vim"
+finished sourcing /home/cknittel/.vim/bundle/vim-opencl/ftdetect/cl.vim
+continuing in /usr/share/vim/vim90/filetype.vim
+chdir(/home/cknittel/.vim/bundle/yats.vim/ftdetect)
+fchdir() to previous dir
+line 2626: sourcing "/home/cknittel/.vim/bundle/yats.vim/ftdetect/typescript.vim"
+finished sourcing /home/cknittel/.vim/bundle/yats.vim/ftdetect/typescript.vim
+continuing in /usr/share/vim/vim90/filetype.vim
+chdir(/home/cknittel/.vim/bundle/yats.vim/ftdetect)
+fchdir() to previous dir
+line 2626: sourcing "/home/cknittel/.vim/bundle/yats.vim/ftdetect/typescriptreact.vim"
+finished sourcing /home/cknittel/.vim/bundle/yats.vim/ftdetect/typescriptreact.vim
+continuing in /usr/share/vim/vim90/filetype.vim
+chdir(/home/cknittel/.vim/bundle/rust.vim/ftdetect)
+fchdir() to previous dir
+line 2626: sourcing "/home/cknittel/.vim/bundle/rust.vim/ftdetect/rust.vim"
+finished sourcing /home/cknittel/.vim/bundle/rust.vim/ftdetect/rust.vim
+continuing in /usr/share/vim/vim90/filetype.vim
+finished sourcing /usr/share/vim/vim90/filetype.vim
+continuing in /home/cknittel/.vimrc
+chdir(/usr/share/vim/vim90)
+fchdir() to previous dir
+line 66: sourcing "/usr/share/vim/vim90/ftplugin.vim"
+finished sourcing /usr/share/vim/vim90/ftplugin.vim
+continuing in /home/cknittel/.vimrc
+chdir(/usr/share/vim/vim90)
+fchdir() to previous dir
+line 66: sourcing "/usr/share/vim/vim90/indent.vim"
+finished sourcing /usr/share/vim/vim90/indent.vim
+continuing in /home/cknittel/.vimrc
+chdir(/usr/share/vim/vim90/syntax)
+fchdir() to previous dir
+line 67: sourcing "/usr/share/vim/vim90/syntax/syntax.vim"
+chdir(/usr/share/vim/vim90/syntax)
+fchdir() to previous dir
+line 15: sourcing "/usr/share/vim/vim90/syntax/nosyntax.vim"
+Executing BufEnter Autocommands for "*"
+autocommand syn clear
+
+autocommand if exists("b:current_syntax") | unlet b:current_syntax | endif
+
+finished sourcing /usr/share/vim/vim90/syntax/nosyntax.vim
+continuing in /usr/share/vim/vim90/syntax/syntax.vim
+chdir(/usr/share/vim/vim90/syntax)
+fchdir() to previous dir
+line 19: sourcing "/usr/share/vim/vim90/syntax/synload.vim"
+chdir(/usr/share/vim/vim90/syntax)
+fchdir() to previous dir
+line 21: sourcing "/usr/share/vim/vim90/syntax/syncolor.vim"
+finished sourcing /usr/share/vim/vim90/syntax/syncolor.vim
+continuing in /usr/share/vim/vim90/syntax/synload.vim
+finished sourcing /usr/share/vim/vim90/syntax/synload.vim
+continuing in /usr/share/vim/vim90/syntax/syntax.vim
+Executing FileType Autocommands for "*"
+autocommand 0verbose exe "set syntax=" . expand("<amatch>")
+
+finished sourcing /usr/share/vim/vim90/syntax/syntax.vim
+continuing in /home/cknittel/.vimrc
+chdir(/usr/share/vim/vim90)
+fchdir() to previous dir
+line 72: sourcing "/usr/share/vim/vim90/filetype.vim"
+finished sourcing /usr/share/vim/vim90/filetype.vim
+continuing in /home/cknittel/.vimrc
+chdir(/usr/share/vim/vim90)
+fchdir() to previous dir
+line 72: sourcing "/usr/share/vim/vim90/ftplugin.vim"
+finished sourcing /usr/share/vim/vim90/ftplugin.vim
+continuing in /home/cknittel/.vimrc
+chdir(/usr/share/vim/vim90)
+fchdir() to previous dir
+line 72: sourcing "/usr/share/vim/vim90/indent.vim"
+finished sourcing /usr/share/vim/vim90/indent.vim
+continuing in /home/cknittel/.vimrc
+chdir(/usr/share/vim/vim90/colors/lists)
+fchdir() to previous dir
+line 91: sourcing "/usr/share/vim/vim90/colors/lists/default.vim"
+finished sourcing /usr/share/vim/vim90/colors/lists/default.vim
+continuing in /home/cknittel/.vimrc
+chdir(/home/cknittel/.vim/bundle/gruvbox/colors)
+fchdir() to previous dir
+line 91: sourcing "/home/cknittel/.vim/bundle/gruvbox/colors/gruvbox.vim"
+chdir(/usr/share/vim/vim90/syntax)
+fchdir() to previous dir
+line 13: sourcing "/usr/share/vim/vim90/syntax/syncolor.vim"
+finished sourcing /usr/share/vim/vim90/syntax/syncolor.vim
+continuing in /home/cknittel/.vim/bundle/gruvbox/colors/gruvbox.vim
+chdir(/usr/share/vim/vim90/syntax)
+fchdir() to previous dir
+line 15: sourcing "/usr/share/vim/vim90/syntax/syncolor.vim"
+finished sourcing /usr/share/vim/vim90/syntax/syncolor.vim
+continuing in /home/cknittel/.vim/bundle/gruvbox/colors/gruvbox.vim
+finished sourcing /home/cknittel/.vim/bundle/gruvbox/colors/gruvbox.vim
+continuing in /home/cknittel/.vimrc
+chdir(/usr/share/vim/vim90/colors/lists)
+fchdir() to previous dir
+line 95: sourcing "/usr/share/vim/vim90/colors/lists/default.vim"
+finished sourcing /usr/share/vim/vim90/colors/lists/default.vim
+continuing in /home/cknittel/.vimrc
+chdir(/home/cknittel/.vim/bundle/gruvbox/colors)
+fchdir() to previous dir
+line 95: sourcing "/home/cknittel/.vim/bundle/gruvbox/colors/gruvbox.vim"
+chdir(/usr/share/vim/vim90/syntax)
+fchdir() to previous dir
+line 13: sourcing "/usr/share/vim/vim90/syntax/syncolor.vim"
+finished sourcing /usr/share/vim/vim90/syntax/syncolor.vim
+continuing in /home/cknittel/.vim/bundle/gruvbox/colors/gruvbox.vim
+chdir(/usr/share/vim/vim90/syntax)
+fchdir() to previous dir
+line 15: sourcing "/usr/share/vim/vim90/syntax/syncolor.vim"
+finished sourcing /usr/share/vim/vim90/syntax/syncolor.vim
+continuing in /home/cknittel/.vim/bundle/gruvbox/colors/gruvbox.vim
+finished sourcing /home/cknittel/.vim/bundle/gruvbox/colors/gruvbox.vim
+continuing in /home/cknittel/.vimrc
+finished sourcing $HOME/.vimrc
+not found in 'packpath': "pack/*/start/*"
+chdir(/home/cknittel/.vim/bundle/vim-lsp/plugin)
+fchdir() to previous dir
+sourcing "/home/cknittel/.vim/bundle/vim-lsp/plugin/lsp.vim"
+chdir(/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp)
+fchdir() to previous dir
+line 25: sourcing "/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/utils.vim"
+finished sourcing /home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/utils.vim
+continuing in /home/cknittel/.vim/bundle/vim-lsp/plugin/lsp.vim
+finished sourcing /home/cknittel/.vim/bundle/vim-lsp/plugin/lsp.vim
+chdir(/home/cknittel/.vim/bundle/vim-lsp-settings/plugin)
+fchdir() to previous dir
+sourcing "/home/cknittel/.vim/bundle/vim-lsp-settings/plugin/lsp_settings.vim"
+chdir(/home/cknittel/.vim/bundle/vim-lsp-settings/autoload)
+fchdir() to previous dir
+line 19: sourcing "/home/cknittel/.vim/bundle/vim-lsp-settings/autoload/lsp_settings.vim"
+finished sourcing /home/cknittel/.vim/bundle/vim-lsp-settings/autoload/lsp_settings.vim
+continuing in /home/cknittel/.vim/bundle/vim-lsp-settings/plugin/lsp_settings.vim
+chdir(/home/cknittel/.vim/bundle/vim-lsp-settings/autoload/lsp_settings)
+fchdir() to previous dir
+line 30: sourcing "/home/cknittel/.vim/bundle/vim-lsp-settings/autoload/lsp_settings/utils.vim"
+finished sourcing /home/cknittel/.vim/bundle/vim-lsp-settings/autoload/lsp_settings/utils.vim
+continuing in lsp_settings#init
+chdir(/home/cknittel/.vim/bundle/vim-lsp-settings/autoload/lsp_settings)
+fchdir() to previous dir
+line 13: sourcing "/home/cknittel/.vim/bundle/vim-lsp-settings/autoload/lsp_settings/profile.vim"
+finished sourcing /home/cknittel/.vim/bundle/vim-lsp-settings/autoload/lsp_settings/profile.vim
+continuing in <SNR>27_vim_lsp_load_or_suggest
+chdir(onoro/src)
+fchdir() to previous dir
+finished sourcing /home/cknittel/.vim/bundle/vim-lsp-settings/plugin/lsp_settings.vim
+chdir(/home/cknittel/.vim/bundle/rust.vim/plugin)
+fchdir() to previous dir
+sourcing "/home/cknittel/.vim/bundle/rust.vim/plugin/cargo.vim"
+finished sourcing /home/cknittel/.vim/bundle/rust.vim/plugin/cargo.vim
+chdir(/home/cknittel/.vim/bundle/rust.vim/plugin)
+fchdir() to previous dir
+sourcing "/home/cknittel/.vim/bundle/rust.vim/plugin/rust.vim"
+finished sourcing /home/cknittel/.vim/bundle/rust.vim/plugin/rust.vim
+chdir(/usr/share/vim/vim90/plugin)
+fchdir() to previous dir
+sourcing "/usr/share/vim/vim90/plugin/getscriptPlugin.vim"
+finished sourcing /usr/share/vim/vim90/plugin/getscriptPlugin.vim
+chdir(/usr/share/vim/vim90/plugin)
+fchdir() to previous dir
+sourcing "/usr/share/vim/vim90/plugin/gzip.vim"
+finished sourcing /usr/share/vim/vim90/plugin/gzip.vim
+chdir(/usr/share/vim/vim90/plugin)
+fchdir() to previous dir
+sourcing "/usr/share/vim/vim90/plugin/logiPat.vim"
+finished sourcing /usr/share/vim/vim90/plugin/logiPat.vim
+chdir(/usr/share/vim/vim90/plugin)
+fchdir() to previous dir
+sourcing "/usr/share/vim/vim90/plugin/manpager.vim"
+finished sourcing /usr/share/vim/vim90/plugin/manpager.vim
+chdir(/usr/share/vim/vim90/plugin)
+fchdir() to previous dir
+sourcing "/usr/share/vim/vim90/plugin/matchparen.vim"
+finished sourcing /usr/share/vim/vim90/plugin/matchparen.vim
+chdir(/usr/share/vim/vim90/plugin)
+fchdir() to previous dir
+sourcing "/usr/share/vim/vim90/plugin/netrwPlugin.vim"
+finished sourcing /usr/share/vim/vim90/plugin/netrwPlugin.vim
+chdir(/usr/share/vim/vim90/plugin)
+fchdir() to previous dir
+sourcing "/usr/share/vim/vim90/plugin/rrhelper.vim"
+finished sourcing /usr/share/vim/vim90/plugin/rrhelper.vim
+chdir(/usr/share/vim/vim90/plugin)
+fchdir() to previous dir
+sourcing "/usr/share/vim/vim90/plugin/spellfile.vim"
+finished sourcing /usr/share/vim/vim90/plugin/spellfile.vim
+chdir(/usr/share/vim/vim90/plugin)
+fchdir() to previous dir
+sourcing "/usr/share/vim/vim90/plugin/tarPlugin.vim"
+finished sourcing /usr/share/vim/vim90/plugin/tarPlugin.vim
+chdir(/usr/share/vim/vim90/plugin)
+fchdir() to previous dir
+sourcing "/usr/share/vim/vim90/plugin/tohtml.vim"
+finished sourcing /usr/share/vim/vim90/plugin/tohtml.vim
+chdir(/usr/share/vim/vim90/plugin)
+fchdir() to previous dir
+sourcing "/usr/share/vim/vim90/plugin/vimballPlugin.vim"
+finished sourcing /usr/share/vim/vim90/plugin/vimballPlugin.vim
+chdir(/usr/share/vim/vim90/plugin)
+fchdir() to previous dir
+sourcing "/usr/share/vim/vim90/plugin/zipPlugin.vim"
+finished sourcing /usr/share/vim/vim90/plugin/zipPlugin.vim
+not found in 'packpath': "pack/*/start/*"
+not found in 'runtimepath': "plugin/**/*.vim"
+Reading viminfo file "/home/cknittel/.viminfo" info oldfiles
+chdir(onoro/src)
+fchdir() to previous dir
+chdir(onoro/src)
+fchdir() to previous dir
+                        "onoro/src/onoro_view.rs" 
+"onoro/src/onoro_view.rs" 737L, 19504B
+Reading viminfo file "/home/cknittel/.viminfo" marks
+Executing BufRead Autocommands for "*.rs"
+autocommand setf rust
+
+Executing FileType Autocommands for "*"
+autocommand call LoadFTPlugin()
+
+chdir(/home/cknittel/.vim/bundle/rust.vim/ftplugin)
+fchdir() to previous dir
+line 18: sourcing "/home/cknittel/.vim/bundle/rust.vim/ftplugin/rust.vim"
+chdir(/home/cknittel/.vim/bundle/rust.vim/compiler)
+fchdir() to previous dir
+line 19: sourcing "/home/cknittel/.vim/bundle/rust.vim/compiler/cargo.vim"
+chdir(/home/cknittel/.vim/bundle/rust.vim/compiler)
+fchdir() to previous dir
+line 10: sourcing "/home/cknittel/.vim/bundle/rust.vim/compiler/rustc.vim"
+finished sourcing /home/cknittel/.vim/bundle/rust.vim/compiler/rustc.vim
+continuing in /home/cknittel/.vim/bundle/rust.vim/compiler/cargo.vim
+finished sourcing /home/cknittel/.vim/bundle/rust.vim/compiler/cargo.vim
+continuing in /home/cknittel/.vim/bundle/rust.vim/ftplugin/rust.vim
+chdir(/usr/share/vim/vim90/compiler)
+fchdir() to previous dir
+line 19: sourcing "/usr/share/vim/vim90/compiler/cargo.vim"
+finished sourcing /usr/share/vim/vim90/compiler/cargo.vim
+continuing in /home/cknittel/.vim/bundle/rust.vim/ftplugin/rust.vim
+finished sourcing /home/cknittel/.vim/bundle/rust.vim/ftplugin/rust.vim
+continuing in <SNR>18_LoadFTPlugin
+chdir(/home/cknittel/.vim/bundle/rust.vim/ftplugin/rust)
+fchdir() to previous dir
+line 18: sourcing "/home/cknittel/.vim/bundle/rust.vim/ftplugin/rust/tagbar.vim"
+finished sourcing /home/cknittel/.vim/bundle/rust.vim/ftplugin/rust/tagbar.vim
+continuing in <SNR>18_LoadFTPlugin
+chdir(/usr/share/vim/vim90/ftplugin)
+fchdir() to previous dir
+line 18: sourcing "/usr/share/vim/vim90/ftplugin/rust.vim"
+finished sourcing /usr/share/vim/vim90/ftplugin/rust.vim
+continuing in <SNR>18_LoadFTPlugin
+Executing FileType Autocommands for "*"
+autocommand call s:LoadIndent()
+
+chdir(/home/cknittel/.vim/bundle/rust.vim/indent)
+fchdir() to previous dir
+line 14: sourcing "/home/cknittel/.vim/bundle/rust.vim/indent/rust.vim"
+finished sourcing /home/cknittel/.vim/bundle/rust.vim/indent/rust.vim
+continuing in <SNR>19_LoadIndent
+chdir(/usr/share/vim/vim90/indent)
+fchdir() to previous dir
+line 14: sourcing "/usr/share/vim/vim90/indent/rust.vim"
+finished sourcing /usr/share/vim/vim90/indent/rust.vim
+continuing in <SNR>19_LoadIndent
+Executing FileType Autocommands for "*"
+autocommand 0verbose exe "set syntax=" . expand("<amatch>")
+
+Executing FileType Autocommands for "rust"
+autocommand call s:vim_lsp_load_or_suggest('rust')
+
+chdir(onoro/src)
+fchdir() to previous dir
+chdir(/home/cknittel/.vim/bundle/vim-lsp-settings/settings)
+fchdir() to previous dir
+line 86: sourcing "/home/cknittel/.vim/bundle/vim-lsp-settings/settings/rust-analyzer.vim"
+finished sourcing /home/cknittel/.vim/bundle/vim-lsp-settings/settings/rust-analyzer.vim
+continuing in <SNR>27_vim_lsp_load_or_suggest
+Executing User Autocommands for "lsp_setup"
+autocommand call lsp_settings#register_server({ 'name': 'rust-analyzer', 'cmd': {server_info->lsp_settings#get('rust-analyzer', 'cmd', [lsp_settings#exec_path('rust-analyzer')]+lsp_settings#get('rust-analyzer', 'args', []))}, 'root_uri':{server_info->lsp_settings#get('rust-analyzer', 'root_uri', lsp_settings#root_uri('rust-analyzer'))}, 'initialization_options': lsp_settings#get('rust-analyzer', 'initialization_options', {     'completion': {         'autoimport': { 'enable': v:true },     }, }), 'allowlist': lsp_settings#get('rust-analyzer', 'allowlist', ['rust']), 'blocklist': lsp_settings#get('rust-analyzer', 'blocklist', []), 'config': lsp_settings#get('rust-analyzer', 'config', lsp_settings#server_config('rust-analyzer')), 'workspace_config': lsp_settings#get('rust-analyzer', 'workspace_config', {}), 'semantic_highlight': lsp_settings#get('rust-analyzer', 'semantic_highlight', {}), })
+
+chdir(/home/cknittel/.vim/bundle/vim-lsp/autoload)
+fchdir() to previous dir
+line 6: sourcing "/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp.vim"
+chdir(/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp)
+fchdir() to previous dir
+line 3: sourcing "/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/callbag.vim"
+finished sourcing /home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/callbag.vim
+continuing in /home/cknittel/.vim/bundle/vim-lsp/autoload/lsp.vim
+finished sourcing /home/cknittel/.vim/bundle/vim-lsp/autoload/lsp.vim
+continuing in lsp_settings#register_server
+Executing User Autocommands for "lsp_register_server"
+autocommand silent
+
+autocommand call s:register_command()
+
+chdir(/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/ui/vim)
+fchdir() to previous dir
+line 1: sourcing "/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/ui/vim/execute_command.vim"
+finished sourcing /home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/ui/vim/execute_command.vim
+continuing in lsp#register_command
+Executing BufRead Autocommands for "*"
+autocommand if !did_filetype() && expand("<amatch>") !~ g:ft_ignore_pat | runtime! scripts.vim | endif
+
+Executing BufRead Autocommands for "*.rs"
+autocommand call s:set_rust_filetype()
+
+Executing BufRead Autocommands for "*"
+autocommand if !did_filetype() && expand("<amatch>") !~ g:ft_ignore_pat    && (getline(1) =~ '^#' || getline(2) =~ '^#' || getline(3) =~ '^#'^I|| getline(4) =~ '^#' || getline(5) =~ '^#') |   setf FALLBACK conf | endif
+
+Executing BufRead Autocommands for "*"
+autocommand if line("'\"") > 1 && line("'\"") <= line("$") | exe "normal! g'\"" | endif
+
+Executing BufRead Autocommands for "*"
+autocommand call s:vim_lsp_suggest_plugin()
+
+Executing BufEnter Autocommands for "*"
+autocommand sil call s:LocalBrowse(expand("<amatch>"))
+
+Executing VimEnter Autocommands for "*"
+autocommand call lsp#enable()
+
+Executing User Autocommands for "lsp_setup"
+autocommand call s:register_command()
+
+Executing User Autocommands for "lsp_setup"
+autocommand silent
+
+chdir(/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/ui/vim)
+fchdir() to previous dir
+line 10: sourcing "/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/ui/vim/signature_help.vim"
+finished sourcing /home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/ui/vim/signature_help.vim
+continuing in lsp#enable
+chdir(/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/ui/vim)
+fchdir() to previous dir
+line 12: sourcing "/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/ui/vim/completion.vim"
+finished sourcing /home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/ui/vim/completion.vim
+continuing in lsp#enable
+chdir(/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal)
+fchdir() to previous dir
+line 13: sourcing "/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal/document_highlight.vim"
+finished sourcing /home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal/document_highlight.vim
+continuing in lsp#enable
+chdir(/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal)
+fchdir() to previous dir
+line 14: sourcing "/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal/diagnostics.vim"
+finished sourcing /home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal/diagnostics.vim
+continuing in lsp#enable
+chdir(/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal/diagnostics)
+fchdir() to previous dir
+line 4: sourcing "/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal/diagnostics/state.vim"
+finished sourcing /home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal/diagnostics/state.vim
+continuing in lsp#internal#diagnostics#_enable
+Executing User Autocommands for "lsp_diagnostics_updated"
+autocommand silent
+
+chdir(/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal/diagnostics)
+fchdir() to previous dir
+line 5: sourcing "/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal/diagnostics/echo.vim"
+finished sourcing /home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal/diagnostics/echo.vim
+continuing in lsp#internal#diagnostics#_enable
+chdir(/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal/diagnostics)
+fchdir() to previous dir
+line 6: sourcing "/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal/diagnostics/highlights.vim"
+finished sourcing /home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal/diagnostics/highlights.vim
+continuing in lsp#internal#diagnostics#_enable
+chdir(/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal)
+fchdir() to previous dir
+line 15: sourcing "/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal/textprop.vim"
+finished sourcing /home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal/textprop.vim
+continuing in lsp#internal#diagnostics#highlights#_enable
+chdir(/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal/diagnostics)
+fchdir() to previous dir
+line 7: sourcing "/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal/diagnostics/float.vim"
+chdir(/home/cknittel/.vim/bundle/vim-lsp/autoload/vital)
+fchdir() to previous dir
+line 4: sourcing "/home/cknittel/.vim/bundle/vim-lsp/autoload/vital/lsp.vim"
+finished sourcing /home/cknittel/.vim/bundle/vim-lsp/autoload/vital/lsp.vim
+continuing in /home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal/diagnostics/float.vim
+chdir(/home/cknittel/.vim/bundle/vim-lsp/autoload/vital/_lsp/VS/Vim/Syntax)
+fchdir() to previous dir
+line 3: sourcing "/home/cknittel/.vim/bundle/vim-lsp/autoload/vital/_lsp/VS/Vim/Syntax/Markdown.vim"
+finished sourcing /home/cknittel/.vim/bundle/vim-lsp/autoload/vital/_lsp/VS/Vim/Syntax/Markdown.vim
+continuing in <SNR>65__get_module
+chdir(/home/cknittel/.vim/bundle/vim-lsp/autoload/vital)
+fchdir() to previous dir
+line 1: sourcing "/home/cknittel/.vim/bundle/vim-lsp/autoload/vital/_lsp.vim"
+finished sourcing /home/cknittel/.vim/bundle/vim-lsp/autoload/vital/_lsp.vim
+continuing in vital#_lsp#VS#Vim#Syntax#Markdown#import
+chdir(/home/cknittel/.vim/bundle/vim-lsp/autoload/vital/_lsp/VS/LSP)
+fchdir() to previous dir
+line 3: sourcing "/home/cknittel/.vim/bundle/vim-lsp/autoload/vital/_lsp/VS/LSP/MarkupContent.vim"
+finished sourcing /home/cknittel/.vim/bundle/vim-lsp/autoload/vital/_lsp/VS/LSP/MarkupContent.vim
+continuing in <SNR>65__get_module
+chdir(/home/cknittel/.vim/bundle/vim-lsp/autoload/vital/_lsp/VS/LSP)
+fchdir() to previous dir
+line 3: sourcing "/home/cknittel/.vim/bundle/vim-lsp/autoload/vital/_lsp/VS/LSP/Text.vim"
+finished sourcing /home/cknittel/.vim/bundle/vim-lsp/autoload/vital/_lsp/VS/LSP/Text.vim
+continuing in <SNR>65__get_module
+chdir(/home/cknittel/.vim/bundle/vim-lsp/autoload/vital/_lsp/VS/Vim/Window)
+fchdir() to previous dir
+line 3: sourcing "/home/cknittel/.vim/bundle/vim-lsp/autoload/vital/_lsp/VS/Vim/Window/FloatingWindow.vim"
+finished sourcing /home/cknittel/.vim/bundle/vim-lsp/autoload/vital/_lsp/VS/Vim/Window/FloatingWindow.vim
+continuing in <SNR>65__get_module
+chdir(/home/cknittel/.vim/bundle/vim-lsp/autoload/vital/_lsp/VS/Vim)
+fchdir() to previous dir
+line 3: sourcing "/home/cknittel/.vim/bundle/vim-lsp/autoload/vital/_lsp/VS/Vim/Window.vim"
+finished sourcing /home/cknittel/.vim/bundle/vim-lsp/autoload/vital/_lsp/VS/Vim/Window.vim
+continuing in <SNR>65__get_module
+chdir(/home/cknittel/.vim/bundle/vim-lsp/autoload/vital/_lsp/VS/Vim)
+fchdir() to previous dir
+line 3: sourcing "/home/cknittel/.vim/bundle/vim-lsp/autoload/vital/_lsp/VS/Vim/Buffer.vim"
+finished sourcing /home/cknittel/.vim/bundle/vim-lsp/autoload/vital/_lsp/VS/Vim/Buffer.vim
+continuing in <SNR>65__get_module
+finished sourcing /home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal/diagnostics/float.vim
+continuing in lsp#internal#diagnostics#_enable
+chdir(/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/ui/vim)
+fchdir() to previous dir
+line 2: sourcing "/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/ui/vim/output.vim"
+finished sourcing /home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/ui/vim/output.vim
+continuing in lsp#internal#diagnostics#float#_enable
+chdir(/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal/diagnostics)
+fchdir() to previous dir
+line 8: sourcing "/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal/diagnostics/signs.vim"
+finished sourcing /home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal/diagnostics/signs.vim
+continuing in lsp#internal#diagnostics#_enable
+chdir(/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal/diagnostics)
+fchdir() to previous dir
+line 9: sourcing "/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal/diagnostics/virtual_text.vim"
+finished sourcing /home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal/diagnostics/virtual_text.vim
+continuing in lsp#internal#diagnostics#_enable
+chdir(/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal/document_code_action)
+fchdir() to previous dir
+line 15: sourcing "/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal/document_code_action/signs.vim"
+finished sourcing /home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal/document_code_action/signs.vim
+continuing in lsp#enable
+chdir(/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal)
+fchdir() to previous dir
+line 16: sourcing "/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal/semantic.vim"
+finished sourcing /home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal/semantic.vim
+continuing in lsp#enable
+chdir(/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal)
+fchdir() to previous dir
+line 17: sourcing "/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal/show_message_request.vim"
+finished sourcing /home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal/show_message_request.vim
+continuing in lsp#enable
+chdir(/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal)
+fchdir() to previous dir
+line 18: sourcing "/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal/show_message.vim"
+finished sourcing /home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal/show_message.vim
+continuing in lsp#enable
+chdir(/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal)
+fchdir() to previous dir
+line 19: sourcing "/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal/work_done_progress.vim"
+finished sourcing /home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal/work_done_progress.vim
+continuing in lsp#enable
+chdir(/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal/completion)
+fchdir() to previous dir
+line 20: sourcing "/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal/completion/documentation.vim"
+finished sourcing /home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal/completion/documentation.vim
+continuing in lsp#enable
+chdir(/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal)
+fchdir() to previous dir
+line 21: sourcing "/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal/inlay_hints.vim"
+finished sourcing /home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal/inlay_hints.vim
+continuing in lsp#enable
+chdir(onoro/src)
+fchdir() to previous dir
+chdir(/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp)
+fchdir() to previous dir
+line 1: sourcing "/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/client.vim"
+finished sourcing /home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/client.vim
+continuing in <lambda>15
+Executing User Autocommands for "lsp_diagnostics_updated"
+autocommand silent
+
+chdir(/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/utils)
+fchdir() to previous dir
+line 1: sourcing "/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/utils/step.vim"
+finished sourcing /home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/utils/step.vim
+continuing in <SNR>53_ensure_flush
+chdir(onoro/src)
+fchdir() to previous dir
+chdir(/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/utils)
+fchdir() to previous dir
+line 12: sourcing "/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/utils/job.vim"
+finished sourcing /home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/utils/job.vim
+continuing in <SNR>83_lsp_start
+chdir(onoro/src)
+fchdir() to previous dir
+chdir(onoro)
+fchdir() to previous dir
+chdir(/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp)
+fchdir() to previous dir
+line 2: sourcing "/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/omni.vim"
+finished sourcing /home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/omni.vim
+continuing in lsp#default_get_supported_capabilities
+chdir(/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/ui/vim)
+fchdir() to previous dir
+line 2: sourcing "/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/ui/vim/utils.vim"
+finished sourcing /home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/ui/vim/utils.vim
+continuing in lsp#default_get_supported_capabilities
+Executing VimEnter Autocommands for "*"
+autocommand sil call s:VimEnter(expand("<amatch>"))
+
+chdir(onoro/src)
+fchdir() to previous dir
+Executing CursorMoved Autocommands for "*"
+autocommand call s:Highlight_Matching_Pair()
+
+Executing CursorMoved Autocommands for "*"
+autocommand call s:on_cursor_moved()
+
+Executing CursorMoved Autocommands for "*"
+autocommand call s:notify_event_handler(0)
+
+Executing CursorMoved Autocommands for "*"
+autocommand call s:notify_event_handler(3)
+
+Reading viminfo file "/home/cknittel/.viminfo" marks
+Executing WinScrolled Autocommands for "*"
+autocommand call s:Highlight_Matching_Pair()
+
+chdir(/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/utils)
+fchdir() to previous dir
+line 5: sourcing "/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/utils/workspace_config.vim"
+finished sourcing /home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/utils/workspace_config.vim
+continuing in <SNR>53_ensure_conf
+chdir(onoro/src)
+fchdir() to previous dir
+chdir(/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp)
+fchdir() to previous dir
+line 20: sourcing "/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/capabilities.vim"
+finished sourcing /home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/capabilities.vim
+continuing in <SNR>53_ensure_open
+chdir(/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/utils)
+fchdir() to previous dir
+line 24: sourcing "/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/utils/buffer.vim"
+finished sourcing /home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/utils/buffer.vim
+continuing in <SNR>53_ensure_open
+chdir(onoro/src)
+fchdir() to previous dir
+chdir(/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/ui/vim)
+fchdir() to previous dir
+line 36: sourcing "/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/ui/vim/folding.vim"
+finished sourcing /home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/ui/vim/folding.vim
+continuing in <SNR>53_ensure_open
+chdir(onoro/src)
+fchdir() to previous dir
+chdir(onoro/src)
+fchdir() to previous dir
+chdir(onoro/src)
+fchdir() to previous dir
+chdir(onoro/src)
+fchdir() to previous dir
+chdir(onoro/src)
+fchdir() to previous dir
+Executing User Autocommands for "lsp_buffer_enabled"
+autocommand call s:on_lsp_buffer_enabled()
+
+Executing User Autocommands for "lsp_buffer_enabled"
+autocommand call s:on_lsp_buffer_enabled()
+
+Executing User Autocommands for "lsp_buffer_enabled"
+autocommand silent
+
+Executing User Autocommands for "lsp_buffer_enabled"
+autocommand call s:on_lsp_buffer_enabled()
+
+Executing User Autocommands for "lsp_buffer_enabled"
+autocommand call s:notify_event_handler(6)
+
+Executing User Autocommands for "lsp_server_init"
+autocommand silent
+
+chdir(onoro/src)
+fchdir() to previous dir
+chdir(onoro/src)
+fchdir() to previous dir
+chdir(onoro/src)
+fchdir() to previous dir
+chdir(onoro/src)
+fchdir() to previous dir
+chdir(onoro/src)
+fchdir() to previous dir
+chdir(onoro/src)
+fchdir() to previous dir
+chdir(/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal/diagnostics)
+fchdir() to previous dir
+line 1: sourcing "/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal/diagnostics/under_cursor.vim"
+finished sourcing /home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal/diagnostics/under_cursor.vim
+continuing in <lambda>32
+chdir(onoro/src)
+fchdir() to previous dir
+chdir(onoro/src)
+fchdir() to previous dir
+chdir(onoro/src)
+fchdir() to previous dir
+chdir(onoro/src)
+fchdir() to previous dir
+chdir(onoro/src)
+fchdir() to previous dir
+Executing User Autocommands for "lsp_diagnostics_updated"
+autocommand silent
+
+Executing User Autocommands for "lsp_diagnostics_updated"
+autocommand silent
+
+Executing User Autocommands for "lsp_diagnostics_updated"
+autocommand silent
+
+Executing User Autocommands for "lsp_diagnostics_updated"
+autocommand silent
+
+Executing User Autocommands for "lsp_diagnostics_updated"
+autocommand silent
+
+Executing User Autocommands for "lsp_diagnostics_updated"
+autocommand silent
+
+Executing User Autocommands for "lsp_diagnostics_updated"
+autocommand silent
+
+Executing User Autocommands for "lsp_diagnostics_updated"
+autocommand silent
+
+Executing User Autocommands for "lsp_diagnostics_updated"
+autocommand silent
+
+Executing User Autocommands for "lsp_diagnostics_updated"
+autocommand silent
+
+chdir(onoro/src)
+fchdir() to previous dir
+chdir(/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/utils)
+fchdir() to previous dir
+line 3: sourcing "/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/utils/position.vim"
+finished sourcing /home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/utils/position.vim
+continuing in <SNR>74_place_signs
+chdir(onoro/src)
+fchdir() to previous dir
+Executing User Autocommands for "lsp_diagnostics_updated"
+autocommand silent
+
+chdir(onoro/src)
+fchdir() to previous dir
+chdir(onoro/src)
+fchdir() to previous dir
+
+chdir(/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal/diagnostics)
+fchdir() to previous dir
+sourcing "/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal/diagnostics/movement.vim"
+finished sourcing /home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal/diagnostics/movement.vim
+chdir(onoro/src)
+fchdir() to previous dir
+Executing CursorMoved Autocommands for "*"
+autocommand call s:Highlight_Matching_Pair()
+
+Executing CursorMoved Autocommands for "*"
+autocommand call s:on_cursor_moved()
+
+Executing CursorMoved Autocommands for "*"
+autocommand call s:notify_event_handler(0)
+
+Executing CursorMoved Autocommands for "*"
+autocommand call s:notify_event_handler(3)
+
+Executing WinScrolled Autocommands for "*"
+autocommand call s:Highlight_Matching_Pair()
+
+chdir(onoro/src)
+fchdir() to previous dir
+chdir(onoro/src)
+fchdir() to previous dir
+chdir(onoro/src)
+fchdir() to previous dir
+chdir(onoro/src)
+fchdir() to previous dir
+chdir(/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/utils)
+fchdir() to previous dir
+line 18: sourcing "/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/utils/range.vim"
+finished sourcing /home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/utils/range.vim
+continuing in <SNR>58_set_highlights
+chdir(onoro/src)
+fchdir() to previous dir
+Executing User Autocommands for "lsp_float_opened"
+autocommand silent
+
+Executing CursorHold Autocommands for "*"
+autocommand call s:notify_event_handler(0)
+
+--No lines in buffer--
+
+chdir(onoro/src)
+fchdir() to previous dir
+Executing BufWinLeave Autocommands for "*"
+autocommand call s:on_text_document_did_close()
+
+chdir(onoro/src)
+fchdir() to previous dir
+Executing BufUnload Autocommands for "<buffer=1>"
+autocommand call setbufvar(1, 'lsp_semantic_previous_result_id', '')
+
+Writing viminfo file "/home/cknittel/.viminfo"
+chdir(/usr/share/vim)
+fchdir() to previous dir
+sourcing "$VIM/vimrc"
+chdir(/usr/share/vim/vim90)
+fchdir() to previous dir
+line 8: sourcing "/usr/share/vim/vim90/debian.vim"
+finished sourcing /usr/share/vim/vim90/debian.vim
+continuing in /usr/share/vim/vimrc
+chdir(/usr/share/vim/vim90/syntax)
+fchdir() to previous dir
+line 25: sourcing "/usr/share/vim/vim90/syntax/syntax.vim"
+chdir(/usr/share/vim/vim90/syntax)
+fchdir() to previous dir
+line 19: sourcing "/usr/share/vim/vim90/syntax/synload.vim"
+chdir(/usr/share/vim/vim90/syntax)
+fchdir() to previous dir
+line 21: sourcing "/usr/share/vim/vim90/syntax/syncolor.vim"
+chdir(/usr/share/vim/vim90/colors/lists)
+fchdir() to previous dir
+line 53: sourcing "/usr/share/vim/vim90/colors/lists/default.vim"
+finished sourcing /usr/share/vim/vim90/colors/lists/default.vim
+continuing in /usr/share/vim/vim90/syntax/syncolor.vim
+finished sourcing /usr/share/vim/vim90/syntax/syncolor.vim
+continuing in /usr/share/vim/vim90/syntax/synload.vim
+finished sourcing /usr/share/vim/vim90/syntax/synload.vim
+continuing in /usr/share/vim/vim90/syntax/syntax.vim
+chdir(/usr/share/vim/vim90)
+fchdir() to previous dir
+line 25: sourcing "/usr/share/vim/vim90/filetype.vim"
+not found in 'runtimepath': "ftdetect/*.vim"
+finished sourcing /usr/share/vim/vim90/filetype.vim
+continuing in /usr/share/vim/vim90/syntax/syntax.vim
+Executing FileType Autocommands for "*"
+autocommand 0verbose exe "set syntax=" . expand("<amatch>")
+
+Executing BufRead Autocommands for "*.rs"
+autocommand setf rust
+
+Executing FileType Autocommands for "*"
+autocommand 0verbose exe "set syntax=" . expand("<amatch>")
+
+Executing BufRead Autocommands for "*"
+autocommand if !did_filetype() && expand("<amatch>") !~ g:ft_ignore_pat | runtime! scripts.vim | endif
+
+Executing BufRead Autocommands for "*"
+autocommand if !did_filetype() && expand("<amatch>") !~ g:ft_ignore_pat    && (getline(1) =~ '^#' || getline(2) =~ '^#' || getline(3) =~ '^#'^I|| getline(4) =~ '^#' || getline(5) =~ '^#') |   setf FALLBACK conf | endif
+
+finished sourcing /usr/share/vim/vim90/syntax/syntax.vim
+continuing in /usr/share/vim/vimrc
+finished sourcing $VIM/vimrc
+chdir(/home/cknittel)
+fchdir() to previous dir
+sourcing "$HOME/.vimrc"
+chdir(/usr/share/vim/vim90)
+fchdir() to previous dir
+line 2: sourcing "/usr/share/vim/vim90/ftoff.vim"
+finished sourcing /usr/share/vim/vim90/ftoff.vim
+continuing in /home/cknittel/.vimrc
+chdir(/home/cknittel/.vim/bundle/Vundle.vim/autoload)
+fchdir() to previous dir
+line 6: sourcing "/home/cknittel/.vim/bundle/Vundle.vim/autoload/vundle.vim"
+finished sourcing /home/cknittel/.vim/bundle/Vundle.vim/autoload/vundle.vim
+continuing in /home/cknittel/.vimrc
+chdir(/home/cknittel/.vim/bundle/Vundle.vim/autoload/vundle)
+fchdir() to previous dir
+line 4: sourcing "/home/cknittel/.vim/bundle/Vundle.vim/autoload/vundle/config.vim"
+finished sourcing /home/cknittel/.vim/bundle/Vundle.vim/autoload/vundle/config.vim
+continuing in vundle#rc
+chdir(/usr/share/vim/vim90)
+fchdir() to previous dir
+line 68: sourcing "/usr/share/vim/vim90/filetype.vim"
+chdir(/home/cknittel/.vim/bundle/vim-glsl/ftdetect)
+fchdir() to previous dir
+line 2626: sourcing "/home/cknittel/.vim/bundle/vim-glsl/ftdetect/glsl.vim"
+finished sourcing /home/cknittel/.vim/bundle/vim-glsl/ftdetect/glsl.vim
+continuing in /usr/share/vim/vim90/filetype.vim
+chdir(/home/cknittel/.vim/bundle/vim-opencl/ftdetect)
+fchdir() to previous dir
+line 2626: sourcing "/home/cknittel/.vim/bundle/vim-opencl/ftdetect/cl.vim"
+finished sourcing /home/cknittel/.vim/bundle/vim-opencl/ftdetect/cl.vim
+continuing in /usr/share/vim/vim90/filetype.vim
+chdir(/home/cknittel/.vim/bundle/yats.vim/ftdetect)
+fchdir() to previous dir
+line 2626: sourcing "/home/cknittel/.vim/bundle/yats.vim/ftdetect/typescript.vim"
+finished sourcing /home/cknittel/.vim/bundle/yats.vim/ftdetect/typescript.vim
+continuing in /usr/share/vim/vim90/filetype.vim
+chdir(/home/cknittel/.vim/bundle/yats.vim/ftdetect)
+fchdir() to previous dir
+line 2626: sourcing "/home/cknittel/.vim/bundle/yats.vim/ftdetect/typescriptreact.vim"
+finished sourcing /home/cknittel/.vim/bundle/yats.vim/ftdetect/typescriptreact.vim
+continuing in /usr/share/vim/vim90/filetype.vim
+chdir(/home/cknittel/.vim/bundle/rust.vim/ftdetect)
+fchdir() to previous dir
+line 2626: sourcing "/home/cknittel/.vim/bundle/rust.vim/ftdetect/rust.vim"
+finished sourcing /home/cknittel/.vim/bundle/rust.vim/ftdetect/rust.vim
+continuing in /usr/share/vim/vim90/filetype.vim
+finished sourcing /usr/share/vim/vim90/filetype.vim
+continuing in /home/cknittel/.vimrc
+chdir(/usr/share/vim/vim90)
+fchdir() to previous dir
+line 68: sourcing "/usr/share/vim/vim90/ftplugin.vim"
+finished sourcing /usr/share/vim/vim90/ftplugin.vim
+continuing in /home/cknittel/.vimrc
+chdir(/usr/share/vim/vim90)
+fchdir() to previous dir
+line 68: sourcing "/usr/share/vim/vim90/indent.vim"
+finished sourcing /usr/share/vim/vim90/indent.vim
+continuing in /home/cknittel/.vimrc
+chdir(/usr/share/vim/vim90/syntax)
+fchdir() to previous dir
+line 69: sourcing "/usr/share/vim/vim90/syntax/syntax.vim"
+chdir(/usr/share/vim/vim90/syntax)
+fchdir() to previous dir
+line 15: sourcing "/usr/share/vim/vim90/syntax/nosyntax.vim"
+Executing BufEnter Autocommands for "*"
+autocommand syn clear
+
+autocommand if exists("b:current_syntax") | unlet b:current_syntax | endif
+
+finished sourcing /usr/share/vim/vim90/syntax/nosyntax.vim
+continuing in /usr/share/vim/vim90/syntax/syntax.vim
+chdir(/usr/share/vim/vim90/syntax)
+fchdir() to previous dir
+line 19: sourcing "/usr/share/vim/vim90/syntax/synload.vim"
+chdir(/usr/share/vim/vim90/syntax)
+fchdir() to previous dir
+line 21: sourcing "/usr/share/vim/vim90/syntax/syncolor.vim"
+finished sourcing /usr/share/vim/vim90/syntax/syncolor.vim
+continuing in /usr/share/vim/vim90/syntax/synload.vim
+finished sourcing /usr/share/vim/vim90/syntax/synload.vim
+continuing in /usr/share/vim/vim90/syntax/syntax.vim
+Executing FileType Autocommands for "*"
+autocommand 0verbose exe "set syntax=" . expand("<amatch>")
+
+finished sourcing /usr/share/vim/vim90/syntax/syntax.vim
+continuing in /home/cknittel/.vimrc
+chdir(/usr/share/vim/vim90)
+fchdir() to previous dir
+line 74: sourcing "/usr/share/vim/vim90/filetype.vim"
+finished sourcing /usr/share/vim/vim90/filetype.vim
+continuing in /home/cknittel/.vimrc
+chdir(/usr/share/vim/vim90)
+fchdir() to previous dir
+line 74: sourcing "/usr/share/vim/vim90/ftplugin.vim"
+finished sourcing /usr/share/vim/vim90/ftplugin.vim
+continuing in /home/cknittel/.vimrc
+chdir(/usr/share/vim/vim90)
+fchdir() to previous dir
+line 74: sourcing "/usr/share/vim/vim90/indent.vim"
+finished sourcing /usr/share/vim/vim90/indent.vim
+continuing in /home/cknittel/.vimrc
+chdir(/usr/share/vim/vim90/colors/lists)
+fchdir() to previous dir
+line 93: sourcing "/usr/share/vim/vim90/colors/lists/default.vim"
+finished sourcing /usr/share/vim/vim90/colors/lists/default.vim
+continuing in /home/cknittel/.vimrc
+chdir(/home/cknittel/.vim/bundle/gruvbox/colors)
+fchdir() to previous dir
+line 93: sourcing "/home/cknittel/.vim/bundle/gruvbox/colors/gruvbox.vim"
+chdir(/usr/share/vim/vim90/syntax)
+fchdir() to previous dir
+line 13: sourcing "/usr/share/vim/vim90/syntax/syncolor.vim"
+finished sourcing /usr/share/vim/vim90/syntax/syncolor.vim
+continuing in /home/cknittel/.vim/bundle/gruvbox/colors/gruvbox.vim
+chdir(/usr/share/vim/vim90/syntax)
+fchdir() to previous dir
+line 15: sourcing "/usr/share/vim/vim90/syntax/syncolor.vim"
+finished sourcing /usr/share/vim/vim90/syntax/syncolor.vim
+continuing in /home/cknittel/.vim/bundle/gruvbox/colors/gruvbox.vim
+finished sourcing /home/cknittel/.vim/bundle/gruvbox/colors/gruvbox.vim
+continuing in /home/cknittel/.vimrc
+chdir(/usr/share/vim/vim90/colors/lists)
+fchdir() to previous dir
+line 97: sourcing "/usr/share/vim/vim90/colors/lists/default.vim"
+finished sourcing /usr/share/vim/vim90/colors/lists/default.vim
+continuing in /home/cknittel/.vimrc
+chdir(/home/cknittel/.vim/bundle/gruvbox/colors)
+fchdir() to previous dir
+line 97: sourcing "/home/cknittel/.vim/bundle/gruvbox/colors/gruvbox.vim"
+chdir(/usr/share/vim/vim90/syntax)
+fchdir() to previous dir
+line 13: sourcing "/usr/share/vim/vim90/syntax/syncolor.vim"
+finished sourcing /usr/share/vim/vim90/syntax/syncolor.vim
+continuing in /home/cknittel/.vim/bundle/gruvbox/colors/gruvbox.vim
+chdir(/usr/share/vim/vim90/syntax)
+fchdir() to previous dir
+line 15: sourcing "/usr/share/vim/vim90/syntax/syncolor.vim"
+finished sourcing /usr/share/vim/vim90/syntax/syncolor.vim
+continuing in /home/cknittel/.vim/bundle/gruvbox/colors/gruvbox.vim
+finished sourcing /home/cknittel/.vim/bundle/gruvbox/colors/gruvbox.vim
+continuing in /home/cknittel/.vimrc
+finished sourcing $HOME/.vimrc
+not found in 'packpath': "pack/*/start/*"
+chdir(/home/cknittel/.vim/bundle/vim-lsp/plugin)
+fchdir() to previous dir
+sourcing "/home/cknittel/.vim/bundle/vim-lsp/plugin/lsp.vim"
+chdir(/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp)
+fchdir() to previous dir
+line 25: sourcing "/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/utils.vim"
+finished sourcing /home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/utils.vim
+continuing in /home/cknittel/.vim/bundle/vim-lsp/plugin/lsp.vim
+finished sourcing /home/cknittel/.vim/bundle/vim-lsp/plugin/lsp.vim
+chdir(/home/cknittel/.vim/bundle/vim-lsp-settings/plugin)
+fchdir() to previous dir
+sourcing "/home/cknittel/.vim/bundle/vim-lsp-settings/plugin/lsp_settings.vim"
+chdir(/home/cknittel/.vim/bundle/vim-lsp-settings/autoload)
+fchdir() to previous dir
+line 19: sourcing "/home/cknittel/.vim/bundle/vim-lsp-settings/autoload/lsp_settings.vim"
+finished sourcing /home/cknittel/.vim/bundle/vim-lsp-settings/autoload/lsp_settings.vim
+continuing in /home/cknittel/.vim/bundle/vim-lsp-settings/plugin/lsp_settings.vim
+chdir(/home/cknittel/.vim/bundle/vim-lsp-settings/autoload/lsp_settings)
+fchdir() to previous dir
+line 30: sourcing "/home/cknittel/.vim/bundle/vim-lsp-settings/autoload/lsp_settings/utils.vim"
+finished sourcing /home/cknittel/.vim/bundle/vim-lsp-settings/autoload/lsp_settings/utils.vim
+continuing in lsp_settings#init
+chdir(/home/cknittel/.vim/bundle/vim-lsp-settings/autoload/lsp_settings)
+fchdir() to previous dir
+line 13: sourcing "/home/cknittel/.vim/bundle/vim-lsp-settings/autoload/lsp_settings/profile.vim"
+finished sourcing /home/cknittel/.vim/bundle/vim-lsp-settings/autoload/lsp_settings/profile.vim
+continuing in <SNR>27_vim_lsp_load_or_suggest
+chdir(onoro/src)
+fchdir() to previous dir
+finished sourcing /home/cknittel/.vim/bundle/vim-lsp-settings/plugin/lsp_settings.vim
+chdir(/home/cknittel/.vim/bundle/rust.vim/plugin)
+fchdir() to previous dir
+sourcing "/home/cknittel/.vim/bundle/rust.vim/plugin/cargo.vim"
+finished sourcing /home/cknittel/.vim/bundle/rust.vim/plugin/cargo.vim
+chdir(/home/cknittel/.vim/bundle/rust.vim/plugin)
+fchdir() to previous dir
+sourcing "/home/cknittel/.vim/bundle/rust.vim/plugin/rust.vim"
+finished sourcing /home/cknittel/.vim/bundle/rust.vim/plugin/rust.vim
+chdir(/usr/share/vim/vim90/plugin)
+fchdir() to previous dir
+sourcing "/usr/share/vim/vim90/plugin/getscriptPlugin.vim"
+finished sourcing /usr/share/vim/vim90/plugin/getscriptPlugin.vim
+chdir(/usr/share/vim/vim90/plugin)
+fchdir() to previous dir
+sourcing "/usr/share/vim/vim90/plugin/gzip.vim"
+finished sourcing /usr/share/vim/vim90/plugin/gzip.vim
+chdir(/usr/share/vim/vim90/plugin)
+fchdir() to previous dir
+sourcing "/usr/share/vim/vim90/plugin/logiPat.vim"
+finished sourcing /usr/share/vim/vim90/plugin/logiPat.vim
+chdir(/usr/share/vim/vim90/plugin)
+fchdir() to previous dir
+sourcing "/usr/share/vim/vim90/plugin/manpager.vim"
+finished sourcing /usr/share/vim/vim90/plugin/manpager.vim
+chdir(/usr/share/vim/vim90/plugin)
+fchdir() to previous dir
+sourcing "/usr/share/vim/vim90/plugin/matchparen.vim"
+finished sourcing /usr/share/vim/vim90/plugin/matchparen.vim
+chdir(/usr/share/vim/vim90/plugin)
+fchdir() to previous dir
+sourcing "/usr/share/vim/vim90/plugin/netrwPlugin.vim"
+finished sourcing /usr/share/vim/vim90/plugin/netrwPlugin.vim
+chdir(/usr/share/vim/vim90/plugin)
+fchdir() to previous dir
+sourcing "/usr/share/vim/vim90/plugin/rrhelper.vim"
+finished sourcing /usr/share/vim/vim90/plugin/rrhelper.vim
+chdir(/usr/share/vim/vim90/plugin)
+fchdir() to previous dir
+sourcing "/usr/share/vim/vim90/plugin/spellfile.vim"
+finished sourcing /usr/share/vim/vim90/plugin/spellfile.vim
+chdir(/usr/share/vim/vim90/plugin)
+fchdir() to previous dir
+sourcing "/usr/share/vim/vim90/plugin/tarPlugin.vim"
+finished sourcing /usr/share/vim/vim90/plugin/tarPlugin.vim
+chdir(/usr/share/vim/vim90/plugin)
+fchdir() to previous dir
+sourcing "/usr/share/vim/vim90/plugin/tohtml.vim"
+finished sourcing /usr/share/vim/vim90/plugin/tohtml.vim
+chdir(/usr/share/vim/vim90/plugin)
+fchdir() to previous dir
+sourcing "/usr/share/vim/vim90/plugin/vimballPlugin.vim"
+finished sourcing /usr/share/vim/vim90/plugin/vimballPlugin.vim
+chdir(/usr/share/vim/vim90/plugin)
+fchdir() to previous dir
+sourcing "/usr/share/vim/vim90/plugin/zipPlugin.vim"
+finished sourcing /usr/share/vim/vim90/plugin/zipPlugin.vim
+not found in 'packpath': "pack/*/start/*"
+not found in 'runtimepath': "plugin/**/*.vim"
+Reading viminfo file "/home/cknittel/.viminfo" info oldfiles
+chdir(onoro/src)
+fchdir() to previous dir
+chdir(onoro/src)
+fchdir() to previous dir
+                        "onoro/src/onoro_view.rs" 
+"onoro/src/onoro_view.rs" 737L, 19504B
+Reading viminfo file "/home/cknittel/.viminfo" marks
+Executing BufRead Autocommands for "*.rs"
+autocommand setf rust
+
+Executing FileType Autocommands for "*"
+autocommand call LoadFTPlugin()
+
+chdir(/home/cknittel/.vim/bundle/rust.vim/ftplugin)
+fchdir() to previous dir
+line 18: sourcing "/home/cknittel/.vim/bundle/rust.vim/ftplugin/rust.vim"
+chdir(/home/cknittel/.vim/bundle/rust.vim/compiler)
+fchdir() to previous dir
+line 19: sourcing "/home/cknittel/.vim/bundle/rust.vim/compiler/cargo.vim"
+chdir(/home/cknittel/.vim/bundle/rust.vim/compiler)
+fchdir() to previous dir
+line 10: sourcing "/home/cknittel/.vim/bundle/rust.vim/compiler/rustc.vim"
+finished sourcing /home/cknittel/.vim/bundle/rust.vim/compiler/rustc.vim
+continuing in /home/cknittel/.vim/bundle/rust.vim/compiler/cargo.vim
+finished sourcing /home/cknittel/.vim/bundle/rust.vim/compiler/cargo.vim
+continuing in /home/cknittel/.vim/bundle/rust.vim/ftplugin/rust.vim
+chdir(/usr/share/vim/vim90/compiler)
+fchdir() to previous dir
+line 19: sourcing "/usr/share/vim/vim90/compiler/cargo.vim"
+finished sourcing /usr/share/vim/vim90/compiler/cargo.vim
+continuing in /home/cknittel/.vim/bundle/rust.vim/ftplugin/rust.vim
+finished sourcing /home/cknittel/.vim/bundle/rust.vim/ftplugin/rust.vim
+continuing in <SNR>18_LoadFTPlugin
+chdir(/home/cknittel/.vim/bundle/rust.vim/ftplugin/rust)
+fchdir() to previous dir
+line 18: sourcing "/home/cknittel/.vim/bundle/rust.vim/ftplugin/rust/tagbar.vim"
+finished sourcing /home/cknittel/.vim/bundle/rust.vim/ftplugin/rust/tagbar.vim
+continuing in <SNR>18_LoadFTPlugin
+chdir(/usr/share/vim/vim90/ftplugin)
+fchdir() to previous dir
+line 18: sourcing "/usr/share/vim/vim90/ftplugin/rust.vim"
+finished sourcing /usr/share/vim/vim90/ftplugin/rust.vim
+continuing in <SNR>18_LoadFTPlugin
+Executing FileType Autocommands for "*"
+autocommand call s:LoadIndent()
+
+chdir(/home/cknittel/.vim/bundle/rust.vim/indent)
+fchdir() to previous dir
+line 14: sourcing "/home/cknittel/.vim/bundle/rust.vim/indent/rust.vim"
+finished sourcing /home/cknittel/.vim/bundle/rust.vim/indent/rust.vim
+continuing in <SNR>19_LoadIndent
+chdir(/usr/share/vim/vim90/indent)
+fchdir() to previous dir
+line 14: sourcing "/usr/share/vim/vim90/indent/rust.vim"
+finished sourcing /usr/share/vim/vim90/indent/rust.vim
+continuing in <SNR>19_LoadIndent
+Executing FileType Autocommands for "*"
+autocommand 0verbose exe "set syntax=" . expand("<amatch>")
+
+Executing FileType Autocommands for "rust"
+autocommand call s:vim_lsp_load_or_suggest('rust')
+
+chdir(onoro/src)
+fchdir() to previous dir
+chdir(/home/cknittel/.vim/bundle/vim-lsp-settings/settings)
+fchdir() to previous dir
+line 86: sourcing "/home/cknittel/.vim/bundle/vim-lsp-settings/settings/rust-analyzer.vim"
+finished sourcing /home/cknittel/.vim/bundle/vim-lsp-settings/settings/rust-analyzer.vim
+continuing in <SNR>27_vim_lsp_load_or_suggest
+Executing User Autocommands for "lsp_setup"
+autocommand call lsp_settings#register_server({ 'name': 'rust-analyzer', 'cmd': {server_info->lsp_settings#get('rust-analyzer', 'cmd', [lsp_settings#exec_path('rust-analyzer')]+lsp_settings#get('rust-analyzer', 'args', []))}, 'root_uri':{server_info->lsp_settings#get('rust-analyzer', 'root_uri', lsp_settings#root_uri('rust-analyzer'))}, 'initialization_options': lsp_settings#get('rust-analyzer', 'initialization_options', {     'completion': {         'autoimport': { 'enable': v:true },     }, }), 'allowlist': lsp_settings#get('rust-analyzer', 'allowlist', ['rust']), 'blocklist': lsp_settings#get('rust-analyzer', 'blocklist', []), 'config': lsp_settings#get('rust-analyzer', 'config', lsp_settings#server_config('rust-analyzer')), 'workspace_config': lsp_settings#get('rust-analyzer', 'workspace_config', {}), 'semantic_highlight': lsp_settings#get('rust-analyzer', 'semantic_highlight', {}), })
+
+chdir(/home/cknittel/.vim/bundle/vim-lsp/autoload)
+fchdir() to previous dir
+line 6: sourcing "/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp.vim"
+chdir(/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp)
+fchdir() to previous dir
+line 3: sourcing "/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/callbag.vim"
+finished sourcing /home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/callbag.vim
+continuing in /home/cknittel/.vim/bundle/vim-lsp/autoload/lsp.vim
+finished sourcing /home/cknittel/.vim/bundle/vim-lsp/autoload/lsp.vim
+continuing in lsp_settings#register_server
+Executing User Autocommands for "lsp_register_server"
+autocommand silent
+
+autocommand call s:register_command()
+
+chdir(/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/ui/vim)
+fchdir() to previous dir
+line 1: sourcing "/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/ui/vim/execute_command.vim"
+finished sourcing /home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/ui/vim/execute_command.vim
+continuing in lsp#register_command
+Executing BufRead Autocommands for "*"
+autocommand if !did_filetype() && expand("<amatch>") !~ g:ft_ignore_pat | runtime! scripts.vim | endif
+
+Executing BufRead Autocommands for "*.rs"
+autocommand call s:set_rust_filetype()
+
+Executing BufRead Autocommands for "*"
+autocommand if !did_filetype() && expand("<amatch>") !~ g:ft_ignore_pat    && (getline(1) =~ '^#' || getline(2) =~ '^#' || getline(3) =~ '^#'^I|| getline(4) =~ '^#' || getline(5) =~ '^#') |   setf FALLBACK conf | endif
+
+Executing BufRead Autocommands for "*"
+autocommand if line("'\"") > 1 && line("'\"") <= line("$") | exe "normal! g'\"" | endif
+
+Executing BufRead Autocommands for "*"
+autocommand call s:vim_lsp_suggest_plugin()
+
+Executing BufEnter Autocommands for "*"
+autocommand sil call s:LocalBrowse(expand("<amatch>"))
+
+Executing VimEnter Autocommands for "*"
+autocommand call lsp#enable()
+
+Executing User Autocommands for "lsp_setup"
+autocommand call s:register_command()
+
+Executing User Autocommands for "lsp_setup"
+autocommand silent
+
+chdir(/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/ui/vim)
+fchdir() to previous dir
+line 10: sourcing "/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/ui/vim/signature_help.vim"
+finished sourcing /home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/ui/vim/signature_help.vim
+continuing in lsp#enable
+chdir(/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/ui/vim)
+fchdir() to previous dir
+line 12: sourcing "/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/ui/vim/completion.vim"
+finished sourcing /home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/ui/vim/completion.vim
+continuing in lsp#enable
+chdir(/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal)
+fchdir() to previous dir
+line 13: sourcing "/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal/document_highlight.vim"
+finished sourcing /home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal/document_highlight.vim
+continuing in lsp#enable
+chdir(/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal)
+fchdir() to previous dir
+line 14: sourcing "/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal/diagnostics.vim"
+finished sourcing /home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal/diagnostics.vim
+continuing in lsp#enable
+chdir(/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal/diagnostics)
+fchdir() to previous dir
+line 4: sourcing "/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal/diagnostics/state.vim"
+finished sourcing /home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal/diagnostics/state.vim
+continuing in lsp#internal#diagnostics#_enable
+Executing User Autocommands for "lsp_diagnostics_updated"
+autocommand silent
+
+chdir(/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal/diagnostics)
+fchdir() to previous dir
+line 5: sourcing "/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal/diagnostics/echo.vim"
+finished sourcing /home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal/diagnostics/echo.vim
+continuing in lsp#internal#diagnostics#_enable
+chdir(/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal/diagnostics)
+fchdir() to previous dir
+line 6: sourcing "/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal/diagnostics/highlights.vim"
+finished sourcing /home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal/diagnostics/highlights.vim
+continuing in lsp#internal#diagnostics#_enable
+chdir(/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal)
+fchdir() to previous dir
+line 15: sourcing "/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal/textprop.vim"
+finished sourcing /home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal/textprop.vim
+continuing in lsp#internal#diagnostics#highlights#_enable
+chdir(/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal/diagnostics)
+fchdir() to previous dir
+line 7: sourcing "/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal/diagnostics/float.vim"
+chdir(/home/cknittel/.vim/bundle/vim-lsp/autoload/vital)
+fchdir() to previous dir
+line 4: sourcing "/home/cknittel/.vim/bundle/vim-lsp/autoload/vital/lsp.vim"
+finished sourcing /home/cknittel/.vim/bundle/vim-lsp/autoload/vital/lsp.vim
+continuing in /home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal/diagnostics/float.vim
+chdir(/home/cknittel/.vim/bundle/vim-lsp/autoload/vital/_lsp/VS/Vim/Syntax)
+fchdir() to previous dir
+line 3: sourcing "/home/cknittel/.vim/bundle/vim-lsp/autoload/vital/_lsp/VS/Vim/Syntax/Markdown.vim"
+finished sourcing /home/cknittel/.vim/bundle/vim-lsp/autoload/vital/_lsp/VS/Vim/Syntax/Markdown.vim
+continuing in <SNR>65__get_module
+chdir(/home/cknittel/.vim/bundle/vim-lsp/autoload/vital)
+fchdir() to previous dir
+line 1: sourcing "/home/cknittel/.vim/bundle/vim-lsp/autoload/vital/_lsp.vim"
+finished sourcing /home/cknittel/.vim/bundle/vim-lsp/autoload/vital/_lsp.vim
+continuing in vital#_lsp#VS#Vim#Syntax#Markdown#import
+chdir(/home/cknittel/.vim/bundle/vim-lsp/autoload/vital/_lsp/VS/LSP)
+fchdir() to previous dir
+line 3: sourcing "/home/cknittel/.vim/bundle/vim-lsp/autoload/vital/_lsp/VS/LSP/MarkupContent.vim"
+finished sourcing /home/cknittel/.vim/bundle/vim-lsp/autoload/vital/_lsp/VS/LSP/MarkupContent.vim
+continuing in <SNR>65__get_module
+chdir(/home/cknittel/.vim/bundle/vim-lsp/autoload/vital/_lsp/VS/LSP)
+fchdir() to previous dir
+line 3: sourcing "/home/cknittel/.vim/bundle/vim-lsp/autoload/vital/_lsp/VS/LSP/Text.vim"
+finished sourcing /home/cknittel/.vim/bundle/vim-lsp/autoload/vital/_lsp/VS/LSP/Text.vim
+continuing in <SNR>65__get_module
+chdir(/home/cknittel/.vim/bundle/vim-lsp/autoload/vital/_lsp/VS/Vim/Window)
+fchdir() to previous dir
+line 3: sourcing "/home/cknittel/.vim/bundle/vim-lsp/autoload/vital/_lsp/VS/Vim/Window/FloatingWindow.vim"
+finished sourcing /home/cknittel/.vim/bundle/vim-lsp/autoload/vital/_lsp/VS/Vim/Window/FloatingWindow.vim
+continuing in <SNR>65__get_module
+chdir(/home/cknittel/.vim/bundle/vim-lsp/autoload/vital/_lsp/VS/Vim)
+fchdir() to previous dir
+line 3: sourcing "/home/cknittel/.vim/bundle/vim-lsp/autoload/vital/_lsp/VS/Vim/Window.vim"
+finished sourcing /home/cknittel/.vim/bundle/vim-lsp/autoload/vital/_lsp/VS/Vim/Window.vim
+continuing in <SNR>65__get_module
+chdir(/home/cknittel/.vim/bundle/vim-lsp/autoload/vital/_lsp/VS/Vim)
+fchdir() to previous dir
+line 3: sourcing "/home/cknittel/.vim/bundle/vim-lsp/autoload/vital/_lsp/VS/Vim/Buffer.vim"
+finished sourcing /home/cknittel/.vim/bundle/vim-lsp/autoload/vital/_lsp/VS/Vim/Buffer.vim
+continuing in <SNR>65__get_module
+finished sourcing /home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal/diagnostics/float.vim
+continuing in lsp#internal#diagnostics#_enable
+chdir(/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/ui/vim)
+fchdir() to previous dir
+line 2: sourcing "/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/ui/vim/output.vim"
+finished sourcing /home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/ui/vim/output.vim
+continuing in lsp#internal#diagnostics#float#_enable
+chdir(/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal/diagnostics)
+fchdir() to previous dir
+line 8: sourcing "/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal/diagnostics/signs.vim"
+finished sourcing /home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal/diagnostics/signs.vim
+continuing in lsp#internal#diagnostics#_enable
+chdir(/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal/diagnostics)
+fchdir() to previous dir
+line 9: sourcing "/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal/diagnostics/virtual_text.vim"
+finished sourcing /home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal/diagnostics/virtual_text.vim
+continuing in lsp#internal#diagnostics#_enable
+chdir(/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal/document_code_action)
+fchdir() to previous dir
+line 15: sourcing "/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal/document_code_action/signs.vim"
+finished sourcing /home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal/document_code_action/signs.vim
+continuing in lsp#enable
+chdir(/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal)
+fchdir() to previous dir
+line 16: sourcing "/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal/semantic.vim"
+finished sourcing /home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal/semantic.vim
+continuing in lsp#enable
+chdir(/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal)
+fchdir() to previous dir
+line 17: sourcing "/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal/show_message_request.vim"
+finished sourcing /home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal/show_message_request.vim
+continuing in lsp#enable
+chdir(/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal)
+fchdir() to previous dir
+line 18: sourcing "/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal/show_message.vim"
+finished sourcing /home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal/show_message.vim
+continuing in lsp#enable
+chdir(/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal)
+fchdir() to previous dir
+line 19: sourcing "/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal/work_done_progress.vim"
+finished sourcing /home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal/work_done_progress.vim
+continuing in lsp#enable
+chdir(/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal/completion)
+fchdir() to previous dir
+line 20: sourcing "/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal/completion/documentation.vim"
+finished sourcing /home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal/completion/documentation.vim
+continuing in lsp#enable
+chdir(/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal)
+fchdir() to previous dir
+line 21: sourcing "/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal/inlay_hints.vim"
+finished sourcing /home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal/inlay_hints.vim
+continuing in lsp#enable
+chdir(onoro/src)
+fchdir() to previous dir
+chdir(/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp)
+fchdir() to previous dir
+line 1: sourcing "/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/client.vim"
+finished sourcing /home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/client.vim
+continuing in <lambda>7
+Executing User Autocommands for "lsp_diagnostics_updated"
+autocommand silent
+
+chdir(/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/utils)
+fchdir() to previous dir
+line 1: sourcing "/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/utils/step.vim"
+finished sourcing /home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/utils/step.vim
+continuing in <SNR>53_ensure_flush
+chdir(onoro/src)
+fchdir() to previous dir
+chdir(/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/utils)
+fchdir() to previous dir
+line 12: sourcing "/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/utils/job.vim"
+finished sourcing /home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/utils/job.vim
+continuing in <SNR>83_lsp_start
+chdir(onoro/src)
+fchdir() to previous dir
+chdir(onoro)
+fchdir() to previous dir
+chdir(/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp)
+fchdir() to previous dir
+line 2: sourcing "/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/omni.vim"
+finished sourcing /home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/omni.vim
+continuing in lsp#default_get_supported_capabilities
+chdir(/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/ui/vim)
+fchdir() to previous dir
+line 2: sourcing "/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/ui/vim/utils.vim"
+finished sourcing /home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/ui/vim/utils.vim
+continuing in lsp#default_get_supported_capabilities
+Executing VimEnter Autocommands for "*"
+autocommand sil call s:VimEnter(expand("<amatch>"))
+
+chdir(onoro/src)
+fchdir() to previous dir
+Executing CursorMoved Autocommands for "*"
+autocommand call s:Highlight_Matching_Pair()
+
+Executing CursorMoved Autocommands for "*"
+autocommand call s:on_cursor_moved()
+
+Executing CursorMoved Autocommands for "*"
+autocommand call s:notify_event_handler(1)
+
+Reading viminfo file "/home/cknittel/.viminfo" marks
+Executing WinScrolled Autocommands for "*"
+autocommand call s:Highlight_Matching_Pair()
+
+chdir(/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/utils)
+fchdir() to previous dir
+line 5: sourcing "/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/utils/workspace_config.vim"
+finished sourcing /home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/utils/workspace_config.vim
+continuing in <SNR>53_ensure_conf
+chdir(onoro/src)
+fchdir() to previous dir
+chdir(/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp)
+fchdir() to previous dir
+line 20: sourcing "/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/capabilities.vim"
+finished sourcing /home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/capabilities.vim
+continuing in <SNR>53_ensure_open
+chdir(/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/utils)
+fchdir() to previous dir
+line 24: sourcing "/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/utils/buffer.vim"
+finished sourcing /home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/utils/buffer.vim
+continuing in <SNR>53_ensure_open
+chdir(onoro/src)
+fchdir() to previous dir
+chdir(/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/ui/vim)
+fchdir() to previous dir
+line 36: sourcing "/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/ui/vim/folding.vim"
+finished sourcing /home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/ui/vim/folding.vim
+continuing in <SNR>53_ensure_open
+chdir(onoro/src)
+fchdir() to previous dir
+chdir(onoro/src)
+fchdir() to previous dir
+chdir(onoro/src)
+fchdir() to previous dir
+chdir(onoro/src)
+fchdir() to previous dir
+chdir(onoro/src)
+fchdir() to previous dir
+Executing User Autocommands for "lsp_buffer_enabled"
+autocommand call s:on_lsp_buffer_enabled()
+
+Executing User Autocommands for "lsp_buffer_enabled"
+autocommand call s:on_lsp_buffer_enabled()
+
+Executing User Autocommands for "lsp_buffer_enabled"
+autocommand silent
+
+Executing User Autocommands for "lsp_buffer_enabled"
+autocommand call s:on_lsp_buffer_enabled()
+
+Executing User Autocommands for "lsp_buffer_enabled"
+autocommand call s:notify_event_handler(3)
+
+Executing User Autocommands for "lsp_server_init"
+autocommand silent
+
+chdir(onoro/src)
+fchdir() to previous dir
+chdir(/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal/diagnostics)
+fchdir() to previous dir
+line 1: sourcing "/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal/diagnostics/under_cursor.vim"
+finished sourcing /home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal/diagnostics/under_cursor.vim
+continuing in <lambda>24
+chdir(onoro/src)
+fchdir() to previous dir
+chdir(onoro/src)
+fchdir() to previous dir
+chdir(onoro/src)
+fchdir() to previous dir
+chdir(onoro/src)
+fchdir() to previous dir
+chdir(onoro/src)
+fchdir() to previous dir
+Executing User Autocommands for "lsp_diagnostics_updated"
+autocommand silent
+
+Executing User Autocommands for "lsp_diagnostics_updated"
+autocommand silent
+
+Executing User Autocommands for "lsp_diagnostics_updated"
+autocommand silent
+
+Executing User Autocommands for "lsp_diagnostics_updated"
+autocommand silent
+
+Executing User Autocommands for "lsp_diagnostics_updated"
+autocommand silent
+
+Executing User Autocommands for "lsp_diagnostics_updated"
+autocommand silent
+
+Executing User Autocommands for "lsp_diagnostics_updated"
+autocommand silent
+
+Executing User Autocommands for "lsp_diagnostics_updated"
+autocommand silent
+
+Executing User Autocommands for "lsp_diagnostics_updated"
+autocommand silent
+
+Executing User Autocommands for "lsp_diagnostics_updated"
+autocommand silent
+
+Executing CursorMoved Autocommands for "*"
+autocommand call s:Highlight_Matching_Pair()
+
+Executing CursorMoved Autocommands for "*"
+autocommand call s:on_cursor_moved()
+
+Executing CursorMoved Autocommands for "*"
+autocommand call s:notify_event_handler(1)
+
+chdir(onoro/src)
+fchdir() to previous dir
+chdir(/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/utils)
+fchdir() to previous dir
+line 3: sourcing "/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/utils/position.vim"
+finished sourcing /home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/utils/position.vim
+continuing in <SNR>62_place_highlights
+chdir(onoro/src)
+fchdir() to previous dir
+Executing User Autocommands for "lsp_diagnostics_updated"
+autocommand silent
+
+chdir(onoro/src)
+fchdir() to previous dir
+
+chdir(/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal/diagnostics)
+fchdir() to previous dir
+sourcing "/home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal/diagnostics/movement.vim"
+finished sourcing /home/cknittel/.vim/bundle/vim-lsp/autoload/lsp/internal/diagnostics/movement.vim
+chdir(onoro/src)
+fchdir() to previous dir
+Executing CursorMoved Autocommands for "*"
+autocommand call s:Highlight_Matching_Pair()
+
+Executing CursorMoved Autocommands for "*"
+autocommand call s:on_cursor_moved()
+
+Executing CursorMoved Autocommands for "*"
+autocommand call s:notify_event_handler(1)
+
+chdir(onoro/src)
+fchdir() to previous dir
+Executing User Autocommands for "lsp_float_opened"
+autocommand silent
+
+
+chdir(onoro/src)
+fchdir() to previous dir
+Executing BufWinLeave Autocommands for "*"
+autocommand call s:on_text_document_did_close()
+
+chdir(onoro/src)
+fchdir() to previous dir
+Executing BufUnload Autocommands for "<buffer=1>"
+autocommand call setbufvar(1, 'lsp_semantic_previous_result_id', '')
+
+Writing viminfo file "/home/cknittel/.viminfo"

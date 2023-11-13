@@ -4,7 +4,7 @@ use std::{
   fmt::{Debug, Display},
 };
 
-use abstract_game::{PackedScore, Score};
+use abstract_game::{GameIterator, GameMoveGenerator, PackedScore, Score};
 use algebra::group::Group;
 use itertools::interleave;
 use union_find::ConstUnionFind;
@@ -318,23 +318,32 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Onoro<N, N2, AD
     self.onoro_state().turn() + 1
   }
 
-  pub fn pawns(&self) -> PawnIterator<'_, N, N2, ADJ_CNT_SIZE> {
-    PawnIterator {
-      onoro: self,
+  pub fn pawns_gen(&self) -> PawnMoveGenerator<N, N2, ADJ_CNT_SIZE> {
+    PawnMoveGenerator {
       pawn_idx: 0,
       one_color: false,
     }
   }
 
-  pub fn color_pawns(&self, color: PawnColor) -> PawnIterator<'_, N, N2, ADJ_CNT_SIZE> {
-    PawnIterator {
-      onoro: self,
+  pub fn pawns(&self) -> GameIterator<'_, PawnMoveGenerator<N, N2, ADJ_CNT_SIZE>, Self> {
+    self.pawns_gen().to_iter(self)
+  }
+
+  pub fn color_pawns_gen(&self, color: PawnColor) -> PawnMoveGenerator<N, N2, ADJ_CNT_SIZE> {
+    PawnMoveGenerator {
       pawn_idx: match color {
         PawnColor::Black => 0,
         PawnColor::White => 1,
       },
       one_color: true,
     }
+  }
+
+  pub fn color_pawns(
+    &self,
+    color: PawnColor,
+  ) -> GameIterator<'_, PawnMoveGenerator<N, N2, ADJ_CNT_SIZE>, Self> {
+    self.color_pawns_gen(color).to_iter(self)
   }
 
   pub fn pawns_mathematica_list(&self) -> String {
@@ -439,27 +448,30 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Onoro<N, N2, AD
     unsafe { self.make_move_unchecked(m) }
   }
 
-  pub fn each_move(&self) -> MoveGenerator<'_, N, N2, ADJ_CNT_SIZE> {
+  pub fn each_move_gen(&self) -> MoveGenerator<N, N2, ADJ_CNT_SIZE> {
     if self.in_phase1() {
-      MoveGenerator::P1Moves(self.each_p1_move())
+      MoveGenerator::P1Moves(self.p1_move_gen())
     } else {
-      MoveGenerator::P2Moves(self.each_p2_move())
+      MoveGenerator::P2Moves(self.p2_move_gen())
     }
   }
 
-  pub fn each_p1_move(&self) -> P1MoveIterator<'_, N, N2, ADJ_CNT_SIZE> {
+  pub fn each_move(&self) -> GameIterator<'_, MoveGenerator<N, N2, ADJ_CNT_SIZE>, Self> {
+    self.each_move_gen().to_iter(self)
+  }
+
+  fn p1_move_gen(&self) -> P1MoveGenerator<N, N2, ADJ_CNT_SIZE> {
     debug_assert!(self.in_phase1());
-    P1MoveIterator {
-      onoro: self,
-      pawn_iter: self.pawns(),
+    P1MoveGenerator {
+      pawn_iter: self.pawns_gen(),
       neighbor_iter: None,
       adjacency_counts: [0; ADJ_CNT_SIZE],
     }
   }
 
-  pub fn each_p2_move(&self) -> P2MoveIterator<'_, N, N2, ADJ_CNT_SIZE> {
+  fn p2_move_gen(&self) -> P2MoveGenerator<N, N2, ADJ_CNT_SIZE> {
     debug_assert!(!self.in_phase1());
-    P2MoveIterator::new(self)
+    P2MoveGenerator::new(self)
   }
 
   /// Adds a new pawn to the game board at index `i`, without checking what was
@@ -868,26 +880,26 @@ impl Display for Pawn {
   }
 }
 
-pub struct PawnIterator<'a, const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> {
-  onoro: &'a Onoro<N, N2, ADJ_CNT_SIZE>,
+pub struct PawnMoveGenerator<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> {
   pawn_idx: usize,
   /// If true, only iterates over pawns of one color, otherwise iterating over
   /// all pawns.
   one_color: bool,
 }
 
-impl<'a, const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Iterator
-  for PawnIterator<'a, N, N2, ADJ_CNT_SIZE>
+impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> GameMoveGenerator
+  for PawnMoveGenerator<N, N2, ADJ_CNT_SIZE>
 {
   type Item = Pawn;
+  type Game = Onoro<N, N2, ADJ_CNT_SIZE>;
 
-  fn next(&mut self) -> Option<Self::Item> {
-    if self.pawn_idx >= self.onoro.pawns_in_play() as usize {
+  fn next(&mut self, onoro: &Self::Game) -> Option<Self::Item> {
+    if self.pawn_idx >= onoro.pawns_in_play() as usize {
       return None;
     }
 
     let pawn = Pawn {
-      pos: unsafe { *self.onoro.pawn_poses.get_unchecked(self.pawn_idx) },
+      pos: unsafe { *onoro.pawn_poses.get_unchecked(self.pawn_idx) },
       color: if self.pawn_idx % 2 == 0 {
         PawnColor::Black
       } else {
@@ -901,27 +913,27 @@ impl<'a, const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Iterator
   }
 }
 
-pub enum MoveGenerator<'a, const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> {
-  P1Moves(P1MoveIterator<'a, N, N2, ADJ_CNT_SIZE>),
-  P2Moves(P2MoveIterator<'a, N, N2, ADJ_CNT_SIZE>),
+pub enum MoveGenerator<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> {
+  P1Moves(P1MoveGenerator<N, N2, ADJ_CNT_SIZE>),
+  P2Moves(P2MoveGenerator<N, N2, ADJ_CNT_SIZE>),
 }
 
-impl<'a, const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Iterator
-  for MoveGenerator<'a, N, N2, ADJ_CNT_SIZE>
+impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> GameMoveGenerator
+  for MoveGenerator<N, N2, ADJ_CNT_SIZE>
 {
   type Item = Move;
+  type Game = Onoro<N, N2, ADJ_CNT_SIZE>;
 
-  fn next(&mut self) -> Option<Self::Item> {
+  fn next(&mut self, onoro: &Self::Game) -> Option<Self::Item> {
     match self {
-      Self::P1Moves(p1_iter) => p1_iter.next(),
-      Self::P2Moves(p2_iter) => p2_iter.next(),
+      Self::P1Moves(p1_iter) => p1_iter.next(onoro),
+      Self::P2Moves(p2_iter) => p2_iter.next(onoro),
     }
   }
 }
 
-pub struct P1MoveIterator<'a, const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> {
-  onoro: &'a Onoro<N, N2, ADJ_CNT_SIZE>,
-  pawn_iter: PawnIterator<'a, N, N2, ADJ_CNT_SIZE>,
+pub struct P1MoveGenerator<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> {
+  pawn_iter: PawnMoveGenerator<N, N2, ADJ_CNT_SIZE>,
   neighbor_iter: Option<std::array::IntoIter<HexPos, 6>>,
 
   /// Bitvector of 2-bit numbers per tile in the whole game board. Each number
@@ -929,15 +941,16 @@ pub struct P1MoveIterator<'a, const N: usize, const N2: usize, const ADJ_CNT_SIZ
   adjacency_counts: [u64; ADJ_CNT_SIZE],
 }
 
-impl<'a, const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Iterator
-  for P1MoveIterator<'a, N, N2, ADJ_CNT_SIZE>
+impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> GameMoveGenerator
+  for P1MoveGenerator<N, N2, ADJ_CNT_SIZE>
 {
   type Item = Move;
+  type Game = Onoro<N, N2, ADJ_CNT_SIZE>;
 
-  fn next(&mut self) -> Option<Self::Item> {
+  fn next(&mut self, onoro: &Self::Game) -> Option<Self::Item> {
     loop {
       if let Some(neighbor) = self.neighbor_iter.as_mut().and_then(|iter| iter.next()) {
-        if self.onoro.get_tile(neighbor.into()) != TileState::Empty {
+        if onoro.get_tile(neighbor.into()) != TileState::Empty {
           continue;
         }
 
@@ -961,7 +974,7 @@ impl<'a, const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Iterator
             });
           }
         }
-      } else if let Some(pawn) = self.pawn_iter.next() {
+      } else if let Some(pawn) = self.pawn_iter.next(onoro) {
         self.neighbor_iter = Some(HexPos::from(pawn.pos).each_neighbor());
       } else {
         return None;
@@ -991,11 +1004,10 @@ struct P2PawnMeta<const N2: usize> {
   adj_cnt_bitmask: u64,
 }
 
-pub struct P2MoveIterator<'a, const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> {
-  onoro: &'a Onoro<N, N2, ADJ_CNT_SIZE>,
+pub struct P2MoveGenerator<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> {
   /// The current pawn that is being considered for moving. Only iterates over
   /// the pawns of the current player.
-  pawn_iter: PawnIterator<'a, N, N2, ADJ_CNT_SIZE>,
+  pawn_iter: PawnMoveGenerator<N, N2, ADJ_CNT_SIZE>,
   pawn_meta: Option<P2PawnMeta<N2>>,
 
   /// Bitvector of 2-bit numbers per tile in the whole game board. Each number
@@ -1003,21 +1015,20 @@ pub struct P2MoveIterator<'a, const N: usize, const N2: usize, const ADJ_CNT_SIZ
   adjacency_counts: [u64; ADJ_CNT_SIZE],
 }
 
-impl<'a, const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize>
-  P2MoveIterator<'a, N, N2, ADJ_CNT_SIZE>
+impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize>
+  P2MoveGenerator<N, N2, ADJ_CNT_SIZE>
 {
-  fn new(onoro: &'a Onoro<N, N2, ADJ_CNT_SIZE>) -> Self {
+  fn new(onoro: &Onoro<N, N2, ADJ_CNT_SIZE>) -> Self {
     Self {
-      onoro,
-      pawn_iter: onoro.color_pawns(onoro.player_color()),
+      pawn_iter: onoro.color_pawns_gen(onoro.player_color()),
       pawn_meta: None,
       adjacency_counts: [0; ADJ_CNT_SIZE],
     }
-    .populate_neighbor_counts()
+    .populate_neighbor_counts(onoro)
   }
 
-  fn populate_neighbor_counts(mut self) -> Self {
-    for pawn in self.onoro.pawns() {
+  fn populate_neighbor_counts(mut self, onoro: &Onoro<N, N2, ADJ_CNT_SIZE>) -> Self {
+    for pawn in onoro.pawns() {
       for neighbor in HexPos::from(pawn.pos).each_neighbor() {
         let ord = Onoro::<N, N2, ADJ_CNT_SIZE>::hex_pos_ord(&neighbor);
         let tb_shift = TILE_BITS * (ord % (64 / TILE_BITS));
@@ -1041,13 +1052,18 @@ impl<'a, const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize>
   /// Prepares the iterator to consider all possible moves of the pawn at
   /// `pawn_pos`. Will update `self` with `Some` `pawn_meta`, and will decrease
   /// the adjacency count of all neighboring pawns of the one at `pawn_pos`.
-  fn prepare_move_pawn(&mut self, pawn_idx: usize, pawn_pos: PackedIdx) {
+  fn prepare_move_pawn(
+    &mut self,
+    pawn_idx: usize,
+    pawn_pos: PackedIdx,
+    onoro: &Onoro<N, N2, ADJ_CNT_SIZE>,
+  ) {
     let mut uf = ConstUnionFind::new();
     let pawn_hex_pos: HexPos = pawn_pos.into();
 
     // Calculate the number of disjoint pawn groups after removing the pawn at
     // next_idx
-    for pawn in self.onoro.pawns() {
+    for pawn in onoro.pawns() {
       // Skip ourselves.
       if pawn.pos == pawn_pos {
         continue;
@@ -1055,7 +1071,7 @@ impl<'a, const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize>
       let pawn_ord = Onoro::<N, N2, ADJ_CNT_SIZE>::hex_pos_ord(&pawn.pos.into());
 
       for neighbor in HexPos::from(pawn.pos).each_top_left_neighbor() {
-        if self.onoro.get_tile(neighbor.into()) != TileState::Empty && pawn_hex_pos != neighbor {
+        if onoro.get_tile(neighbor.into()) != TileState::Empty && pawn_hex_pos != neighbor {
           uf.union(
             pawn_ord,
             Onoro::<N, N2, ADJ_CNT_SIZE>::hex_pos_ord(&neighbor),
@@ -1064,8 +1080,7 @@ impl<'a, const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize>
       }
     }
 
-    let empty_tiles =
-      Onoro::<N, N2, ADJ_CNT_SIZE>::board_size() as u32 - self.onoro.pawns_in_play();
+    let empty_tiles = Onoro::<N, N2, ADJ_CNT_SIZE>::board_size() as u32 - onoro.pawns_in_play();
     // Note: the pawn we are moving is its own group.
     let pawn_groups = uf.unique_sets() as u32 - empty_tiles - 1;
 
@@ -1083,7 +1098,7 @@ impl<'a, const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize>
       // If this neighbor has only one neighbor itself now, and it isn't empty,
       // we have to place our pawn next to it.
       if ((unsafe { *self.adjacency_counts.get_unchecked(tb_idx) } >> tb_shift) & TILE_MASK) == 1
-        && self.onoro.get_tile(neighbor.into()) != TileState::Empty
+        && onoro.get_tile(neighbor.into()) != TileState::Empty
       {
         neighbors_to_satisfy += 1;
       }
@@ -1116,12 +1131,13 @@ impl<'a, const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize>
   }
 }
 
-impl<'a, const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Iterator
-  for P2MoveIterator<'a, N, N2, ADJ_CNT_SIZE>
+impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> GameMoveGenerator
+  for P2MoveGenerator<N, N2, ADJ_CNT_SIZE>
 {
   type Item = Move;
+  type Game = Onoro<N, N2, ADJ_CNT_SIZE>;
 
-  fn next(&mut self) -> Option<Self::Item> {
+  fn next(&mut self, onoro: &Self::Game) -> Option<Self::Item> {
     loop {
       if let Some(pawn_meta) = &mut self.pawn_meta {
         // If the adjacency counts mask is empty, we have run out of candidate
@@ -1153,7 +1169,7 @@ impl<'a, const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Iterator
 
         // Skip this tile if it isn't empty (this will also skip the piece's
         // old location since we haven't removed it, which we want)
-        if self.onoro.get_tile(place_to_consider_idx) != TileState::Empty
+        if onoro.get_tile(place_to_consider_idx) != TileState::Empty
           || ((pawn_meta.adj_cnt_bitmask >> tb_shift) & TILE_MASK) <= 1
         {
           pawn_meta.adj_cnt_bitmask &= !clr_mask;
@@ -1174,7 +1190,7 @@ impl<'a, const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Iterator
         // considered.
         let mut groups_touching = 0;
         for neighbor in place_to_consider.each_neighbor() {
-          if self.onoro.get_tile(neighbor.into()) == TileState::Empty {
+          if onoro.get_tile(neighbor.into()) == TileState::Empty {
             continue;
           }
           let neighbor_ord = Onoro::<N, N2, ADJ_CNT_SIZE>::hex_pos_ord(&neighbor);
@@ -1215,8 +1231,8 @@ impl<'a, const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Iterator
             from_idx: pawn_meta.pawn_idx as u32,
           });
         }
-      } else if let Some(pawn) = self.pawn_iter.next() {
-        self.prepare_move_pawn(pawn.board_idx as usize, pawn.pos);
+      } else if let Some(pawn) = self.pawn_iter.next(onoro) {
+        self.prepare_move_pawn(pawn.board_idx as usize, pawn.pos, onoro);
       } else {
         return None;
       }
