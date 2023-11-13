@@ -137,8 +137,9 @@ where
     debug_assert!(self.current_move.is_none());
     (
       if self.best_move.is_none() {
-        // If there were no possible moves, then the game is considered a tie.
-        Score::guaranteed_tie()
+        // If there were no possible moves, then the game is considered lost for
+        // the current player.
+        Score::lose(1)
       } else {
         self.best_score.clone()
       },
