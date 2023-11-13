@@ -94,8 +94,6 @@ where
   /// isn't found, or it is found but wasn't searched deep enough, it will
   /// reserve a spot in `pending_states` by placing the bottom game state of the
   /// stack.
-  ///
-  /// Stack must be under a seize::Guard for this to be safe.
   pub fn get_or_queue(&self, stack_ptr: *mut Stack<G>, metrics: &mut Metrics) -> LookupResult {
     let stack = unsafe { &mut *stack_ptr };
     let bottom_state = stack.bottom_frame().unwrap();
@@ -173,18 +171,20 @@ where
                   Score::lose(1)
                 }
               }
-              GameResult::Tie => Score::tie(1),
+              GameResult::Tie => Score::guaranteed_tie(),
               GameResult::NotFinished => {
-                if game.search_immediate_win().is_some() {
-                  self.commit_game_with_score(bottom_state.game().clone(), Score::win(1));
-                  // If this game is a win for the current player, it's a lose for the
-                  // player of the previous turn.
-                  Score::lose(2)
-                } else {
-                  // Don't commit game, since we have no information on it (tie to
-                  // depth 1 is not worth committing).
-                  Score::tie(1)
-                }
+                Score::tie(1)
+                // TODO: not immediately clear if search imm win is faster.
+                // if game.search_immediate_win().is_some() {
+                //   self.commit_game_with_score(bottom_state.game().clone(), Score::win(1));
+                //   // If this game is a win for the current player, it's a lose for the
+                //   // player of the previous turn.
+                //   Score::lose(2)
+                // } else {
+                //   // Don't commit game, since we have no information on it (tie to
+                //   // depth 1 is not worth committing).
+                //   Score::tie(1)
+                // }
               }
             };
 

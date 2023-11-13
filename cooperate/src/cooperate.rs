@@ -3,6 +3,7 @@ use std::{
   fmt::{Debug, Display},
   hash::{BuildHasher, Hash},
   sync::Arc,
+  thread,
 };
 
 use abstract_game::{Game, Score};
@@ -86,26 +87,39 @@ where
 
 pub fn solve<G>(game: &G, options: Options) -> Score
 where
-  G: Game + Display + Hash + PartialEq + Eq + 'static,
+  G: Game + Display + Send + Sync + Hash + PartialEq + Eq + 'static,
   G::Move: Display,
   G::PlayerIdentifier: Debug,
 {
-  let globals = construct_globals(game, options.clone(), RandomState::new());
-  start_worker(WorkerData::new(0, globals.clone()));
-  find_best_move_serial_table(game, options.search_depth, globals.resolved_states_table())
-    .0
-    .unwrap()
+  solve_with_hasher(game, options, RandomState::new())
 }
 
 pub fn solve_with_hasher<G, H>(game: &G, options: Options, hasher: H) -> Score
 where
-  G: Game + Display + Hash + PartialEq + Eq + 'static,
+  G: Game + Display + Send + Sync + Hash + PartialEq + Eq + 'static,
   G::Move: Display,
   G::PlayerIdentifier: Debug,
-  H: BuildHasher + Clone,
+  H: BuildHasher + Clone + Send + Sync + 'static,
 {
   let globals = construct_globals(game, options.clone(), hasher);
-  start_worker(WorkerData::new(0, globals.clone()));
+  let thread_handles: Vec<_> = (0..options.num_threads)
+    .map(|thread_idx| {
+      let globals = globals.clone();
+      thread::Builder::new()
+        .name(format!("worker_{thread_idx}"))
+        .spawn(move || {
+          start_worker(WorkerData::new(thread_idx, globals));
+        })
+        .unwrap()
+    })
+    .collect();
+
+  let mut any_bad = false;
+  for thread in thread_handles.into_iter() {
+    any_bad = thread.join().is_err() || any_bad;
+  }
+  assert!(!any_bad);
+
   find_best_move_serial_table(game, options.search_depth, globals.resolved_states_table())
     .0
     .unwrap()
