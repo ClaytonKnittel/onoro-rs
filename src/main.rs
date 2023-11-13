@@ -26,9 +26,9 @@ fn main() {
 
   let start = SystemTime::now();
   let options = cooperate::Options {
-    num_threads: 8,
-    search_depth: 14,
-    unit_depth: 7,
+    num_threads: 16,
+    search_depth: 15,
+    unit_depth: 8,
   };
   let score = solve_with_hasher(
     &OnoroView::new(Onoro16::default_start()),
