@@ -67,7 +67,6 @@ impl SearchWorker {
 
       let score = table
         .get(&view)
-        .map(|view| view.onoro().score())
         .and_then(|score| {
           if score.determined(depth - 1) {
             self.metrics.n_states += 1;
@@ -87,10 +86,7 @@ impl SearchWorker {
             None => Score::win(1),
           };
 
-          view.mut_onoro().set_score(score.clone());
-          table.update(&mut view);
-
-          view.onoro().score()
+          table.update(view, score)
         });
 
       let score = score.backstep();

@@ -122,7 +122,6 @@ pub fn find_best_move_table(
 
     let score = table
       .get(&view)
-      .map(|view| view.onoro().score())
       .and_then(|score| {
         if score.determined(depth - 1) {
           metrics.n_states += 1;
@@ -142,10 +141,7 @@ pub fn find_best_move_table(
           None => Score::win(1),
         };
 
-        view.mut_onoro().set_score(score.clone());
-        table.update(&mut view);
-
-        view.onoro().score()
+        table.update(view, score)
       });
 
     let score = score.backstep();

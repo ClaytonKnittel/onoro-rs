@@ -156,8 +156,9 @@ fn main() {
     );
 
     println!("Checking table: {} entries:", table.len());
-    for view in table.table().iter().step_by(17) {
-      let view_score = view.onoro().score();
+    for entry in table.table().iter().step_by(17) {
+      let view = entry.key();
+      let view_score = entry.value();
       let (score, _) = find_best_move(
         view.onoro(),
         view_score.determined_depth(),

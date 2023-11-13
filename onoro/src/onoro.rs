@@ -1,10 +1,9 @@
 use std::{
-  borrow::Borrow,
   cmp,
   fmt::{Debug, Display},
 };
 
-use abstract_game::{GameIterator, GameMoveGenerator, PackedScore, Score};
+use abstract_game::{GameIterator, GameMoveGenerator};
 use algebra::group::Group;
 use itertools::interleave;
 use union_find::ConstUnionFind;
@@ -53,7 +52,7 @@ pub struct Onoro<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> {
   /// pawns, the others are white. Filled from lowest to highest index as the
   /// first phase proceeds.
   pawn_poses: [PackedIdx; N],
-  score: PackedScore<OnoroState>,
+  state: OnoroState,
   // Sum of all HexPos's of pieces on the board
   sum_of_mass: PackedHexPos,
 }
@@ -65,7 +64,7 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Onoro<N, N2, AD
   fn new() -> Self {
     Self {
       pawn_poses: [PackedIdx::null(); N],
-      score: PackedScore::new(Score::tie(0), OnoroState::new()),
+      state: OnoroState::new(),
       sum_of_mass: HexPos::zero().into(),
     }
   }
@@ -229,12 +228,12 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Onoro<N, N2, AD
       |((min_x, min_y), (max_x, max_y)), pawn| {
         (
           (
-            min_x.min(pawn.borrow().pos.x() as usize),
-            min_y.min(pawn.borrow().pos.y() as usize),
+            min_x.min(pawn.pos.x() as usize),
+            min_y.min(pawn.pos.y() as usize),
           ),
           (
-            max_x.max(pawn.borrow().pos.x() as usize),
-            max_y.max(pawn.borrow().pos.y() as usize),
+            max_x.max(pawn.pos.x() as usize),
+            max_y.max(pawn.pos.y() as usize),
           ),
         )
       },
@@ -357,20 +356,12 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Onoro<N, N2, AD
     )
   }
 
-  pub fn score(&self) -> Score {
-    self.score.score()
-  }
-
-  pub fn set_score(&mut self, score: Score) {
-    self.score = PackedScore::new(score, self.score.packed_data().clone());
-  }
-
   fn onoro_state(&self) -> &OnoroState {
-    self.score.packed_data()
+    &self.state
   }
 
   fn mut_onoro_state(&mut self) -> &mut OnoroState {
-    self.score.mut_packed_data()
+    &mut self.state
   }
 
   /// The color of the current player as a `PawnColor`.

@@ -1,4 +1,5 @@
-use dashmap::{setref::one::Ref, DashSet};
+use abstract_game::Score;
+use dashmap::DashMap;
 use onoro::Onoro16View;
 
 pub struct PassThroughHasher {
@@ -27,17 +28,17 @@ impl std::hash::BuildHasher for BuildPassThroughHasher {
 }
 
 pub struct OnoroTable {
-  table: DashSet<Onoro16View, BuildPassThroughHasher>,
+  table: DashMap<Onoro16View, Score, BuildPassThroughHasher>,
 }
 
 impl OnoroTable {
   pub fn new() -> Self {
     Self {
-      table: DashSet::with_hasher(BuildPassThroughHasher),
+      table: DashMap::with_hasher(BuildPassThroughHasher),
     }
   }
 
-  pub fn table(&self) -> &DashSet<Onoro16View, BuildPassThroughHasher> {
+  pub fn table(&self) -> &DashMap<Onoro16View, Score, BuildPassThroughHasher> {
     &self.table
   }
 
@@ -45,20 +46,21 @@ impl OnoroTable {
     self.table.len()
   }
 
-  pub fn get<'a>(
-    &'a self,
-    key: &Onoro16View,
-  ) -> Option<Ref<'a, Onoro16View, BuildPassThroughHasher>> {
-    self.table.get(key)
+  pub fn get(&self, key: &Onoro16View) -> Option<Score> {
+    self.table.get(key).map(|entry| entry.clone())
   }
 
-  /// Updates an Onoro view in the table, potentially modifying the passed view
-  /// to match the merged view that is in the table upon returning.
-  pub fn update(&self, view: &mut Onoro16View) {
-    while !self.table.insert(view.clone()) {
-      if let Some(prev_view) = self.table.remove(view) {
-        let merged_score = view.onoro().score().merge(&prev_view.onoro().score());
-        view.mut_onoro().set_score(merged_score);
+  /// Updates the score for an OnoroView in the table, returning the updated
+  /// score for the view.
+  pub fn update(&self, view: Onoro16View, score: Score) -> Score {
+    match self.table.entry(view) {
+      dashmap::mapref::entry::Entry::Occupied(mut entry) => {
+        *entry.get_mut() = entry.get().merge(&score);
+        entry.get().clone()
+      }
+      dashmap::mapref::entry::Entry::Vacant(entry) => {
+        entry.insert(score.clone());
+        score
       }
     }
   }
