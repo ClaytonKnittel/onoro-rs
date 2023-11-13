@@ -1,5 +1,9 @@
 use crate::{Move, MoveGenerator};
-use std::{fmt::Display, hash::Hash};
+use std::{
+  fmt::Display,
+  hash::Hash,
+  sync::atomic::{AtomicBool, AtomicU64, AtomicU8, Ordering},
+};
 
 use algebra::{
   group::{Group, Trivial},
@@ -22,6 +26,43 @@ use crate::{
 /// will be used for smaller games.
 type ViewHashTable<G> = HashTable<16, 256, G>;
 
+#[derive(Debug)]
+struct CanonicalView {
+  initialized: AtomicBool,
+  op_ord: AtomicU8,
+  hash: AtomicU64,
+}
+
+impl CanonicalView {
+  fn new() -> CanonicalView {
+    CanonicalView {
+      initialized: false.into(),
+      op_ord: 0.into(),
+      hash: 0.into(),
+    }
+  }
+
+  fn get_op_ord(&self) -> u8 {
+    debug_assert!(self.initialized.load(Ordering::Relaxed));
+    self.op_ord.load(Ordering::Relaxed)
+  }
+
+  fn get_hash(&self) -> u64 {
+    debug_assert!(self.initialized.load(Ordering::Relaxed));
+    self.hash.load(Ordering::Relaxed)
+  }
+}
+
+impl Clone for CanonicalView {
+  fn clone(&self) -> Self {
+    CanonicalView {
+      initialized: self.initialized.load(Ordering::Relaxed).into(),
+      op_ord: self.op_ord.load(Ordering::Relaxed).into(),
+      hash: self.hash.load(Ordering::Relaxed).into(),
+    }
+  }
+}
+
 /// A wrapper over Onoro states that caches the hash of the game state and it's
 /// canonicalizing symmetry operations. These caches values are used for quicker
 /// equality comparison between different Onoro game states which may be in
@@ -29,36 +70,45 @@ type ViewHashTable<G> = HashTable<16, 256, G>;
 #[derive(Clone, Debug)]
 pub struct OnoroView<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> {
   onoro: Onoro<N, N2, ADJ_CNT_SIZE>,
-  symm_class: SymmetryClass,
-  op_ord: u8,
-  hash: u64,
+  symm_state: BoardSymmetryState,
+  view: CanonicalView,
 }
 
 impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroView<N, N2, ADJ_CNT_SIZE> {
   /// TODO: Make new lazy
   pub fn new(onoro: Onoro<N, N2, ADJ_CNT_SIZE>) -> Self {
     let symm_state = board_symm_state(&onoro);
-
-    let (hash, op_ord) = match symm_state.symm_class {
-      SymmetryClass::C => Self::find_canonical_orientation_d6(&onoro, &symm_state),
-      SymmetryClass::V => Self::find_canonical_orientation_d3(&onoro, &symm_state),
-      SymmetryClass::E => Self::find_canonical_orientation_k4(&onoro, &symm_state),
-      SymmetryClass::CV => Self::find_canonical_orientation_c2_cv(&onoro, &symm_state),
-      SymmetryClass::CE => Self::find_canonical_orientation_c2_ce(&onoro, &symm_state),
-      SymmetryClass::EV => Self::find_canonical_orientation_c2_ev(&onoro, &symm_state),
-      SymmetryClass::Trivial => Self::find_canonical_orientation_trivial(&onoro, &symm_state),
-    };
-
     Self {
       onoro,
-      symm_class: symm_state.symm_class,
-      op_ord,
-      hash,
+      symm_state,
+      view: CanonicalView::new(),
     }
   }
 
   pub fn onoro(&self) -> &Onoro<N, N2, ADJ_CNT_SIZE> {
     &self.onoro
+  }
+
+  fn maybe_initialize_canonical_view(&self) {
+    if self.view.initialized.load(Ordering::Relaxed) {
+      return;
+    }
+
+    let (hash, op_ord) = match self.symm_state.symm_class {
+      SymmetryClass::C => Self::find_canonical_orientation_d6(&self.onoro, &self.symm_state),
+      SymmetryClass::V => Self::find_canonical_orientation_d3(&self.onoro, &self.symm_state),
+      SymmetryClass::E => Self::find_canonical_orientation_k4(&self.onoro, &self.symm_state),
+      SymmetryClass::CV => Self::find_canonical_orientation_c2_cv(&self.onoro, &self.symm_state),
+      SymmetryClass::CE => Self::find_canonical_orientation_c2_ce(&self.onoro, &self.symm_state),
+      SymmetryClass::EV => Self::find_canonical_orientation_c2_ev(&self.onoro, &self.symm_state),
+      SymmetryClass::Trivial => {
+        Self::find_canonical_orientation_trivial(&self.onoro, &self.symm_state)
+      }
+    };
+
+    self.view.initialized.store(true, Ordering::Relaxed);
+    self.view.op_ord.store(op_ord, Ordering::Relaxed);
+    self.view.hash.store(hash, Ordering::Relaxed);
   }
 
   fn find_canonical_orientation_d6(
@@ -181,8 +231,8 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroView<N, N2
     let origin1 = onoro1.origin(&symm_state1);
     let origin2 = onoro2.origin(&symm_state2);
 
-    let canon_op1 = G::from_ord(view1.op_ord as usize);
-    let canon_op2 = G::from_ord(view2.op_ord as usize);
+    let canon_op1 = G::from_ord(view1.view.get_op_ord() as usize);
+    let canon_op2 = G::from_ord(view2.view.get_op_ord() as usize);
     let to_view2 = canon_op2.inverse() * canon_op1;
 
     let same_color_turn = onoro1.player_color() == onoro2.player_color();
@@ -217,11 +267,16 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> PartialEq
   for OnoroView<N, N2, ADJ_CNT_SIZE>
 {
   fn eq(&self, other: &Self) -> bool {
-    if self.hash != other.hash || self.symm_class != other.symm_class {
+    self.maybe_initialize_canonical_view();
+    other.maybe_initialize_canonical_view();
+
+    if self.view.get_hash() != other.view.get_hash()
+      || self.symm_state.symm_class != other.symm_state.symm_class
+    {
       return false;
     }
 
-    match self.symm_class {
+    match self.symm_state.symm_class {
       SymmetryClass::C => Self::cmp_views(self, other, HexPosOffset::apply_d6_c),
       SymmetryClass::V => Self::cmp_views(self, other, HexPosOffset::apply_d3_v),
       SymmetryClass::E => Self::cmp_views(self, other, HexPosOffset::apply_k4_e),
@@ -242,7 +297,8 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Hash
   for OnoroView<N, N2, ADJ_CNT_SIZE>
 {
   fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-    state.write_u64(self.hash);
+    self.maybe_initialize_canonical_view();
+    state.write_u64(self.view.get_hash());
   }
 }
 
@@ -250,15 +306,17 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Display
   for OnoroView<N, N2, ADJ_CNT_SIZE>
 {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    self.maybe_initialize_canonical_view();
+
     let symm_state = board_symm_state(self.onoro());
     let rotated = self.onoro().rotated_d6_c(symm_state.op);
-    let _rotated = match self.symm_class {
-      SymmetryClass::C => rotated.rotated_d6_c(D6::from_ord(self.op_ord as usize)),
-      SymmetryClass::V => rotated.rotated_d3_v(D3::from_ord(self.op_ord as usize)),
-      SymmetryClass::E => rotated.rotated_k4_e(K4::from_ord(self.op_ord as usize)),
-      SymmetryClass::CV => rotated.rotated_c2_cv(C2::from_ord(self.op_ord as usize)),
-      SymmetryClass::CE => rotated.rotated_c2_ce(C2::from_ord(self.op_ord as usize)),
-      SymmetryClass::EV => rotated.rotated_c2_ev(C2::from_ord(self.op_ord as usize)),
+    let _rotated = match self.symm_state.symm_class {
+      SymmetryClass::C => rotated.rotated_d6_c(D6::from_ord(self.view.get_op_ord() as usize)),
+      SymmetryClass::V => rotated.rotated_d3_v(D3::from_ord(self.view.get_op_ord() as usize)),
+      SymmetryClass::E => rotated.rotated_k4_e(K4::from_ord(self.view.get_op_ord() as usize)),
+      SymmetryClass::CV => rotated.rotated_c2_cv(C2::from_ord(self.view.get_op_ord() as usize)),
+      SymmetryClass::CE => rotated.rotated_c2_ce(C2::from_ord(self.view.get_op_ord() as usize)),
+      SymmetryClass::EV => rotated.rotated_c2_ev(C2::from_ord(self.view.get_op_ord() as usize)),
       SymmetryClass::Trivial => rotated,
     };
 
@@ -266,17 +324,17 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Display
       f,
       "{}\n{:?}: canon: {}, normalize: {} ({:#018x?})",
       self.onoro,
-      self.symm_class,
+      self.symm_state.symm_class,
       symm_state.op,
-      match self.symm_class {
-        SymmetryClass::C => D6::from_ord(self.op_ord as usize).to_string(),
-        SymmetryClass::V => D3::from_ord(self.op_ord as usize).to_string(),
-        SymmetryClass::E => K4::from_ord(self.op_ord as usize).to_string(),
+      match self.symm_state.symm_class {
+        SymmetryClass::C => D6::from_ord(self.view.get_op_ord() as usize).to_string(),
+        SymmetryClass::V => D3::from_ord(self.view.get_op_ord() as usize).to_string(),
+        SymmetryClass::E => K4::from_ord(self.view.get_op_ord() as usize).to_string(),
         SymmetryClass::CV | SymmetryClass::CE | SymmetryClass::EV =>
-          C2::from_ord(self.op_ord as usize).to_string(),
-        SymmetryClass::Trivial => Trivial::from_ord(self.op_ord as usize).to_string(),
+          C2::from_ord(self.view.get_op_ord() as usize).to_string(),
+        SymmetryClass::Trivial => Trivial::from_ord(self.view.get_op_ord() as usize).to_string(),
       },
-      self.hash
+      self.view.get_hash()
     )
   }
 }
@@ -349,7 +407,7 @@ mod tests {
       .unwrap(),
     );
 
-    assert_eq!(view1.symm_class, SymmetryClass::V);
+    assert_eq!(view1.symm_state.symm_class, SymmetryClass::V);
 
     assert_eq!(view1, view2);
   }
@@ -398,9 +456,9 @@ mod tests {
       .unwrap(),
     );
 
-    assert_eq!(view1.symm_class, SymmetryClass::C);
-    assert_eq!(view3.symm_class, SymmetryClass::C);
-    assert_eq!(view4.symm_class, SymmetryClass::C);
+    assert_eq!(view1.symm_state.symm_class, SymmetryClass::C);
+    assert_eq!(view3.symm_state.symm_class, SymmetryClass::C);
+    assert_eq!(view4.symm_state.symm_class, SymmetryClass::C);
 
     assert_eq!(view1, view2);
     assert_ne!(view1, view3);
@@ -450,8 +508,8 @@ mod tests {
       .unwrap(),
     );
 
-    assert_eq!(view1.symm_class, SymmetryClass::C);
-    assert_eq!(view3.symm_class, SymmetryClass::C);
+    assert_eq!(view1.symm_state.symm_class, SymmetryClass::C);
+    assert_eq!(view3.symm_state.symm_class, SymmetryClass::C);
 
     assert_eq!(view1, view2);
     assert_ne!(view1, view3);
@@ -500,8 +558,8 @@ mod tests {
       .unwrap(),
     );
 
-    assert_eq!(view1.symm_class, SymmetryClass::E);
-    assert_eq!(view3.symm_class, SymmetryClass::E);
+    assert_eq!(view1.symm_state.symm_class, SymmetryClass::E);
+    assert_eq!(view3.symm_state.symm_class, SymmetryClass::E);
 
     assert_eq!(view1, view2);
     assert_ne!(view1, view3);
@@ -555,8 +613,8 @@ mod tests {
       .unwrap(),
     );
 
-    assert_eq!(view1.symm_class, SymmetryClass::CV);
-    assert_eq!(view3.symm_class, SymmetryClass::CV);
+    assert_eq!(view1.symm_state.symm_class, SymmetryClass::CV);
+    assert_eq!(view3.symm_state.symm_class, SymmetryClass::CV);
 
     assert_eq!(view1, view2);
     assert_ne!(view1, view3);
@@ -595,7 +653,7 @@ mod tests {
     let views =
       BOARD_POSITIONS.map(|view| OnoroView::new(Onoro16::from_board_string(view).unwrap()));
     for i in 0..views.len() {
-      assert_eq!(views[i].symm_class, SymmetryClass::CV);
+      assert_eq!(views[i].symm_state.symm_class, SymmetryClass::CV);
       for j in 0..i {
         let view1 = &views[j];
         let view2 = &views[i];
@@ -639,8 +697,8 @@ mod tests {
       .unwrap(),
     );
 
-    assert_eq!(view1.symm_class, SymmetryClass::CE);
-    assert_eq!(view3.symm_class, SymmetryClass::CE);
+    assert_eq!(view1.symm_state.symm_class, SymmetryClass::CE);
+    assert_eq!(view3.symm_state.symm_class, SymmetryClass::CE);
 
     assert_eq!(view1, view2);
     assert_ne!(view1, view3);
@@ -691,8 +749,8 @@ mod tests {
       .unwrap(),
     );
 
-    assert_eq!(view1.symm_class, SymmetryClass::EV);
-    assert_eq!(view3.symm_class, SymmetryClass::EV);
+    assert_eq!(view1.symm_state.symm_class, SymmetryClass::EV);
+    assert_eq!(view3.symm_state.symm_class, SymmetryClass::EV);
 
     assert_eq!(view1, view2);
     assert_ne!(view1, view3);
@@ -743,8 +801,8 @@ mod tests {
       .unwrap(),
     );
 
-    assert_eq!(view1.symm_class, SymmetryClass::Trivial);
-    assert_eq!(view3.symm_class, SymmetryClass::Trivial);
+    assert_eq!(view1.symm_state.symm_class, SymmetryClass::Trivial);
+    assert_eq!(view3.symm_state.symm_class, SymmetryClass::Trivial);
 
     assert_eq!(view1, view2);
     assert_ne!(view1, view3);
