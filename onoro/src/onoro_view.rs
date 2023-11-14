@@ -445,7 +445,7 @@ mod tests {
       .unwrap(),
     );
 
-    assert_eq!(view1.symm_state.symm_class, SymmetryClass::V);
+    assert_eq!(view1.canon_view().get_symm_class(), SymmetryClass::V);
 
     assert_eq!(view1, view2);
   }
@@ -494,9 +494,9 @@ mod tests {
       .unwrap(),
     );
 
-    assert_eq!(view1.symm_state.symm_class, SymmetryClass::C);
-    assert_eq!(view3.symm_state.symm_class, SymmetryClass::C);
-    assert_eq!(view4.symm_state.symm_class, SymmetryClass::C);
+    assert_eq!(view1.canon_view().get_symm_class(), SymmetryClass::C);
+    assert_eq!(view3.canon_view().get_symm_class(), SymmetryClass::C);
+    assert_eq!(view4.canon_view().get_symm_class(), SymmetryClass::C);
 
     assert_eq!(view1, view2);
     assert_ne!(view1, view3);
@@ -546,8 +546,8 @@ mod tests {
       .unwrap(),
     );
 
-    assert_eq!(view1.symm_state.symm_class, SymmetryClass::C);
-    assert_eq!(view3.symm_state.symm_class, SymmetryClass::C);
+    assert_eq!(view1.canon_view().get_symm_class(), SymmetryClass::C);
+    assert_eq!(view3.canon_view().get_symm_class(), SymmetryClass::C);
 
     assert_eq!(view1, view2);
     assert_ne!(view1, view3);
@@ -596,8 +596,8 @@ mod tests {
       .unwrap(),
     );
 
-    assert_eq!(view1.symm_state.symm_class, SymmetryClass::E);
-    assert_eq!(view3.symm_state.symm_class, SymmetryClass::E);
+    assert_eq!(view1.canon_view().get_symm_class(), SymmetryClass::E);
+    assert_eq!(view3.canon_view().get_symm_class(), SymmetryClass::E);
 
     assert_eq!(view1, view2);
     assert_ne!(view1, view3);
@@ -651,8 +651,8 @@ mod tests {
       .unwrap(),
     );
 
-    assert_eq!(view1.symm_state.symm_class, SymmetryClass::CV);
-    assert_eq!(view3.symm_state.symm_class, SymmetryClass::CV);
+    assert_eq!(view1.canon_view().get_symm_class(), SymmetryClass::CV);
+    assert_eq!(view3.canon_view().get_symm_class(), SymmetryClass::CV);
 
     assert_eq!(view1, view2);
     assert_ne!(view1, view3);
@@ -691,7 +691,7 @@ mod tests {
     let views =
       BOARD_POSITIONS.map(|view| OnoroView::new(Onoro16::from_board_string(view).unwrap()));
     for i in 0..views.len() {
-      assert_eq!(views[i].symm_state.symm_class, SymmetryClass::CV);
+      assert_eq!(views[i].canon_view().get_symm_class(), SymmetryClass::CV);
       for j in 0..i {
         let view1 = &views[j];
         let view2 = &views[i];
@@ -735,8 +735,8 @@ mod tests {
       .unwrap(),
     );
 
-    assert_eq!(view1.symm_state.symm_class, SymmetryClass::CE);
-    assert_eq!(view3.symm_state.symm_class, SymmetryClass::CE);
+    assert_eq!(view1.canon_view().get_symm_class(), SymmetryClass::CE);
+    assert_eq!(view3.canon_view().get_symm_class(), SymmetryClass::CE);
 
     assert_eq!(view1, view2);
     assert_ne!(view1, view3);
@@ -787,8 +787,8 @@ mod tests {
       .unwrap(),
     );
 
-    assert_eq!(view1.symm_state.symm_class, SymmetryClass::EV);
-    assert_eq!(view3.symm_state.symm_class, SymmetryClass::EV);
+    assert_eq!(view1.canon_view().get_symm_class(), SymmetryClass::EV);
+    assert_eq!(view3.canon_view().get_symm_class(), SymmetryClass::EV);
 
     assert_eq!(view1, view2);
     assert_ne!(view1, view3);
@@ -839,8 +839,8 @@ mod tests {
       .unwrap(),
     );
 
-    assert_eq!(view1.symm_state.symm_class, SymmetryClass::Trivial);
-    assert_eq!(view3.symm_state.symm_class, SymmetryClass::Trivial);
+    assert_eq!(view1.canon_view().get_symm_class(), SymmetryClass::Trivial);
+    assert_eq!(view3.canon_view().get_symm_class(), SymmetryClass::Trivial);
 
     assert_eq!(view1, view2);
     assert_ne!(view1, view3);

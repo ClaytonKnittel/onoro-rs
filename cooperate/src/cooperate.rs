@@ -341,14 +341,14 @@ mod tests {
     assert!(!any_bad);
 
     // Compute the ground truth table.
-    let mut table = find_best_move_serial(&Gomoku::new(4, 4, 4), DEPTH).2;
+    let table = find_best_move_serial(&Gomoku::new(4, 4, 4), DEPTH).2;
 
     for state in globals.resolved_states_table().table().iter() {
       // Terminal states should not be stored in the table.
       assert_eq!(state.key().finished(), GameResult::NotFinished);
 
       let expected_score = table.get(state.key()).unwrap_or_else(|| {
-        find_best_move_serial_table(state.key(), DEPTH, &mut table);
+        find_best_move_serial_table(state.key(), DEPTH, &table);
         table.get(state.key()).unwrap()
       });
 
@@ -405,14 +405,14 @@ mod tests {
     assert!(!any_bad);
 
     // Compute the ground truth table.
-    let mut table = find_best_move_serial(&Gomoku::new(4, 4, 4), DEPTH).2;
+    let table = find_best_move_serial(&Gomoku::new(4, 4, 4), DEPTH).2;
 
     for state in globals.resolved_states_table().table().iter() {
       // Terminal states should not be stored in the table.
       assert_eq!(state.key().finished(), GameResult::NotFinished);
 
       let expected_score = table.get(state.key()).unwrap_or_else(|| {
-        find_best_move_serial_table(state.key(), DEPTH, &mut table);
+        find_best_move_serial_table(state.key(), DEPTH, &table);
         table.get(state.key()).unwrap()
       });
 
@@ -469,14 +469,14 @@ mod tests {
     assert!(!any_bad);
 
     // Compute the ground truth table.
-    let mut table = find_best_move_serial(&Gomoku::new(4, 4, 4), DEPTH).2;
+    let table = find_best_move_serial(&Gomoku::new(4, 4, 4), DEPTH).2;
 
     for state in globals.resolved_states_table().table().iter() {
       // Terminal states should not be stored in the table.
       assert_eq!(state.key().finished(), GameResult::NotFinished);
 
       let expected_score = table.get(state.key()).unwrap_or_else(|| {
-        find_best_move_serial_table(state.key(), DEPTH, &mut table);
+        find_best_move_serial_table(state.key(), DEPTH, &table);
         table.get(state.key()).unwrap()
       });
 
@@ -533,14 +533,14 @@ mod tests {
     assert!(!any_bad);
 
     // Compute the ground truth table.
-    let mut table = find_best_move_serial(&Gomoku::new(5, 5, 4), DEPTH).2;
+    let table = find_best_move_serial(&Gomoku::new(5, 5, 4), DEPTH).2;
 
     for state in globals.resolved_states_table().table().iter() {
       // Terminal states should not be stored in the table.
       assert_eq!(state.key().finished(), GameResult::NotFinished);
 
       let expected_score = table.get(state.key()).unwrap_or_else(|| {
-        find_best_move_serial_table(state.key(), DEPTH, &mut table);
+        find_best_move_serial_table(state.key(), DEPTH, &table);
         table.get(state.key()).unwrap()
       });
 
