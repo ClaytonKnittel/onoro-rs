@@ -13,7 +13,6 @@ use crate::{
   global_data::GlobalData,
   null_lock::NullLock,
   search_worker::{start_worker, WorkerData},
-  serial_search::find_best_move_serial_table,
   stack::Stack,
 };
 
@@ -124,9 +123,7 @@ where
   // grabbed from LRU cache definitively. With the resolved table now being an
   // LRU cache, we don't know for certain if all game states on the frontier
   // are still cached.
-  find_best_move_serial_table(game, options.search_depth, globals.resolved_states_table())
-    .0
-    .unwrap()
+  todo!()
 }
 
 #[cfg(test)]
@@ -159,9 +156,13 @@ mod tests {
     start_worker(WorkerData::new(0, globals.clone()));
 
     for sticks in 1..=STICKS {
-      let cached_score = globals.resolved_states_table().get(&Nim::new(sticks));
+      let cached_score = globals
+        .resolved_states_table()
+        .lock()
+        .unwrap()
+        .get(&Nim::new(sticks));
       assert!(cached_score.is_some());
-      assert_eq!(cached_score.unwrap(), Nim::new(sticks).expected_score());
+      assert_eq!(*cached_score.unwrap(), Nim::new(sticks).expected_score());
     }
   }
 
@@ -193,9 +194,13 @@ mod tests {
     }
 
     for sticks in 1..=(STICKS - 1) {
-      let cached_score = globals.resolved_states_table().get(&Nim::new(sticks));
+      let cached_score = globals
+        .resolved_states_table()
+        .lock()
+        .unwrap()
+        .get(&Nim::new(sticks));
       assert!(cached_score.is_some());
-      assert_eq!(cached_score.unwrap(), Nim::new(sticks).expected_score());
+      assert_eq!(*cached_score.unwrap(), Nim::new(sticks).expected_score());
     }
   }
 
@@ -232,21 +237,21 @@ mod tests {
     }
     assert!(!any_bad);
 
-    for state in globals.resolved_states_table().table().iter() {
+    for (ttt, &score) in globals.resolved_states_table().lock().unwrap().iter() {
       // Terminal states should not be stored in the table.
-      assert_eq!(state.key().finished(), GameResult::NotFinished);
+      assert_eq!(ttt.finished(), GameResult::NotFinished);
 
       // Compute the score using a simple min-max search.
-      let expected_score = state.key().compute_expected_score(DEPTH);
+      let expected_score = ttt.compute_expected_score(DEPTH);
 
       // We can't expect the scores to be equal, since the score from the
       // algorithm may not be complete (i.e. there's a win in X turns, but we're
       // unsure if there's a way to win in fewer turns). We expect them to be
       // compatible.
       assert!(
-        state.value().compatible(&expected_score),
+        score.compatible(&expected_score),
         "Expect computed score {} to be compatible with true score {}",
-        state.value(),
+        score,
         expected_score
       );
     }
@@ -285,21 +290,21 @@ mod tests {
     }
     assert!(!any_bad);
 
-    for state in globals.resolved_states_table().table().iter() {
+    for (ttt, &score) in globals.resolved_states_table().lock().unwrap().iter() {
       // Terminal states should not be stored in the table.
-      assert_eq!(state.key().finished(), GameResult::NotFinished);
+      assert_eq!(ttt.finished(), GameResult::NotFinished);
 
       // Compute the score using a simple min-max search.
-      let expected_score = state.key().compute_expected_score(DEPTH);
+      let expected_score = ttt.compute_expected_score(DEPTH);
 
       // We can't expect the scores to be equal, since the score from the
       // algorithm may not be complete (i.e. there's a win in X turns, but we're
       // unsure if there's a way to win in fewer turns). We expect them to be
       // compatible.
       assert!(
-        state.value().compatible(&expected_score),
+        score.compatible(&expected_score),
         "Expect computed score {} to be compatible with true score {}",
-        state.value(),
+        score,
         expected_score
       );
     }
@@ -347,13 +352,13 @@ mod tests {
     // Compute the ground truth table.
     let table = find_best_move_serial(&Gomoku::new(4, 4, 4), DEPTH).2;
 
-    for state in globals.resolved_states_table().table().iter() {
+    for (gomoku, &score) in globals.resolved_states_table().lock().unwrap().iter() {
       // Terminal states should not be stored in the table.
-      assert_eq!(state.key().finished(), GameResult::NotFinished);
+      assert_eq!(gomoku.finished(), GameResult::NotFinished);
 
-      let expected_score = table.get(state.key()).unwrap_or_else(|| {
-        find_best_move_serial_table(state.key(), DEPTH, &table);
-        table.get(state.key()).unwrap()
+      let expected_score = table.get(gomoku).unwrap_or_else(|| {
+        find_best_move_serial_table(gomoku, DEPTH, &table);
+        table.get(gomoku).unwrap()
       });
 
       // We can't expect the scores to be equal, since the score from the
@@ -361,9 +366,9 @@ mod tests {
       // unsure if there's a way to win in fewer turns). We expect them to be
       // compatible.
       assert!(
-        state.value().compatible(&expected_score),
+        score.compatible(&expected_score),
         "Expect computed score {} to be compatible with true score {}",
-        state.value(),
+        score,
         expected_score
       );
     }
@@ -411,13 +416,13 @@ mod tests {
     // Compute the ground truth table.
     let table = find_best_move_serial(&Gomoku::new(4, 4, 4), DEPTH).2;
 
-    for state in globals.resolved_states_table().table().iter() {
+    for (gomoku, &score) in globals.resolved_states_table().lock().unwrap().iter() {
       // Terminal states should not be stored in the table.
-      assert_eq!(state.key().finished(), GameResult::NotFinished);
+      assert_eq!(gomoku.finished(), GameResult::NotFinished);
 
-      let expected_score = table.get(state.key()).unwrap_or_else(|| {
-        find_best_move_serial_table(state.key(), DEPTH, &table);
-        table.get(state.key()).unwrap()
+      let expected_score = table.get(gomoku).unwrap_or_else(|| {
+        find_best_move_serial_table(gomoku, DEPTH, &table);
+        table.get(gomoku).unwrap()
       });
 
       // We can't expect the scores to be equal, since the score from the
@@ -425,9 +430,9 @@ mod tests {
       // unsure if there's a way to win in fewer turns). We expect them to be
       // compatible.
       assert!(
-        state.value().compatible(&expected_score),
+        score.compatible(&expected_score),
         "Expect computed score {} to be compatible with true score {}",
-        state.value(),
+        score,
         expected_score
       );
     }
@@ -475,13 +480,13 @@ mod tests {
     // Compute the ground truth table.
     let table = find_best_move_serial(&Gomoku::new(4, 4, 4), DEPTH).2;
 
-    for state in globals.resolved_states_table().table().iter() {
+    for (gomoku, &score) in globals.resolved_states_table().lock().unwrap().iter() {
       // Terminal states should not be stored in the table.
-      assert_eq!(state.key().finished(), GameResult::NotFinished);
+      assert_eq!(gomoku.finished(), GameResult::NotFinished);
 
-      let expected_score = table.get(state.key()).unwrap_or_else(|| {
-        find_best_move_serial_table(state.key(), DEPTH, &table);
-        table.get(state.key()).unwrap()
+      let expected_score = table.get(gomoku).unwrap_or_else(|| {
+        find_best_move_serial_table(gomoku, DEPTH, &table);
+        table.get(gomoku).unwrap()
       });
 
       // We can't expect the scores to be equal, since the score from the
@@ -489,9 +494,9 @@ mod tests {
       // unsure if there's a way to win in fewer turns). We expect them to be
       // compatible.
       assert!(
-        state.value().compatible(&expected_score),
+        score.compatible(&expected_score),
         "Expect computed score {} to be compatible with true score {}",
-        state.value(),
+        score,
         expected_score
       );
     }
@@ -539,13 +544,13 @@ mod tests {
     // Compute the ground truth table.
     let table = find_best_move_serial(&Gomoku::new(5, 5, 4), DEPTH).2;
 
-    for state in globals.resolved_states_table().table().iter() {
+    for (gomoku, &score) in globals.resolved_states_table().lock().unwrap().iter() {
       // Terminal states should not be stored in the table.
-      assert_eq!(state.key().finished(), GameResult::NotFinished);
+      assert_eq!(gomoku.finished(), GameResult::NotFinished);
 
-      let expected_score = table.get(state.key()).unwrap_or_else(|| {
-        find_best_move_serial_table(state.key(), DEPTH, &table);
-        table.get(state.key()).unwrap()
+      let expected_score = table.get(gomoku).unwrap_or_else(|| {
+        find_best_move_serial_table(gomoku, DEPTH, &table);
+        table.get(gomoku).unwrap()
       });
 
       // We can't expect the scores to be equal, since the score from the
@@ -553,9 +558,9 @@ mod tests {
       // unsure if there's a way to win in fewer turns). We expect them to be
       // compatible.
       assert!(
-        state.value().compatible(&expected_score),
+        score.compatible(&expected_score),
         "Expect computed score {} to be compatible with true score {}",
-        state.value(),
+        score,
         expected_score
       );
     }

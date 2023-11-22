@@ -109,10 +109,12 @@ where
     let game = bottom_state.game();
 
     if let Ok(mut guard) = self.resolved_states.lock() {
-      if let Some(&score) = guard.get(game) {
+      if let Some(score) = guard.get(game) {
         if score.determined(stack.bottom_depth()) {
           metrics.hits += 1;
-          return LookupResult::Found { score };
+          return LookupResult::Found {
+            score: score.clone(),
+          };
         }
       }
     }
