@@ -11,7 +11,7 @@ use crossbeam_queue::SegQueue;
 use dashmap::{mapref::entry::Entry, DashMap};
 use lru::LruCache;
 
-use crate::{null_lock::NullLock, stack::Stack, table::Table, Metrics};
+use crate::{null_lock::NullLock, stack::Stack, Metrics};
 
 struct PendingFrame<G>
 where
@@ -57,16 +57,13 @@ where
   G::Move: Display,
 {
   #[cfg(test)]
-  pub fn new(search_depth: u32, num_threads: u32) -> Self {
+  pub fn new(cache_size: NonZeroUsize, search_depth: u32, num_threads: u32) -> Self {
     Self {
       queues: (0..num_threads).map(|_| SegQueue::new()).collect(),
       pending_states: (0..search_depth)
         .map(|_| DashMap::<G, PendingFrame<G>, RandomState>::new())
         .collect(),
-      resolved_states: Mutex::new(LruCache::with_hasher(
-        NonZeroUsize::new(1000).unwrap(),
-        RandomState::new(),
-      )),
+      resolved_states: Mutex::new(LruCache::with_hasher(cache_size, RandomState::new())),
     }
   }
 }
@@ -78,16 +75,18 @@ where
   G::PlayerIdentifier: Debug,
   H: BuildHasher + Clone,
 {
-  pub fn with_hasher(search_depth: u32, num_threads: u32, hasher: H) -> Self {
+  pub fn with_hasher(
+    cache_size: NonZeroUsize,
+    search_depth: u32,
+    num_threads: u32,
+    hasher: H,
+  ) -> Self {
     Self {
       queues: (0..num_threads).map(|_| SegQueue::new()).collect(),
       pending_states: (0..search_depth)
         .map(|_| DashMap::<G, PendingFrame<G>, H>::with_hasher(hasher.clone()))
         .collect(),
-      resolved_states: Mutex::new(LruCache::with_hasher(
-        NonZeroUsize::new(1000).unwrap(),
-        hasher,
-      )),
+      resolved_states: Mutex::new(LruCache::with_hasher(cache_size, hasher)),
     }
   }
 

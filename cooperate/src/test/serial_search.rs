@@ -6,7 +6,7 @@ use std::{
 
 use abstract_game::{Game, GameResult, Score, ScoreValue};
 
-use crate::table::Table;
+use super::table::Table;
 
 fn check_score<G, H>(game: G, score: Score, table: &Table<G, H>)
 where

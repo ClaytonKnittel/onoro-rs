@@ -306,10 +306,6 @@ where
     self.pop_with_score(completed_frame.best_score().0.clone())
   }
 
-  pub fn stack_state(&self) -> StackState {
-    self.state
-  }
-
   pub fn revive(&mut self) {
     debug_assert_ne!(self.state, StackState::Live);
     self.state = StackState::Live;
@@ -368,10 +364,6 @@ where
 
   pub fn is_full(&self) -> bool {
     self.frames.len() == self.root_depth as usize
-  }
-
-  pub fn frame(&self, idx: u32) -> &StackFrame<G> {
-    self.frames.get(idx as usize).unwrap()
   }
 
   pub fn frame_mut(&mut self, idx: u32) -> &mut StackFrame<G> {

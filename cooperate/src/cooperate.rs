@@ -2,6 +2,7 @@ use std::{
   collections::{hash_map::RandomState, HashSet},
   fmt::{Debug, Display},
   hash::{BuildHasher, Hash},
+  num::NonZeroUsize,
   sync::Arc,
   thread,
 };
@@ -32,16 +33,20 @@ where
   G::Move: Display,
 {
   let mut visited_states = HashSet::new();
+  let initial_state = Box::into_raw(Box::new(Stack::make_root(
+    initial_state,
+    options.search_depth,
+  )));
   let mut frontier = vec![initial_state];
 
   for _ in 0..options.unit_depth {
     let mut next_frontier = Vec::new();
 
-    for state in frontier.into_iter() {
-      for m in state.each_move() {
-        let child = state.with_move(m);
-        if visited_states.insert(child.clone()) {
-          next_frontier.push(child);
+    for stack_ptr in frontier.into_iter() {
+      for child in Stack::split(stack_ptr) {
+        let child_ptr = Box::into_raw(Box::new(child));
+        if visited_states.insert(child_ptr) {
+          next_frontier.push(child_ptr);
         }
       }
     }
@@ -50,14 +55,6 @@ where
   }
 
   frontier
-    .into_iter()
-    .map(|state| {
-      Box::into_raw(Box::new(Stack::make_root(
-        state,
-        options.search_depth - options.unit_depth,
-      )))
-    })
-    .collect()
 }
 
 fn construct_globals<G, H>(game: &G, options: Options, hasher: H) -> Arc<GlobalData<G, H>>
@@ -68,6 +65,7 @@ where
   H: BuildHasher + Clone,
 {
   let globals = Arc::new(GlobalData::with_hasher(
+    NonZeroUsize::new(100_000_000).unwrap(),
     options.search_depth,
     options.num_threads,
     hasher,
@@ -123,20 +121,25 @@ where
   // grabbed from LRU cache definitively. With the resolved table now being an
   // LRU cache, we don't know for certain if all game states on the frontier
   // are still cached.
-  todo!()
+  let lru_cache = &mut globals.resolved_states_table().lock().unwrap();
+  lru_cache.get(game).unwrap().clone()
 }
 
 #[cfg(test)]
 mod tests {
   use std::{collections::hash_map::RandomState, thread, time::SystemTime};
 
-  use abstract_game::{Game, GameResult};
+  use abstract_game::{Game, GameResult, Score};
 
   use crate::{
     cooperate::construct_globals,
     search_worker::{start_worker, WorkerData},
-    serial_search::{find_best_move_serial, find_best_move_serial_table},
-    test::{gomoku::Gomoku, nim::Nim, tic_tac_toe::Ttt},
+    test::{
+      gomoku::Gomoku,
+      nim::Nim,
+      serial_search::{find_best_move_serial, find_best_move_serial_table},
+      tic_tac_toe::Ttt,
+    },
   };
 
   #[test]
@@ -160,9 +163,10 @@ mod tests {
         .resolved_states_table()
         .lock()
         .unwrap()
-        .get(&Nim::new(sticks));
+        .get(&Nim::new(sticks))
+        .map(Score::clone);
       assert!(cached_score.is_some());
-      assert_eq!(*cached_score.unwrap(), Nim::new(sticks).expected_score());
+      assert_eq!(cached_score.unwrap(), Nim::new(sticks).expected_score());
     }
   }
 
@@ -198,9 +202,10 @@ mod tests {
         .resolved_states_table()
         .lock()
         .unwrap()
-        .get(&Nim::new(sticks));
+        .get(&Nim::new(sticks))
+        .map(Score::clone);
       assert!(cached_score.is_some());
-      assert_eq!(*cached_score.unwrap(), Nim::new(sticks).expected_score());
+      assert_eq!(cached_score.unwrap(), Nim::new(sticks).expected_score());
     }
   }
 
@@ -237,7 +242,7 @@ mod tests {
     }
     assert!(!any_bad);
 
-    for (ttt, &score) in globals.resolved_states_table().lock().unwrap().iter() {
+    for (ttt, score) in globals.resolved_states_table().lock().unwrap().iter() {
       // Terminal states should not be stored in the table.
       assert_eq!(ttt.finished(), GameResult::NotFinished);
 
@@ -290,7 +295,7 @@ mod tests {
     }
     assert!(!any_bad);
 
-    for (ttt, &score) in globals.resolved_states_table().lock().unwrap().iter() {
+    for (ttt, score) in globals.resolved_states_table().lock().unwrap().iter() {
       // Terminal states should not be stored in the table.
       assert_eq!(ttt.finished(), GameResult::NotFinished);
 
@@ -352,7 +357,7 @@ mod tests {
     // Compute the ground truth table.
     let table = find_best_move_serial(&Gomoku::new(4, 4, 4), DEPTH).2;
 
-    for (gomoku, &score) in globals.resolved_states_table().lock().unwrap().iter() {
+    for (gomoku, score) in globals.resolved_states_table().lock().unwrap().iter() {
       // Terminal states should not be stored in the table.
       assert_eq!(gomoku.finished(), GameResult::NotFinished);
 
@@ -416,7 +421,7 @@ mod tests {
     // Compute the ground truth table.
     let table = find_best_move_serial(&Gomoku::new(4, 4, 4), DEPTH).2;
 
-    for (gomoku, &score) in globals.resolved_states_table().lock().unwrap().iter() {
+    for (gomoku, score) in globals.resolved_states_table().lock().unwrap().iter() {
       // Terminal states should not be stored in the table.
       assert_eq!(gomoku.finished(), GameResult::NotFinished);
 
@@ -480,7 +485,7 @@ mod tests {
     // Compute the ground truth table.
     let table = find_best_move_serial(&Gomoku::new(4, 4, 4), DEPTH).2;
 
-    for (gomoku, &score) in globals.resolved_states_table().lock().unwrap().iter() {
+    for (gomoku, score) in globals.resolved_states_table().lock().unwrap().iter() {
       // Terminal states should not be stored in the table.
       assert_eq!(gomoku.finished(), GameResult::NotFinished);
 
@@ -544,7 +549,7 @@ mod tests {
     // Compute the ground truth table.
     let table = find_best_move_serial(&Gomoku::new(5, 5, 4), DEPTH).2;
 
-    for (gomoku, &score) in globals.resolved_states_table().lock().unwrap().iter() {
+    for (gomoku, score) in globals.resolved_states_table().lock().unwrap().iter() {
       // Terminal states should not be stored in the table.
       assert_eq!(gomoku.finished(), GameResult::NotFinished);
 

@@ -147,24 +147,30 @@ where
 
 #[cfg(test)]
 mod tests {
-  use std::{sync::Arc, time::SystemTime};
+  use std::{num::NonZeroUsize, sync::Arc, time::SystemTime};
 
-  use abstract_game::{Game, GameResult};
+  use abstract_game::{Game, GameResult, Score};
 
   use crate::{
     global_data::GlobalData,
     null_lock::NullLock,
-    serial_search::{find_best_move_serial, find_best_move_serial_table},
     stack::Stack,
-    test::{gomoku::Gomoku, nim::Nim, tic_tac_toe::Ttt},
+    test::{
+      gomoku::Gomoku,
+      nim::Nim,
+      serial_search::{find_best_move_serial, find_best_move_serial_table},
+      tic_tac_toe::Ttt,
+    },
   };
 
   use super::{start_worker, WorkerData};
 
+  const CACHE_SIZE: NonZeroUsize = unsafe { NonZeroUsize::new_unchecked(100_000) };
+
   #[test]
   fn test_nim_serial() {
     const STICKS: u32 = 100;
-    let globals = Arc::new(GlobalData::new(STICKS + 1, 1));
+    let globals = Arc::new(GlobalData::new(CACHE_SIZE, STICKS + 1, 1));
     globals.queue(0).push(unsafe {
       NullLock::new(Box::into_raw(Box::new(Stack::make_root(
         Nim::new(STICKS),
@@ -175,7 +181,12 @@ mod tests {
     start_worker(WorkerData::new(0, globals.clone()));
 
     for sticks in 1..=STICKS {
-      let cached_score = globals.resolved_states_table().get(&Nim::new(sticks));
+      let cached_score = globals
+        .resolved_states_table()
+        .lock()
+        .unwrap()
+        .get(&Nim::new(sticks))
+        .map(Score::clone);
       assert!(cached_score.is_some());
       assert_eq!(cached_score.unwrap(), Nim::new(sticks).expected_score());
     }
@@ -184,7 +195,7 @@ mod tests {
   #[test]
   fn test_ttt_serial() {
     const DEPTH: u32 = 10;
-    let globals = Arc::new(GlobalData::new(DEPTH, 1));
+    let globals = Arc::new(GlobalData::new(CACHE_SIZE, DEPTH, 1));
     globals
       .queue(0)
       .push(unsafe { NullLock::new(Box::into_raw(Box::new(Stack::make_root(Ttt::new(), DEPTH)))) });
@@ -194,24 +205,25 @@ mod tests {
     // The table should contain the completed initial state.
     assert!(globals
       .resolved_states_table()
-      .table()
-      .contains_key(&Ttt::new()));
+      .lock()
+      .unwrap()
+      .contains(&Ttt::new()));
 
-    for state in globals.resolved_states_table().table().iter() {
+    for (ttt, score) in globals.resolved_states_table().lock().unwrap().iter() {
       // Terminal states should not be stored in the table.
-      assert_eq!(state.key().finished(), GameResult::NotFinished);
+      assert_eq!(ttt.finished(), GameResult::NotFinished);
 
       // Compute the score using a simple min-max search.
-      let expected_score = state.key().compute_expected_score(DEPTH);
+      let expected_score = ttt.compute_expected_score(DEPTH);
 
       // We can't expect the scores to be equal, since the score from the
       // algorithm may not be complete (i.e. there's a win in X turns, but we're
       // unsure if there's a way to win in fewer turns). We expect them to be
       // compatible.
       assert!(
-        state.value().compatible(&expected_score),
+        score.compatible(&expected_score),
         "Expect computed score {} to be compatible with true score {}",
-        state.value(),
+        score,
         expected_score
       );
     }
@@ -221,7 +233,7 @@ mod tests {
   #[ignore]
   fn test_gomoku_4x4_serial() {
     const DEPTH: u32 = 16;
-    let globals = Arc::new(GlobalData::new(DEPTH, 1));
+    let globals = Arc::new(GlobalData::new(CACHE_SIZE, DEPTH, 1));
     globals.queue(0).push(unsafe {
       NullLock::new(Box::into_raw(Box::new(Stack::make_root(
         Gomoku::new(4, 4, 4),
@@ -238,26 +250,27 @@ mod tests {
     // The table should contain the completed initial state.
     assert!(globals
       .resolved_states_table()
-      .table()
-      .contains_key(&Gomoku::new(4, 4, 4)));
+      .lock()
+      .unwrap()
+      .contains(&Gomoku::new(4, 4, 4)));
 
     let mut table = find_best_move_serial(&Gomoku::new(4, 4, 4), DEPTH).2;
 
-    for state in globals.resolved_states_table().table().iter() {
+    for (gomoku, score) in globals.resolved_states_table().lock().unwrap().iter() {
       // Terminal states should not be stored in the table.
-      assert_eq!(state.key().finished(), GameResult::NotFinished);
+      assert_eq!(gomoku.finished(), GameResult::NotFinished);
 
-      let expected_score = table.get(state.key()).unwrap_or_else(|| {
-        find_best_move_serial_table(state.key(), DEPTH, &mut table);
-        table.get(state.key()).unwrap()
+      let expected_score = table.get(gomoku).unwrap_or_else(|| {
+        find_best_move_serial_table(gomoku, DEPTH, &mut table);
+        table.get(gomoku).unwrap()
       });
 
       assert!(
-        state.value().compatible(&expected_score),
+        score.compatible(&expected_score),
         "Expect computed score {} to be compatible with true score {} for state\n{}",
-        state.value(),
+        score,
         expected_score,
-        state.key()
+        gomoku
       );
     }
   }

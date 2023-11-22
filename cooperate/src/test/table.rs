@@ -26,13 +26,13 @@ where
   G: Game + Hash + Eq,
   H: BuildHasher + Clone,
 {
+  #[allow(dead_code)]
   pub fn with_hasher(hasher: H) -> Self {
     Self {
       table: DashMap::with_hasher(hasher),
     }
   }
 
-  #[cfg(test)]
   pub fn table(&self) -> &DashMap<G, Score, H> {
     &self.table
   }
