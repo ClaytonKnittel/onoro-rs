@@ -2,11 +2,14 @@ use std::{
   collections::hash_map::RandomState,
   fmt::{Debug, Display},
   hash::{BuildHasher, Hash},
+  num::NonZeroUsize,
+  sync::Mutex,
 };
 
 use abstract_game::{Game, GameResult, Score};
 use crossbeam_queue::SegQueue;
 use dashmap::{mapref::entry::Entry, DashMap};
+use lru::LruCache;
 
 use crate::{null_lock::NullLock, stack::Stack, table::Table, Metrics};
 
@@ -45,7 +48,7 @@ where
   /// There is a hash table for all states which have been resolved to some
   /// degree. They may need to be recomputed to a greater depth, but the
   /// information in this table will only ever accumulate over time.
-  resolved_states: Table<G, H>,
+  resolved_states: Mutex<LruCache<G, Score, H>>,
 }
 
 impl<G> GlobalData<G, RandomState>
@@ -60,7 +63,10 @@ where
       pending_states: (0..search_depth)
         .map(|_| DashMap::<G, PendingFrame<G>, RandomState>::new())
         .collect(),
-      resolved_states: Table::new(),
+      resolved_states: Mutex::new(LruCache::with_hasher(
+        NonZeroUsize::new(1000).unwrap(),
+        RandomState::new(),
+      )),
     }
   }
 }
@@ -78,7 +84,10 @@ where
       pending_states: (0..search_depth)
         .map(|_| DashMap::<G, PendingFrame<G>, H>::with_hasher(hasher.clone()))
         .collect(),
-      resolved_states: Table::with_hasher(hasher),
+      resolved_states: Mutex::new(LruCache::with_hasher(
+        NonZeroUsize::new(1000).unwrap(),
+        hasher,
+      )),
     }
   }
 
@@ -86,7 +95,7 @@ where
     self.queues.get(thread_idx as usize).unwrap()
   }
 
-  pub fn resolved_states_table(&self) -> &Table<G, H> {
+  pub fn resolved_states_table(&self) -> &Mutex<LruCache<G, Score, H>> {
     &self.resolved_states
   }
 
@@ -98,10 +107,13 @@ where
     let stack = unsafe { &mut *stack_ptr };
     let bottom_state = stack.bottom_frame().unwrap();
     let game = bottom_state.game();
-    if let Some(score) = self.resolved_states.get(game) {
-      if score.determined(stack.bottom_depth()) {
-        metrics.hits += 1;
-        return LookupResult::Found { score };
+
+    if let Ok(mut guard) = self.resolved_states.lock() {
+      if let Some(&score) = guard.get(game) {
+        if score.determined(stack.bottom_depth()) {
+          metrics.hits += 1;
+          return LookupResult::Found { score };
+        }
       }
     }
 
@@ -249,6 +261,12 @@ where
   }
 
   fn commit_game_with_score(&self, game: G, score: Score) {
-    self.resolved_states.update(game, score);
+    if let Ok(mut guard) = self.resolved_states.lock() {
+      if let Some(entry_score) = guard.get_mut(&game) {
+        *entry_score = entry_score.merge(&score);
+      } else {
+        guard.put(game, score);
+      }
+    }
   }
 }

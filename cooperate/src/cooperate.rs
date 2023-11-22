@@ -120,6 +120,10 @@ where
   }
   assert!(!any_bad);
 
+  // TODO: need to make parent/child dependencies, so final score can be
+  // grabbed from LRU cache definitively. With the resolved table now being an
+  // LRU cache, we don't know for certain if all game states on the frontier
+  // are still cached.
   find_best_move_serial_table(game, options.search_depth, globals.resolved_states_table())
     .0
     .unwrap()
