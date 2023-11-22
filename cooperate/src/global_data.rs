@@ -48,6 +48,8 @@ where
   /// There is a hash table for all states which have been resolved to some
   /// degree. They may need to be recomputed to a greater depth, but the
   /// information in this table will only ever accumulate over time.
+  /// TODO: This is way slower than DashMap, maybe need to implement my own
+  /// thread-safe variant (mutex contention is high).
   resolved_states: Mutex<LruCache<G, Score, H>>,
 }
 
