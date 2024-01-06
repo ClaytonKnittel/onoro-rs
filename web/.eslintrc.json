@@ -120,5 +120,5 @@
     ],
     "@typescript-eslint/dot-notation": "warn"
   },
-  "ignorePatterns": ["**/*.js", "**/*.d.ts"]
+  "ignorePatterns": ["**/*.js", "**/*.d.ts", "dist/**/*"]
 }

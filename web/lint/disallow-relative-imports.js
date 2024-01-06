@@ -44,7 +44,7 @@ module.exports = {
           const dir = path.dirname(context.physicalFilename);
           const import_dir = path.resolve(dir, node.source.value);
           let new_import_dir = maybeReplaceSubstr(
-            new_import_dir,
+            import_dir,
             '/client/src/',
             'client/'
           );
