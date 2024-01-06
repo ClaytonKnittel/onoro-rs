@@ -1,0 +1,26 @@
+name: Lint
+
+on:
+  push:
+  pull_request:
+jobs:
+  check-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out Onoro
+        uses: actions/checkout@v2
+        with:
+          path: onoro
+          submodules: recursive
+      - name: Install eslint
+        working-directory: onoro/web
+        run: |
+          npm install eslint
+      - name: Generate CSS types
+        working-directory: onoro/web
+        run: |
+          npm run generate-css-types
+      - name: Run eslint
+        working-directory: onoro/web
+        run: |
+          npx eslint --max-warnings=0 .

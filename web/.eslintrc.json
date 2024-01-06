@@ -1,0 +1,124 @@
+{
+  "root": true,
+  "extends": ["eslint:recommended", "plugin:@typescript-eslint/recommended"],
+  "parser": "@typescript-eslint/parser",
+  "parserOptions": {
+    "project": ["./tsconfig.json"]
+  },
+  "plugins": ["@typescript-eslint", "eslint-plugin-local-rules"],
+  "rules": {
+    "local-rules/disallow-relative-imports": "error",
+    "eqeqeq": "error",
+    "@typescript-eslint/await-thenable": "error",
+    "@typescript-eslint/ban-ts-comment": "error",
+    "@typescript-eslint/ban-types": "error",
+    "@typescript-eslint/consistent-generic-constructors": "warn",
+    "@typescript-eslint/consistent-type-assertions": [
+      "error",
+      { "assertionStyle": "as", "objectLiteralTypeAssertions": "never" }
+    ],
+    "@typescript-eslint/consistent-type-definitions": ["error", "interface"],
+    "@typescript-eslint/consistent-type-exports": "error",
+    "@typescript-eslint/consistent-type-imports": [
+      "error",
+      { "prefer": "no-type-imports" }
+    ],
+    "@typescript-eslint/method-signature-style": ["error", "property"],
+    "@typescript-eslint/naming-convention": [
+      "warn",
+      {
+        "format": ["UPPER_CASE"],
+        "trailingUnderscore": "forbid",
+        "selector": ["enumMember"]
+      },
+      {
+        "format": ["PascalCase"],
+        "trailingUnderscore": "forbid",
+        "selector": ["typeLike"]
+      },
+      {
+        "format": ["camelCase"],
+        "trailingUnderscore": "forbid",
+        "selector": [
+          "function",
+          "method",
+          "classMethod",
+          "typeProperty",
+          "typeMethod"
+        ]
+      },
+      {
+        "format": ["camelCase", "PascalCase"],
+        "trailingUnderscore": "forbid",
+        "selector": "function",
+        "modifiers": ["global"]
+      },
+      {
+        "format": ["camelCase"],
+        "leadingUnderscore": "allow",
+        "trailingUnderscore": "forbid",
+        "selector": ["accessor", "parameter", "variable", "parameterProperty"]
+      },
+      {
+        "format": ["UPPER_CASE", "PascalCase", "camelCase"],
+        "trailingUnderscore": "forbid",
+        "selector": "variable",
+        "modifiers": ["global", "const"]
+      },
+      {
+        "format": ["camelCase"],
+        "trailingUnderscore": "forbid",
+        "selector": "variable",
+        "modifiers": ["global", "const"],
+        "types": ["function"]
+      }
+    ],
+    "@typescript-eslint/no-confusing-void-expression": "error",
+    "@typescript-eslint/no-duplicate-enum-values": "error",
+    "@typescript-eslint/no-duplicate-type-constituents": "error",
+    "@typescript-eslint/no-explicit-any": "warn",
+    "@typescript-eslint/no-for-in-array": "error",
+    "@typescript-eslint/no-import-type-side-effects": "error",
+    "@typescript-eslint/no-inferrable-types": "warn",
+    "@typescript-eslint/no-invalid-void-type": "error",
+    "@typescript-eslint/no-mixed-enums": "error",
+    "@typescript-eslint/no-namespace": "error",
+    "@typescript-eslint/no-non-null-assertion": "error",
+    "@typescript-eslint/no-require-imports": "error",
+    "@typescript-eslint/no-unnecessary-boolean-literal-compare": "error",
+    "@typescript-eslint/no-unnecessary-condition": "error",
+    "@typescript-eslint/no-unsafe-argument": "error",
+    "@typescript-eslint/no-unsafe-assignment": "error",
+    "@typescript-eslint/no-unsafe-call": "error",
+    "@typescript-eslint/no-unsafe-enum-comparison": "error",
+    "@typescript-eslint/prefer-enum-initializers": "error",
+    "@typescript-eslint/prefer-for-of": "warn",
+    "@typescript-eslint/prefer-includes": "warn",
+    "@typescript-eslint/prefer-nullish-coalescing": "warn",
+    "@typescript-eslint/prefer-optional-chain": "warn",
+    "@typescript-eslint/restrict-plus-operands": "warn",
+    "@typescript-eslint/strict-boolean-expressions": [
+      "error",
+      {
+        "allowString": false,
+        "allowNumber": false,
+        "allowNullableObject": false,
+        "allowNullableBoolean": false,
+        "allowNullableString": false,
+        "allowNullableNumber": false,
+        "allowAny": false
+      }
+    ],
+    "@typescript-eslint/switch-exhaustiveness-check": "error",
+    "@typescript-eslint/no-unused-vars": [
+      "warn",
+      {
+        "argsIgnorePattern": "^_",
+        "varsIgnorePattern": "^_",
+        "caughtErrorsIgnorePattern": "^_"
+      }
+    ],
+    "@typescript-eslint/dot-notation": "warn"
+  },
+  "ignorePatterns": ["**/*.js", "**/*.d.ts"]
+}

@@ -1,0 +1,7 @@
+dist
+node_modules
+.gitignore
+.github
+*.swp
+package.json
+package-lock.json

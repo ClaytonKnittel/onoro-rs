@@ -1,0 +1,24 @@
+name: Build
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+jobs:
+  check-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out Onoro
+        uses: actions/checkout@v2
+        with:
+          path: onoro
+          submodules: recursive
+      - name: Install dependencies
+        working-directory: onoro/web
+        run: |
+          npm install
+      - name: Build
+        working-directory: onoro/web
+        run: |
+          npm run build
