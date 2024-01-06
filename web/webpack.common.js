@@ -29,6 +29,7 @@ module.exports = {
     extensions: ['.tsx', '.ts', '.jsx', '.js'],
     alias: {
       client: path.resolve(__dirname, 'src/'),
+      proto: path.resolve(__dirname, 'dist/gen/proto/'),
     },
     modules: ['./node_modules'],
   },

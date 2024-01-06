@@ -44,19 +44,14 @@ module.exports = {
           const dir = path.dirname(context.physicalFilename);
           const import_dir = path.resolve(dir, node.source.value);
           let new_import_dir = maybeReplaceSubstr(
-            import_dir,
-            '/common/src/',
-            'common/'
-          );
-          new_import_dir = maybeReplaceSubstr(
             new_import_dir,
             '/client/src/',
             'client/'
           );
           new_import_dir = maybeReplaceSubstr(
             new_import_dir,
-            '/server/src/',
-            'server/'
+            '/dist/proto/',
+            'proto/'
           );
 
           if (new_import_dir !== import_dir) {

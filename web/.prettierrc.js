@@ -7,7 +7,11 @@ module.exports = {
   singleQuote: true,
   jsxSingleQuote: true,
   plugins: [require.resolve('@trivago/prettier-plugin-sort-imports')],
-  importOrder: ['^(?!([./]|client//).*)$', '^[./]', '^(client)/(.*)$'],
+  importOrder: [
+    '^(?!([./]|client/|proto//).*)$',
+    '^[./]',
+    '^(client|proto)/(.*)$',
+  ],
   importOrderSeparation: true,
   importOrderSortSpecifiers: true,
 };
