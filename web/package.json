@@ -9,13 +9,13 @@
     "format": "npx prettier --write .",
     "lint": "npx eslint .",
     "generate-css-types": "npx tcm -s -o dist/@types ./src",
-    "check-types": "npm run generate-css-types && npx tsc --noemit",
+    "check-types": "npm run generate-css-types && npm run generate-proto && npx tsc --noemit",
     "build-react": "npx webpack --progress --config webpack.dev.js",
     "build-react-prod": "npx webpack --progress --config webpack.prod.js",
     "build-public": "npx copyfiles --flat public/* dist/dev/static/",
     "build-public-prod": "npx copyfiles --flat public/* dist/prod/static/",
     "build": "npm run check-types && npm run build-react && npm run build-public",
-    "build-prod": "npm run generate-css-types && npm run build-react-prod && npm run build-public-prod"
+    "build-prod": "npm run generate-css-types && npm run generate-proto && npm run build-react-prod && npm run build-public-prod"
   },
   "browserslist": {
     "production": [
