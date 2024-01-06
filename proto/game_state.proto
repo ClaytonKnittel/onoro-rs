@@ -1,0 +1,21 @@
+syntax = "proto2";
+
+package onoro.proto;
+
+message GameState {
+  message Pawn {
+    optional int32 x = 1;
+    optional int32 y = 2;
+    optional bool black = 3;
+  }
+
+  repeated Pawn pawns = 4;
+
+  optional bool black_turn = 1;
+  optional uint32 turn_num = 2;
+  optional bool finished = 3;
+}
+
+message GameStates {
+  repeated GameState state = 1;
+}
