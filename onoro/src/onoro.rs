@@ -62,7 +62,7 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Onoro<N, N2, AD
   /// Don't publicly expose the constructor, since it produces an invalid board
   /// state. Any constructor returning an owned instance of `Onoro` _must_ make
   /// at least one move after initializing an `Onoro` with this function.
-  fn new() -> Self {
+  pub unsafe fn new() -> Self {
     Self {
       pawn_poses: [PackedIdx::null(); N],
       state: OnoroState::new(),
@@ -109,7 +109,7 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Onoro<N, N2, AD
       ));
     }
 
-    let mut game = Self::new();
+    let mut game = unsafe { Self::new() };
     unsafe {
       game.make_move_unchecked(Move::Phase1Move { to: black_pawns[0] });
     }
@@ -122,7 +122,7 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Onoro<N, N2, AD
 
   pub fn default_start() -> Self {
     let mid_idx = ((Self::board_width() - 1) / 2) as u32;
-    let mut game = Self::new();
+    let mut game = unsafe { Self::new() };
     unsafe {
       game.make_move_unchecked(Move::Phase1Move {
         to: PackedIdx::new(mid_idx, mid_idx),
@@ -152,7 +152,7 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Onoro<N, N2, AD
     op: G,
     mut op_fn: OpFn,
   ) -> Self {
-    let mut game = Self::new();
+    let mut game = unsafe { Self::new() };
 
     let mut black_pawns = Vec::new();
     let mut white_pawns = Vec::new();
@@ -412,7 +412,12 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Onoro<N, N2, AD
     self.onoro_state().turn() < 0xf
   }
 
-  unsafe fn make_move_unchecked(&mut self, m: Move) {
+  /// Make move without checking that we are in the right phase.
+  ///
+  /// # Safety
+  /// This function should not be called unless the move being made is
+  /// certainly in the right phase.
+  pub unsafe fn make_move_unchecked(&mut self, m: Move) {
     match m {
       Move::Phase1Move { to } => {
         // Increment the turn first, so self.onoro_state().turn() is 0 for turn

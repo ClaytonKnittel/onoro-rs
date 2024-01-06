@@ -4,6 +4,7 @@
     "./algebra/Cargo.toml",
     "./abstract_game/Cargo.toml",
     "./cooperate/Cargo.toml",
+    "./server/Cargo.toml",
     "./onoro/Cargo.toml"
   ],
   "rust-analyzer.check.command": "clippy"

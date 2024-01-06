@@ -4,7 +4,10 @@ use async_sockets::{
   AsyncSocket, AsyncSocketContext, AsyncSocketEmitters, AsyncSocketListeners, AsyncSocketOptions,
   AsyncSocketResponders, Status,
 };
+use onoro::Onoro16;
 use tokio::task::JoinHandle;
+
+use crate::proto::GameStateProto;
 
 #[derive(AsyncSocketEmitters)]
 enum ServerEmitEvents {}
@@ -19,12 +22,12 @@ enum FromClientResponses {}
 
 #[derive(AsyncSocketListeners)]
 enum FromClientRequests {
-  Test1 { id: u64 },
+  NewGame {},
 }
 
 #[derive(AsyncSocketResponders)]
 enum ToClientResponses {
-  Test1 { id: u64 },
+  NewGame { game: GameStateProto },
 }
 
 async fn handle_connect_event(_context: AsyncSocketContext<ServerEmitEvents>) {}
@@ -34,7 +37,9 @@ async fn handle_call_event(
   _context: AsyncSocketContext<ServerEmitEvents>,
 ) -> Status<ToClientResponses> {
   match event {
-    FromClientRequests::Test1 { id } => Status::Ok(ToClientResponses::Test1 { id: id + 1 }),
+    FromClientRequests::NewGame {} => Status::Ok(ToClientResponses::NewGame {
+      game: GameStateProto::from_onoro(&Onoro16::default_start()),
+    }),
   }
 }
 

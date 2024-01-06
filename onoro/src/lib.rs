@@ -19,4 +19,5 @@ pub use crate::onoro::*;
 pub use color_print::*;
 pub use onoro_defs::*;
 pub use onoro_view::*;
+pub use packed_idx::*;
 pub use r#move::*;
