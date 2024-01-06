@@ -1,0 +1,3 @@
+[submodule "server/modules/async-sockets"]
+	path = server/modules/async-sockets
+	url = git@github.com:ClaytonKnittel/async-sockets.git
