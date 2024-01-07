@@ -18,13 +18,13 @@ interface EventsMap {
 
 interface EmitMessage<Params extends unknown[]> {
   event: string;
-  args: Params;
+  args: Params | null;
 }
 
 interface CallMessage<Params extends unknown[]> {
   event: string;
   uuid: string;
-  args: Params;
+  args: Params | null;
 }
 
 interface ResponseMessage<T> {
@@ -223,7 +223,7 @@ export class AsyncSocketContext<
 
   constructor(url: string) {
     this.url = url;
-    this.socket = new WebSocket(url);
+    this.socket = new WebSocket(url, ['websocket', 'polling']);
     this.initializeWebSocket();
     this.timeout = 1000;
 
@@ -247,7 +247,7 @@ export class AsyncSocketContext<
     }
 
     const callback: (...args: any[]) => void = eventInfo.callback;
-    callback(...message.args);
+    callback(...(message.args ?? []));
   }
 
   private async handleCall(message: CallMessage<unknown[]>) {
@@ -263,7 +263,7 @@ export class AsyncSocketContext<
 
     const callback: (...args: any) => Promise<Status<unknown>> =
       eventInfo.callback;
-    const status = await callback(...message.args);
+    const status = await callback(...(message.args ?? []));
 
     console.log(`responding to ${message.event} with`, status);
     const response: ResponseMessage<unknown> = {
@@ -402,7 +402,7 @@ export class AsyncSocketContext<
   ) {
     const emit: EmitMessage<Parameters<EmitEvents[EventName]>> = {
       event: eventName,
-      args,
+      args: args.length === 0 ? null : args,
     };
     this.sendMessage({ emit });
   }
@@ -436,7 +436,7 @@ export class AsyncSocketContext<
       const call: CallMessage<ReqParams<EventName, EmitEvents>> = {
         event: eventName,
         uuid,
-        args,
+        args: args.length === 0 ? null : args,
       };
       this.sendMessage({ call });
     });

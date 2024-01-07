@@ -1,3 +1,4 @@
+use serde::Deserialize;
 use std::time::Duration;
 
 use async_sockets::{
@@ -18,6 +19,7 @@ enum ClientEmitEvents {}
 #[derive(AsyncSocketEmitters)]
 enum ToClientRequests {}
 
+#[derive(Deserialize)]
 enum FromClientResponses {}
 
 #[derive(AsyncSocketListeners)]
