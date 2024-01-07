@@ -58,7 +58,8 @@ pub fn create_socket_endpoint() -> JoinHandle<()> {
       AsyncSocketOptions::new()
         .with_path("onoro")
         .with_port(2345)
-        .with_timeout(Duration::from_secs(10)),
+        .with_timeout(Duration::from_secs(10))
+        .with_verbose(false),
       handle_connect_event,
       handle_emit_event,
       handle_call_event,

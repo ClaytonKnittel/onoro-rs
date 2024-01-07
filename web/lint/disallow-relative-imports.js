@@ -40,18 +40,14 @@ module.exports = {
           if (node.source.value.endsWith('.module.css')) {
             return;
           }
+          context.path;
 
           const dir = path.dirname(context.physicalFilename);
           const import_dir = path.resolve(dir, node.source.value);
           let new_import_dir = maybeReplaceSubstr(
             import_dir,
-            '/client/src/',
+            '/web/src/',
             'client/'
-          );
-          new_import_dir = maybeReplaceSubstr(
-            new_import_dir,
-            '/dist/proto/',
-            'proto/'
           );
 
           if (new_import_dir !== import_dir) {
