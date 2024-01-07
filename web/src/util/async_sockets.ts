@@ -204,6 +204,8 @@ export class AsyncSocketContext<
   private readonly url: string;
   private socket: WebSocket;
   private timeout: number;
+  private verbose: boolean;
+  private isOpen: boolean;
 
   /**
    * A map of event names to the corresponding call/response or emit listeners.
@@ -221,28 +223,45 @@ export class AsyncSocketContext<
     ResponseMessageInfo<ListenEvents, EmitEvents, never>
   >;
 
-  constructor(url: string) {
+  constructor(url: string, verbose?: boolean) {
     this.url = url;
     this.socket = new WebSocket(url, ['websocket', 'polling']);
-    this.initializeWebSocket();
+    this.isOpen = false;
     this.timeout = 1000;
+    this.verbose = verbose ?? false;
+    this.initializeWebSocket();
 
     this.listeners = new Map();
     this.outstanding_calls = new Map();
   }
 
+  async awaitOpen(): Promise<void> {
+    return new Promise((resolve) => {
+      if (this.isOpen) {
+        resolve();
+      } else {
+        this.socket.addEventListener('open', () => {
+          resolve();
+        });
+      }
+    });
+  }
+
   private onOpen() {
-    console.log('websocket opened');
+    if (this.verbose) {
+      console.log('websocket opened');
+    }
+    this.isOpen = true;
   }
 
   private handleEmit(message: EmitMessage<unknown[]>) {
     const eventInfo = this.listeners.get(message.event);
     if (eventInfo === undefined) {
-      console.log('Unknown emit event:', message.event);
+      console.error('Unknown emit event:', message.event);
       return;
     }
     if (eventInfo.type !== 'emit') {
-      console.log('Received emit for call/response message:', message.event);
+      console.error('Received emit for call/response message:', message.event);
       return;
     }
 
@@ -253,11 +272,11 @@ export class AsyncSocketContext<
   private async handleCall(message: CallMessage<unknown[]>) {
     const eventInfo = this.listeners.get(message.event);
     if (eventInfo === undefined) {
-      console.log('Unknown call event:', message.event);
+      console.error('Unknown call event:', message.event);
       return;
     }
     if (eventInfo.type !== 'call') {
-      console.log('Received call for emit message:', message.event);
+      console.error('Received call for emit message:', message.event);
       return;
     }
 
@@ -265,7 +284,9 @@ export class AsyncSocketContext<
       eventInfo.callback;
     const status = await callback(...(message.args ?? []));
 
-    console.log(`responding to ${message.event} with`, status);
+    if (this.verbose) {
+      console.log(`responding to ${message.event} with`, status);
+    }
     const response: ResponseMessage<unknown> = {
       uuid: message.uuid,
       status,
@@ -274,9 +295,11 @@ export class AsyncSocketContext<
   }
 
   private async handleResponse({ uuid, status }: ResponseMessage<unknown>) {
-    console.log(uuid, status);
+    if (this.verbose) {
+      console.log(uuid, status);
+    }
     if (!this.outstanding_calls.has(uuid)) {
-      console.log(`Error: received event with unknown uuid: ${uuid}`);
+      console.error(`Error: received event with unknown uuid: ${uuid}`);
       return;
     }
 
@@ -296,31 +319,28 @@ export class AsyncSocketContext<
 
   private async onMessage(event: MessageEvent) {
     const message = this.parseMessage(event.data);
-    console.log('message:', message);
-
     if (!isMessage(message)) {
       console.log('ill-formed message:', message);
       return;
     }
 
     if (message.emit !== undefined) {
-      console.log('handling emit');
       this.handleEmit(message.emit);
     } else if (message.call !== undefined) {
-      console.log('handling call');
       this.handleCall(message.call);
     } else if (message.response !== undefined) {
-      console.log('handling response');
       this.handleResponse(message.response);
     }
   }
 
   private onError() {
-    console.log('websocket closed via error');
+    console.error('websocket closed via error');
+    this.isOpen = false;
   }
 
   private onClose() {
     console.log('websocket closed');
+    this.isOpen = false;
     this.periodicallyTryReconnect();
   }
 
@@ -330,6 +350,7 @@ export class AsyncSocketContext<
     };
     this.socket.onmessage = (event) => {
       this.onMessage(event);
+      return false;
     };
     this.socket.onerror = () => {
       this.onError();
@@ -425,7 +446,9 @@ export class AsyncSocketContext<
     eventName: EventName,
     ...args: ReqParams<EventName, EmitEvents>
   ): Promise<ResponseStatus<EventName, ListenEvents>> {
-    console.log(`calling ${eventName} with`, args);
+    if (this.verbose) {
+      console.log(`calling ${eventName} with`, args);
+    }
 
     return new Promise((resolve) => {
       const uuid = uuidv4();

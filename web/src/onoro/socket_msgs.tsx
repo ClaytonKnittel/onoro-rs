@@ -4,7 +4,7 @@ import { GameState } from 'proto/game_state';
 
 interface ServerToClient {
   /* eslint-disable @typescript-eslint/naming-convention */
-  new_game_res: (res: Status<Uint8Array>) => void;
+  new_game_res: (res: Status<{ game: Array<number> }>) => void;
   /* eslint-enable @typescript-eslint/naming-convention */
 }
 

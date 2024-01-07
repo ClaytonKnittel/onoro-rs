@@ -1,26 +1,36 @@
 import React from 'react';
 
+import { OnoroBoard } from 'client/onoro/OnoroBoard';
 import { OnoroSocket } from 'client/onoro/socket_msgs';
 import { AsyncSocketContext } from 'client/util/async_sockets';
+import { isOk } from 'client/util/status';
 import { GameState } from 'proto/game_state';
 
+const socket: OnoroSocket = new AsyncSocketContext(
+  'ws://[::]:2345/onoro',
+  true
+);
+
 export function App() {
-  const socket_ref = React.useRef<OnoroSocket>(
-    new AsyncSocketContext('ws://[::]:2345/onoro')
-  );
-  const g: GameState = {
-    pawns: [],
-    blackTurn: false,
-    finished: false,
-    turnNum: 0,
-  };
+  const [game, setGame] = React.useState<GameState | null>(null);
+  const setGameRef = React.useRef(setGame);
+  setGameRef.current = setGame;
 
   const getGame = async () => {
-    const gameRes = await socket_ref.current.call('new_game');
-    console.log(gameRes);
+    if (game !== null) {
+      return;
+    }
+
+    await socket.awaitOpen();
+    const gameRes = await socket.call('new_game');
+    if (isOk(gameRes)) {
+      const game = GameState.fromBinary(Uint8Array.from(gameRes.value.game));
+      console.log(game);
+      setGameRef.current(game);
+    }
   };
 
-  setTimeout(getGame, 1000);
+  getGame();
 
-  return <>Hello world</>;
+  return game !== null ? <OnoroBoard gameState={game} /> : <>No game</>;
 }
