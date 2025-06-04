@@ -57,7 +57,7 @@ impl CanonicalView {
 }
 
 /// A wrapper over Onoro states that caches the hash of the game state and it's
-/// canonicalizing symmetry operations. These caches values are used for quicker
+/// canonicalizing symmetry operations. These cached values are used for quicker
 /// equality comparison between different Onoro game states which may be in
 /// different orientations.
 #[derive(Debug)]
