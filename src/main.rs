@@ -8,7 +8,21 @@ use crate::passthrough_hasher::BuildPassThroughHasher;
 mod passthrough_hasher;
 
 fn main() {
-  let game = Onoro16::default_start();
+  // let onoro = Onoro16::from_board_string(
+  //   ". B . . . . . . . . . . . .
+  //     W B B B W B W B W B W W W B
+  //      . . . . . . . . . . . . W .").unwrap();
+  // let onoro = Onoro16::from_board_string(
+  //   ". B . . . . . B W B W W W B
+  //     W B B B W B W . . . . . W .").unwrap();
+  let onoro = Onoro16::from_board_string(
+    ". . . W . .
+      . B B B W .
+       . W B B B W
+        B W W W B .
+         . W . . . .",
+  )
+  .unwrap();
 
   println!("size of game state: {}", std::mem::size_of::<Onoro16>());
   println!(
@@ -16,7 +30,7 @@ fn main() {
     std::mem::size_of_val(&OnoroView::new(Onoro16::default_start()))
   );
 
-  println!("{}", game);
+  println!("{}", onoro);
 
   let guard = pprof::ProfilerGuardBuilder::default()
     .frequency(1000)
@@ -27,14 +41,10 @@ fn main() {
   let start = SystemTime::now();
   let options = cooperate::Options {
     num_threads: 16,
-    search_depth: 15,
-    unit_depth: 8,
+    search_depth: 9,
+    unit_depth: 4,
   };
-  let score = solve_with_hasher(
-    &OnoroView::new(Onoro16::default_start()),
-    options,
-    BuildPassThroughHasher,
-  );
+  let score = solve_with_hasher(&OnoroView::new(onoro), options, BuildPassThroughHasher);
   let end = SystemTime::now();
 
   if let Ok(report) = guard.report().build() {

@@ -17,7 +17,7 @@ pub struct GameIterator<'a, GI, G> {
   game_iter: GI,
 }
 
-impl<'a, GI, I, G> Iterator for GameIterator<'a, GI, G>
+impl<GI, I, G> Iterator for GameIterator<'_, GI, G>
 where
   GI: GameMoveGenerator<Item = I, Game = G>,
 {

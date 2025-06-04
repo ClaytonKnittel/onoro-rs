@@ -51,7 +51,7 @@ use crate::transparent_iterator::TransparentIterator;
 ///   }
 /// }
 /// ```
-
+///
 /// The type of a stack is either the root, which contains the initial game
 /// state as it's first frame, or a child, which has a pointer to the parent
 /// that it is solving a branch for.

@@ -6,7 +6,7 @@ use std::{
   thread,
 };
 
-use abstract_game::{Game, Score};
+use abstract_game::{Game, GameResult, Score, ScoreValue};
 use rand::prelude::*;
 
 use crate::{
@@ -15,6 +15,7 @@ use crate::{
   search_worker::{start_worker, WorkerData},
   serial_search::find_best_move_serial_table,
   stack::Stack,
+  table::Table,
 };
 
 #[derive(Clone)]
@@ -94,6 +95,34 @@ where
   solve_with_hasher(game, options, RandomState::new())
 }
 
+fn playout<G, H>(game: &G, tbl: &Table<G, H>, depth: u32)
+where
+  G: Game + Display + Send + Sync + Hash + PartialEq + Eq + 'static,
+  G::Move: Display,
+  G::PlayerIdentifier: Debug,
+  H: BuildHasher + Clone + Send + Sync + 'static,
+{
+  println!("{}", game);
+  if depth == 0 || game.finished() != GameResult::NotFinished {
+    return;
+  }
+  
+  for mv in game.each_move() {
+    let next_state = game.with_move(mv);
+    if depth == 1 && next_state.finished() != GameResult::NotFinished {
+      playout(&next_state, tbl, depth - 1);
+    }
+    if depth != 1 {
+      if let Some(score) = tbl.get(&next_state) {
+        if score.determined(depth) && score.score_at_depth(depth) != ScoreValue::Tie {
+          println!("{score}");
+          playout(&next_state, tbl, depth - 1);
+        }
+      }
+    }
+  }
+}
+
 pub fn solve_with_hasher<G, H>(game: &G, options: Options, hasher: H) -> Score
 where
   G: Game + Display + Send + Sync + Hash + PartialEq + Eq + 'static,
@@ -119,6 +148,19 @@ where
     any_bad = thread.join().is_err() || any_bad;
   }
   assert!(!any_bad);
+
+  for mv in game.each_move() {
+    let next_state = game.with_move(mv);
+    print!("{mv}: ");
+    // if let Some(score) = globals.resolved_states_table().get(&next_state) {
+    //   println!("{score}");
+    //   if score.score_at_depth(score.determined_depth()) != ScoreValue::Tie {
+    //     playout(&next_state, globals.resolved_states_table(), score.determined_depth());
+    //   }
+    // } else {
+    //   println!();
+    // }
+  }
 
   find_best_move_serial_table(game, options.search_depth, globals.resolved_states_table())
     .0

@@ -1,0 +1,11 @@
+size of game state: 24
+size of game view: 40
+black:
+. . . . . . . . . . . . . . . .
+ . . B . . . . . B W B W W W B .
+  . W B B B W B W . . . . . W . .
+   . . . . . . . . . . . . . . . .
+Worker 6 done: Metrics { hits: 82373294, queues: 145, claims: 19286847 }
+Worker 1 done: Metrics { hits: 92540518, queues: 139, claims: 20867201 }
+Worker 3 done: Metrics { hits: 100693620, queues: 158, claims: 22400222 }
+Worker 5 done: Metrics { hits: 107566738, queues: 130, claims: 23374489 }

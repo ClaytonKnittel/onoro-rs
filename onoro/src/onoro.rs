@@ -60,8 +60,12 @@ pub struct Onoro<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> {
 
 impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Onoro<N, N2, ADJ_CNT_SIZE> {
   /// Don't publicly expose the constructor, since it produces an invalid board
-  /// state. Any constructor returning an owned instance of `Onoro` _must_ make
-  /// at least one move after initializing an `Onoro` with this function.
+  /// state.
+  ///
+  /// # Safety
+  ///
+  /// Any constructor returning an owned instance of `Onoro` _must_ make at
+  /// least one move after initializing an `Onoro` with this function.
   pub unsafe fn new() -> Self {
     Self {
       pawn_poses: [PackedIdx::null(); N],
@@ -755,7 +759,7 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Onoro<N, N2, AD
     {
       return Err(make_onoro_error!(
         "Expected {} black pawns and {} white pawns, but found {} and {}",
-        (self.pawns_in_play() + 1) / 2,
+        self.pawns_in_play().div_ceil(2),
         self.pawns_in_play() / 2,
         n_b_pawns,
         n_w_pawns

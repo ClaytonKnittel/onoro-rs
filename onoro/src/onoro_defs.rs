@@ -1,7 +1,7 @@
 use crate::{canonicalize::BoardSymmetryState, TILE_BITS};
 
 const fn adjacency_count_size(n: usize) -> usize {
-  (n * n * TILE_BITS + 63) / 64
+  (n * n * TILE_BITS).div_ceil(64)
 }
 
 #[macro_export]

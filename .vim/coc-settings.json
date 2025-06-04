@@ -5,5 +5,6 @@
     "./abstract_game/Cargo.toml",
     "./cooperate/Cargo.toml",
     "./onoro/Cargo.toml"
-  ]
+  ],
+  "rust-analyzer.inlayHints.parameterHints.enable": false
 }

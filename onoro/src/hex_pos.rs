@@ -300,22 +300,22 @@ impl HexPosOffset {
     *self
   }
 
-  /// Applies the corresponding group operation for the given symmetry class (C,
-  /// V, E, CV, ...) given the ordinal of the group operation.
-  /// TODO remove if decide not to use
-  ///  fn apply<G: Group>(uint32_t op_ordinal, SymmetryClass symm_class) const;
+  // Applies the corresponding group operation for the given symmetry class (C,
+  // V, E, CV, ...) given the ordinal of the group operation.
+  // TODO remove if decide not to use
+  //  fn apply<G: Group>(uint32_t op_ordinal, SymmetryClass symm_class) const;
 
-  /// The following all rotate the point 60, 120, and 180 degrees (R1, R2, R3).
-  ///
-  /// c_r1 rotates 60 degrees about the center of the origin tile.
-  ///
-  /// v_r2 rotates 120 degrees about the top right vertex of the origin tile.
-  ///
-  /// e_r3 rotates 180 degrees about the center of the right edge of the origin
-  /// tile.
-  ///
-  /// Note: these algorithms are incompatible with each other, i.e.
-  /// p.c_r1().c_r1() != p.v_r2().
+  // The following all rotate the point 60, 120, and 180 degrees (R1, R2, R3).
+  //
+  // c_r1 rotates 60 degrees about the center of the origin tile.
+  //
+  // v_r2 rotates 120 degrees about the top right vertex of the origin tile.
+  //
+  // e_r3 rotates 180 degrees about the center of the right edge of the origin
+  // tile.
+  //
+  // Note: these algorithms are incompatible with each other, i.e.
+  // p.c_r1().c_r1() != p.v_r2().
 
   const fn c_r1(&self) -> Self {
     Self {
@@ -358,11 +358,11 @@ impl HexPosOffset {
     }
   }
 
-  /// [cve]_r<n>: Reflects the point across a line at angle n*30 degrees,
-  /// passing through:
-  ///  - c: the center of the origin hex
-  ///  - v: the top right vertex of the origin hex
-  ///  - e: the center of the right edge of the origin hex
+  // [cve]_r<n>: Reflects the point across a line at angle n*30 degrees,
+  // passing through:
+  //  - c: the center of the origin hex
+  //  - v: the top right vertex of the origin hex
+  //  - e: the center of the right edge of the origin hex
 
   const fn c_s0(&self) -> Self {
     Self {

@@ -36,6 +36,8 @@ impl PackedIdx {
 
   /// Returns the underlying representation of the `PackedIdx` as a `u8`.
   ///
+  /// # Safety
+  ///
   /// This function is unsafe because this representation should normally be
   /// opaque to anything external to this class, but it can be used for more
   /// efficient tile occupancy checking in the game state.
@@ -43,6 +45,9 @@ impl PackedIdx {
     self.bytes.0
   }
 
+  /// # Safety
+  ///
+  /// Assumes no overflow in x or y
   pub const unsafe fn unsafe_add(&self, other: &PackedIdx) -> PackedIdx {
     // Assume no overflow in x or y
     PackedIdx {

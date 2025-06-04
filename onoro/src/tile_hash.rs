@@ -320,7 +320,7 @@ impl HashGroup<D3> {
 
 impl HashGroup<K4> {
   const fn a(h: u64) -> u64 {
-    (h << 32) | (h >> 32)
+    h.rotate_right(32)
   }
 
   const fn b(h: u64) -> u64 {
@@ -381,7 +381,7 @@ impl HashGroup<K4> {
 
 impl HashGroup<C2> {
   const fn a(h: u64) -> u64 {
-    (h << 32) | (h >> 32)
+    h.rotate_right(32)
   }
 
   pub const fn apply(&self, op: &C2) -> Self {

@@ -272,23 +272,23 @@ pub const fn gen_symm_state_table<const N: usize, const N2: usize>() -> [BoardSy
 /// for the group operations in the regions.
 ///
 /// - C is the symmetry group D6 about the origin, which is only possible when
-///     the center of mass lies on the origin, so (x, y) = (0, 0).
+///   the center of mass lies on the origin, so (x, y) = (0, 0).
 /// - V is the symmetry group D3 about a vertex, which are labeled as 'v' in the
-///     diagram. These are the points (2/3 n_pawns, 1/3 n_pawns) and (1/3
-///     n_pawns, 2/3 n_pawns), or (x2, y2) = (2/3 n_pawns, 1/3 n_pawns).
+///   diagram. These are the points (2/3 n_pawns, 1/3 n_pawns) and (1/3
+///   n_pawns, 2/3 n_pawns), or (x2, y2) = (2/3 n_pawns, 1/3 n_pawns).
 /// - E is the symmetry group K4 about the center of an edge, which are labeled
-///     as 'e' in the diagram. These are the points (1/2 n_pawns, 0), (1/2
-///     n_pawns, 1/2 n_pawns), and (0, 1/2 n_pawns), or (x2, y2) = (1/2 n_pawns,
-///     0) or (1/2 n_pawns, 1/2 n_pawns).
+///   as 'e' in the diagram. These are the points (1/2 n_pawns, 0), (1/2
+///   n_pawns, 1/2 n_pawns), and (0, 1/2 n_pawns), or (x2, y2) = (1/2 n_pawns,
+///   0) or (1/2 n_pawns, 1/2 n_pawns).
 /// - CV is the symmetry group C2 about a line passing through the center of the
-///     origin hex and one of its vertices.
+///   origin hex and one of its vertices.
 /// - CE is the symmetry group C2 about a line passing through the center of the
-///     origin hex and the center of one of its edges.
+///   origin hex and the center of one of its edges.
 /// - EV is the symmetry group C2 about a line tangent to one of the edges of
-///     the origin hex.
+///   the origin hex.
 /// - TRIVIAL is a group with no symmetries other than the identity, so all
-///     board states with center of masses which don't lie on any symmetry lines
-///     are part of this group.
+///   board states with center of masses which don't lie on any symmetry lines
+///   are part of this group.
 ///
 /// In the case that the center of mass lies on a symmetry line/point, it is
 /// classified into one of 6 symmetry groups above. These symmetry groups are

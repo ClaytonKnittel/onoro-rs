@@ -22,13 +22,13 @@ where
 /// A serial, non-cached min-max search of the game state.
 ///
 /// TODO: make this alpha-beta search.
-pub fn find_best_move_serial_table<G: Clone + Game, H>(
+pub fn find_best_move_serial_table<G, H>(
   game: &G,
   depth: u32,
   table: &Table<G, H>,
 ) -> (Option<Score>, Option<G::Move>)
 where
-  G: Display + Game + Hash + Eq,
+  G: Clone + Display + Game + Hash + Eq,
   H: BuildHasher + Clone,
 {
   // Can't score games that are already over.
