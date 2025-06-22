@@ -1,4 +1,4 @@
-use crate::{Move, MoveGenerator};
+use crate::{compress::Compress, Move, MoveGenerator};
 use std::{cell::UnsafeCell, fmt::Display, hash::Hash};
 
 use algebra::{
@@ -409,6 +409,20 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Game
       Some(color) => GameResult::Win(color),
       None => GameResult::NotFinished,
     }
+  }
+}
+
+impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Compress
+  for OnoroView<N, N2, ADJ_CNT_SIZE>
+{
+  type Repr = u64;
+
+  fn compress(&self) -> u64 {
+    0
+  }
+
+  fn decompress(repr: u64) -> Self {
+    todo!()
   }
 }
 

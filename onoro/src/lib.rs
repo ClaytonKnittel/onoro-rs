@@ -1,5 +1,6 @@
 mod canonicalize;
 mod color_print;
+mod compress;
 mod const_rand;
 mod error;
 mod groups;
