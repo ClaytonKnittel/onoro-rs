@@ -100,14 +100,18 @@ where
 
 impl<L, R> Semigroup for DirectProduct<L, R>
 where
-  L: Semigroup,
+  L: Semigroup + Clone + 'static,
   R: Semigroup,
 {
+  fn for_each() -> impl Iterator<Item = Self> {
+    L::for_each()
+      .flat_map(|left| R::for_each().map(move |right| DirectProduct::new(left.clone(), right)))
+  }
 }
 
 impl<L, R> Monoid for DirectProduct<L, R>
 where
-  L: Monoid,
+  L: Monoid + Clone + 'static,
   R: Monoid,
 {
   fn identity() -> Self {
@@ -120,7 +124,7 @@ where
 
 impl<L, R> Group for DirectProduct<L, R>
 where
-  L: Group,
+  L: Group + Clone + 'static,
   R: Group,
 {
   fn inverse(&self) -> Self {
