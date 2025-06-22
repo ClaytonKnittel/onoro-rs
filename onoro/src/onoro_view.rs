@@ -439,24 +439,24 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Clone
 
 #[cfg(test)]
 mod tests {
-  use crate::{groups::SymmetryClass, Onoro16, OnoroView};
+  use crate::{groups::SymmetryClass, Onoro16, Onoro16View, OnoroView};
+
+  fn build_view(board_layout: &str) -> Onoro16View {
+    let view = OnoroView::new(Onoro16::from_board_string(board_layout).unwrap());
+    view.maybe_initialize_canonical_view();
+    view
+  }
 
   #[test]
   #[allow(non_snake_case)]
   fn test_V_symm_simple() {
-    let view1 = OnoroView::new(
-      Onoro16::from_board_string(
-        ". W
-          B B",
-      )
-      .unwrap(),
+    let view1 = build_view(
+      ". W
+        B B",
     );
-    let view2 = OnoroView::new(
-      Onoro16::from_board_string(
-        ". B
-          B W",
-      )
-      .unwrap(),
+    let view2 = build_view(
+      ". B
+        B W",
     );
 
     assert_eq!(view1.canon_view().get_symm_class(), SymmetryClass::V);
@@ -467,45 +467,30 @@ mod tests {
   #[test]
   #[allow(non_snake_case)]
   fn test_C_symm_simple() {
-    let view1 = OnoroView::new(
-      Onoro16::from_board_string(
-        ". W B
-          B . W
-           W B",
-      )
-      .unwrap(),
+    let view1 = build_view(
+      ". W B
+        B . W
+         W B",
     );
-    let view2 = OnoroView::new(
-      Onoro16::from_board_string(
-        ". B W
-          W . B
-           B W",
-      )
-      .unwrap(),
+    let view2 = build_view(
+      ". B W
+        W . B
+         B W",
     );
-    let view3 = OnoroView::new(
-      Onoro16::from_board_string(
-        ". B W
-          W B B
-           B W",
-      )
-      .unwrap(),
+    let view3 = build_view(
+      ". B W
+        W B B
+         B W",
     );
-    let view4 = OnoroView::new(
-      Onoro16::from_board_string(
-        ". . B
-          W . .
-           . B",
-      )
-      .unwrap(),
+    let view4 = build_view(
+      ". . B
+        W . .
+         . B",
     );
-    let view5 = OnoroView::new(
-      Onoro16::from_board_string(
-        ". B .
-          . . B
-           W .",
-      )
-      .unwrap(),
+    let view5 = build_view(
+      ". B .
+        . . B
+         W .",
     );
 
     assert_eq!(view1.canon_view().get_symm_class(), SymmetryClass::C);
@@ -527,37 +512,25 @@ mod tests {
   #[test]
   #[allow(non_snake_case)]
   fn test_C_symm_2() {
-    let view1 = OnoroView::new(
-      Onoro16::from_board_string(
-        ". W B
-          . . .
-           W B .",
-      )
-      .unwrap(),
+    let view1 = build_view(
+      ". W B
+        . . .
+         W B .",
     );
-    let view2 = OnoroView::new(
-      Onoro16::from_board_string(
-        ". B .
-          W . B
-           . W .",
-      )
-      .unwrap(),
+    let view2 = build_view(
+      ". B .
+        W . B
+         . W .",
     );
-    let view3 = OnoroView::new(
-      Onoro16::from_board_string(
-        ". W .
-          B . B
-           . W .",
-      )
-      .unwrap(),
+    let view3 = build_view(
+      ". W .
+        B . B
+         . W .",
     );
-    let view4 = OnoroView::new(
-      Onoro16::from_board_string(
-        ". . W
-          B . B
-           W . .",
-      )
-      .unwrap(),
+    let view4 = build_view(
+      ". . W
+        B . B
+         W . .",
     );
 
     assert_eq!(view1.canon_view().get_symm_class(), SymmetryClass::C);
@@ -574,40 +547,28 @@ mod tests {
   #[test]
   #[allow(non_snake_case)]
   fn test_E_symm_simple() {
-    let view1 = OnoroView::new(
-      Onoro16::from_board_string(
-        ". W . B
-          . . . .
-           W . B .",
-      )
-      .unwrap(),
+    let view1 = build_view(
+      ". W . B
+        . . . .
+         W . B .",
     );
-    let view2 = OnoroView::new(
-      Onoro16::from_board_string(
-        ". . B .
-          . . . B
-           W . . .
-            . W . .",
-      )
-      .unwrap(),
+    let view2 = build_view(
+      ". . B .
+        . . . B
+         W . . .
+          . W . .",
     );
-    let view3 = OnoroView::new(
-      Onoro16::from_board_string(
-        ". . W .
-          . . . B
-           B . . .
-            . W . .",
-      )
-      .unwrap(),
+    let view3 = build_view(
+      ". . W .
+        . . . B
+         B . . .
+          . W . .",
     );
-    let view4 = OnoroView::new(
-      Onoro16::from_board_string(
-        ". . W .
-          B . . .
-           . . B .
-            W . . .",
-      )
-      .unwrap(),
+    let view4 = build_view(
+      ". . W .
+        B . . .
+         . . B .
+          W . . .",
     );
 
     assert_eq!(view1.canon_view().get_symm_class(), SymmetryClass::E);
@@ -624,45 +585,33 @@ mod tests {
   #[test]
   #[allow(non_snake_case)]
   fn test_CV_symm_simple() {
-    let view1 = OnoroView::new(
-      Onoro16::from_board_string(
-        ". B . .
-          W B . .
-           . . . .
-            . . . W",
-      )
-      .unwrap(),
+    let view1 = build_view(
+      ". B . .
+        W B . .
+         . . . .
+          . . . W",
     );
-    let view2 = OnoroView::new(
-      Onoro16::from_board_string(
-        ". . . W
+    let view2 = build_view(
+      ". . . W
+        . . . .
+         . . . .
+          . . . .
+           . B . .
+            W B . .",
+    );
+    let view3 = build_view(
+      ". . B B
+        . . W .
+         . . . .
           . . . .
            . . . .
-            . . . .
-             . B . .
-              W B . .",
-      )
-      .unwrap(),
+            W . . .",
     );
-    let view3 = OnoroView::new(
-      Onoro16::from_board_string(
-        ". . B B
-          . . W .
-           . . . .
-            . . . .
-             . . . .
-              W . . .",
-      )
-      .unwrap(),
-    );
-    let view4 = OnoroView::new(
-      Onoro16::from_board_string(
-        ". . . . . B
-          . . . . W B
-           . . . . . .
-            W . . . . .",
-      )
-      .unwrap(),
+    let view4 = build_view(
+      ". . . . . B
+        . . . . W B
+         . . . . . .
+          W . . . . .",
     );
 
     assert_eq!(view1.canon_view().get_symm_class(), SymmetryClass::CV);
@@ -702,8 +651,7 @@ mod tests {
          B W .",
     ];
 
-    let views =
-      BOARD_POSITIONS.map(|view| OnoroView::new(Onoro16::from_board_string(view).unwrap()));
+    let views = BOARD_POSITIONS.map(build_view);
     for i in 0..views.len() {
       assert_eq!(views[i].canon_view().get_symm_class(), SymmetryClass::CV);
       for j in 0..i {
@@ -718,35 +666,23 @@ mod tests {
   #[test]
   #[allow(non_snake_case)]
   fn test_CE_symm_simple() {
-    let view1 = OnoroView::new(
-      Onoro16::from_board_string(
-        ". B
-          W B
-           . W",
-      )
-      .unwrap(),
+    let view1 = build_view(
+      ". B
+        W B
+         . W",
     );
-    let view2 = OnoroView::new(
-      Onoro16::from_board_string(
-        ". W .
-          B B W",
-      )
-      .unwrap(),
+    let view2 = build_view(
+      ". W .
+        B B W",
     );
-    let view3 = OnoroView::new(
-      Onoro16::from_board_string(
-        ". . B
-          W B W",
-      )
-      .unwrap(),
+    let view3 = build_view(
+      ". . B
+        W B W",
     );
-    let view4 = OnoroView::new(
-      Onoro16::from_board_string(
-        ". . W
-          . B B
-           W . .",
-      )
-      .unwrap(),
+    let view4 = build_view(
+      ". . W
+        . B B
+         W . .",
     );
 
     assert_eq!(view1.canon_view().get_symm_class(), SymmetryClass::CE);
@@ -763,42 +699,30 @@ mod tests {
   #[test]
   #[allow(non_snake_case)]
   fn test_EV_symm_simple() {
-    let view1 = OnoroView::new(
-      Onoro16::from_board_string(
-        ". B . B
+    let view1 = build_view(
+      ". B . B
+        . . . .
+         . . W .
+          B . W .",
+    );
+    let view2 = build_view(
+      ". . . B
+        W W . .
+         . . . B
+          B . . .",
+    );
+    let view3 = build_view(
+      ". . . B
+        . . B .
+         B . . W
           . . . .
-           . . W .
-            B . W .",
-      )
-      .unwrap(),
+           W . . .",
     );
-    let view2 = OnoroView::new(
-      Onoro16::from_board_string(
-        ". . . B
-          W W . .
-           . . . B
-            B . . .",
-      )
-      .unwrap(),
-    );
-    let view3 = OnoroView::new(
-      Onoro16::from_board_string(
-        ". . . B
-          . . B .
-           B . . W
-            . . . .
-             W . . .",
-      )
-      .unwrap(),
-    );
-    let view4 = OnoroView::new(
-      Onoro16::from_board_string(
-        ". W . B
-          . . . .
-           . . B .
-            W . B .",
-      )
-      .unwrap(),
+    let view4 = build_view(
+      ". W . B
+        . . . .
+         . . B .
+          W . B .",
     );
 
     assert_eq!(view1.canon_view().get_symm_class(), SymmetryClass::EV);
@@ -815,42 +739,30 @@ mod tests {
   #[test]
   #[allow(non_snake_case)]
   fn test_trivial_symm_simple() {
-    let view1 = OnoroView::new(
-      Onoro16::from_board_string(
-        ". B . B
+    let view1 = build_view(
+      ". B . B
+        . . . .
+         . . W .
+          B W W .",
+    );
+    let view2 = build_view(
+      ". . . B
+        W W . .
+         W . . B
+          B . . .",
+    );
+    let view3 = build_view(
+      ". . . B
+        . . B W
+         B . . W
           . . . .
-           . . W .
-            B W W .",
-      )
-      .unwrap(),
+           W . . .",
     );
-    let view2 = OnoroView::new(
-      Onoro16::from_board_string(
-        ". . . B
-          W W . .
-           W . . B
-            B . . .",
-      )
-      .unwrap(),
-    );
-    let view3 = OnoroView::new(
-      Onoro16::from_board_string(
-        ". . . B
-          . . B W
-           B . . W
-            . . . .
-             W . . .",
-      )
-      .unwrap(),
-    );
-    let view4 = OnoroView::new(
-      Onoro16::from_board_string(
-        ". W . B
-          . . . .
-           . . B .
-            W W B .",
-      )
-      .unwrap(),
+    let view4 = build_view(
+      ". W . B
+        . . . .
+         . . B .
+          W W B .",
     );
 
     assert_eq!(view1.canon_view().get_symm_class(), SymmetryClass::Trivial);
