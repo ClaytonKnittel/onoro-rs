@@ -23,10 +23,6 @@ impl<const N: u16> Dihedral<N> {
       (Self::Rfl(i), Self::Rfl(j)) => Self::Rot((N + i - j) % N),
     }
   }
-
-  pub fn for_each() -> impl Iterator<Item = Self> {
-    (0..Self::SIZE).map(Self::from_ord)
-  }
 }
 
 impl<const N: u16> Mul for Dihedral<N> {
@@ -59,7 +55,11 @@ impl<const N: u16> Ordinal for Dihedral<N> {
   }
 }
 
-impl<const N: u16> Semigroup for Dihedral<N> {}
+impl<const N: u16> Semigroup for Dihedral<N> {
+  fn for_each() -> impl Iterator<Item = Self> {
+    (0..Self::SIZE).map(Self::from_ord)
+  }
+}
 
 impl<const N: u16> Monoid for Dihedral<N> {
   fn identity() -> Self {

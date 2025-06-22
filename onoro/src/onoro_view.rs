@@ -5,6 +5,7 @@ use algebra::{
   group::{Group, Trivial},
   monoid::Monoid,
   ordinal::Ordinal,
+  semigroup::Semigroup,
 };
 
 use abstract_game::{Game, GameMoveGenerator, GameResult};

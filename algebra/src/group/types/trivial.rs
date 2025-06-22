@@ -27,7 +27,11 @@ impl Ordinal for Trivial {
   }
 }
 
-impl Semigroup for Trivial {}
+impl Semigroup for Trivial {
+  fn for_each() -> impl Iterator<Item = Self> {
+    std::iter::once(Self)
+  }
+}
 
 impl Monoid for Trivial {
   fn identity() -> Self {

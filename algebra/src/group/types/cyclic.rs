@@ -13,10 +13,6 @@ impl<const N: u16> Cyclic<N> {
   pub const fn const_from_ord(ord: usize) -> Self {
     Self(ord as u16)
   }
-
-  pub fn for_each() -> impl Iterator<Item = Self> {
-    (0..Self::SIZE).map(Self::from_ord)
-  }
 }
 
 impl<const N: u16> Mul for Cyclic<N> {
@@ -42,7 +38,11 @@ impl<const N: u16> Ordinal for Cyclic<N> {
   }
 }
 
-impl<const N: u16> Semigroup for Cyclic<N> {}
+impl<const N: u16> Semigroup for Cyclic<N> {
+  fn for_each() -> impl Iterator<Item = Self> {
+    (0..Self::SIZE).map(Self::from_ord)
+  }
+}
 
 impl<const N: u16> Monoid for Cyclic<N> {
   fn identity() -> Self {
