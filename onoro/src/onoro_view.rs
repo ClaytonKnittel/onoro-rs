@@ -228,6 +228,8 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroView<N, N2
   }
 
   pub fn pawns(&self) -> impl Iterator<Item = (HexPosOffset, PawnColor)> + '_ {
+    self.maybe_initialize_canonical_view();
+
     match self.canon_view().get_symm_class() {
       SymmetryClass::C => SymmetryClassContainer::C(self.pawns_iterator(HexPosOffset::apply_d6_c)),
       SymmetryClass::V => SymmetryClassContainer::V(self.pawns_iterator(HexPosOffset::apply_d3_v)),
