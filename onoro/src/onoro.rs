@@ -329,8 +329,12 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Onoro<N, N2, AD
     }
   }
 
-  pub fn pawns(&self) -> GameIterator<'_, PawnMoveGenerator<N, N2, ADJ_CNT_SIZE>, Self> {
+  pub fn pawns_typed(&self) -> GameIterator<'_, PawnMoveGenerator<N, N2, ADJ_CNT_SIZE>, Self> {
     self.pawns_gen().to_iter(self)
+  }
+
+  pub fn pawns(&self) -> impl Iterator<Item = Pawn> + '_ {
+    self.pawns_typed()
   }
 
   pub fn color_pawns_gen(&self, color: PawnColor) -> PawnMoveGenerator<N, N2, ADJ_CNT_SIZE> {
@@ -343,11 +347,15 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Onoro<N, N2, AD
     }
   }
 
-  pub fn color_pawns(
+  pub fn color_pawns_typed(
     &self,
     color: PawnColor,
   ) -> GameIterator<'_, PawnMoveGenerator<N, N2, ADJ_CNT_SIZE>, Self> {
     self.color_pawns_gen(color).to_iter(self)
+  }
+
+  pub fn color_pawns(&self, color: PawnColor) -> impl Iterator<Item = Pawn> + '_ {
+    self.color_pawns_typed(color)
   }
 
   pub fn pawns_mathematica_list(&self) -> String {
