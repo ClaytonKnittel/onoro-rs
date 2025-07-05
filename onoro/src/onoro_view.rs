@@ -1,4 +1,4 @@
-use crate::{compress::Compress, groups::SymmetryClassContainer, Move, MoveGenerator};
+use crate::{compress::Compress, groups::SymmetryClassContainer, Move, MoveGenerator, Onoro16View};
 use std::{cell::UnsafeCell, fmt::Display, hash::Hash};
 
 use algebra::{
@@ -454,12 +454,23 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Game
   }
 }
 
-impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Compress
-  for OnoroView<N, N2, ADJ_CNT_SIZE>
-{
+impl Compress for Onoro16View {
   type Repr = u64;
 
   fn compress(&self) -> u64 {
+    // Find the lowest-index pawn.
+    const N: usize = 16;
+    const EXPLORE_MAP_SIZE: usize = usize::div_ceil(N * N, u64::BITS as usize);
+
+    let (min_x, min_y) = self
+      .pawns()
+      .fold((N as i32, N as i32), |(min_x, min_y), (pawn_pos, _)| {
+        (min_x.min(pawn_pos.x()), min_y.min(pawn_pos.y()))
+      });
+
+    let mut explore_map = [0u64; EXPLORE_MAP_SIZE];
+    for (pawn_pos, color) in self.pawns() {}
+
     0
   }
 
