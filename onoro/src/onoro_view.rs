@@ -525,7 +525,7 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Clone
 mod tests {
   use googletest::{
     assert_that, expect_that, gtest,
-    prelude::{any, container_eq},
+    prelude::{any, anything, container_eq},
   };
   use itertools::{Either, Itertools};
 
@@ -927,6 +927,19 @@ mod tests {
         0b01_000_010,
         0b01_000_001
       )
+    );
+  }
+
+  #[gtest]
+  fn test_compress_long_board() {
+    expect_that!(
+      build_view(
+        ". W . . . . . . . . . . . .
+          B W B W B W B W B W B W B W
+           . . . . . . . . . . . . B ."
+      )
+      .compress(),
+      anything()
     );
   }
 }
