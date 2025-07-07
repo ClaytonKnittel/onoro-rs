@@ -496,9 +496,10 @@ impl Compress for Onoro16View {
       }
     }
 
-    position_bits
-      .into_iter()
-      .chain(color_bits.iter().map(|c| matches!(c, PawnColor::Black)))
+    color_bits
+      .iter()
+      .map(|c| matches!(c, PawnColor::Black))
+      .chain(position_bits)
       .enumerate()
       .fold(0, |acc, (idx, set)| {
         acc | ((if set { 1 } else { 0 }) << idx)
@@ -912,20 +913,21 @@ mod tests {
 
   #[test]
   fn test_compress_single_pawn() {
-    assert_eq!(build_view("B").compress(), 0b1000);
+    assert_eq!(build_view("B").compress(), 0b0001);
   }
 
   #[gtest]
+  #[allow(clippy::unusual_byte_groupings)]
   fn test_compress_two_pawns() {
     expect_that!(
       build_view("B W").compress(),
       any!(
-        0b10_000_100,
-        0b10_000_010,
-        0b10_000_001,
-        0b01_000_100,
-        0b01_000_010,
-        0b01_000_001
+        0b000_100_10,
+        0b000_010_10,
+        0b000_001_10,
+        0b000_100_01,
+        0b000_010_01,
+        0b000_001_01
       )
     );
   }
