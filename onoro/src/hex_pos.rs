@@ -30,7 +30,7 @@ impl HexPos {
   }
 
   /// Returns an iterator over all neighbors of this `HexPos`.
-  pub fn each_neighbor(&self) -> std::array::IntoIter<HexPos, 6> {
+  pub fn each_neighbor(&self) -> std::array::IntoIter<Self, 6> {
     [
       self + &HexPosOffset::new(-1, -1),
       self + &HexPosOffset::new(0, -1),
@@ -173,7 +173,7 @@ impl Display for HexPos {
   }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct HexPosOffset {
   x: i32,
   y: i32,
@@ -194,6 +194,33 @@ impl HexPosOffset {
 
   pub const fn y(&self) -> i32 {
     self.y
+  }
+
+  /// Returns an iterator over all neighbors of this `HexPosOffset`.
+  pub fn each_neighbor(&self) -> std::array::IntoIter<Self, 6> {
+    [
+      self + &HexPosOffset::new(-1, -1),
+      self + &HexPosOffset::new(0, -1),
+      self + &HexPosOffset::new(-1, 0),
+      self + &HexPosOffset::new(1, 0),
+      self + &HexPosOffset::new(0, 1),
+      self + &HexPosOffset::new(1, 1),
+    ]
+    .into_iter()
+  }
+
+  /// Returns an iterator over the top-left neighbors of this `HexPosOffset`.
+  /// This has the property that for any two hex poses `p1` and `p2`, if `p1` is
+  /// a top left neighbor of `p2`, `p2` is not a top left neighbor of `p1`, and
+  /// for any two neighboring hex poses `p1` and `p2`, one of `p1` and `p2` are
+  /// the top left neighbor of the other.
+  pub fn each_top_left_neighbor(&self) -> impl Iterator<Item = Self> {
+    [
+      self + &HexPosOffset::new(-1, -1),
+      self + &HexPosOffset::new(0, -1),
+      self + &HexPosOffset::new(-1, 0),
+    ]
+    .into_iter()
   }
 
   /// Returns the sectant this point lies in, treating (0, 0) as the origin. The

@@ -40,6 +40,15 @@ pub enum TileState {
   White,
 }
 
+impl From<PawnColor> for TileState {
+  fn from(value: PawnColor) -> Self {
+    match value {
+      PawnColor::Black => TileState::Black,
+      PawnColor::White => TileState::White,
+    }
+  }
+}
+
 /// An Onoro game state with `N / 2` pawns per player.
 ///
 /// Note: All of `N`, the total number of pawns in the game, `N2`, the square of
@@ -862,7 +871,7 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Display
   }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum PawnColor {
   Black,
   White,

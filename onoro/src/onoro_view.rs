@@ -1,5 +1,10 @@
 use crate::{compress::Compress, groups::SymmetryClassContainer, Move, MoveGenerator, Onoro16View};
-use std::{cell::UnsafeCell, fmt::Display, hash::Hash};
+use std::{
+  cell::UnsafeCell,
+  collections::{HashMap, HashSet},
+  fmt::Display,
+  hash::Hash,
+};
 
 use algebra::{
   group::{Group, Trivial},
@@ -458,20 +463,45 @@ impl Compress for Onoro16View {
   type Repr = u64;
 
   fn compress(&self) -> u64 {
-    // Find the lowest-index pawn.
-    const N: usize = 16;
-    const EXPLORE_MAP_SIZE: usize = usize::div_ceil(N * N, u64::BITS as usize);
+    let pawn_colors: HashMap<_, _> = self.pawns().collect();
+    let Some((start_pawn_pos, start_pawn_color)) = self.pawns().min_by_key(|(pos, _)| *pos) else {
+      return 0;
+    };
 
-    let (min_x, min_y) = self
-      .pawns()
-      .fold((N as i32, N as i32), |(min_x, min_y), (pawn_pos, _)| {
-        (min_x.min(pawn_pos.x()), min_y.min(pawn_pos.y()))
-      });
+    let mut known_tiles = HashSet::<HexPosOffset>::new();
+    known_tiles.insert(start_pawn_pos);
+    for empty_pos in start_pawn_pos.each_top_left_neighbor() {
+      known_tiles.insert(empty_pos);
+    }
 
-    let mut explore_map = [0u64; EXPLORE_MAP_SIZE];
-    for (pawn_pos, color) in self.pawns() {}
+    let mut position_bits = Vec::<bool>::new();
+    let mut color_bits = vec![start_pawn_color];
 
-    0
+    let mut pawn_stack = vec![start_pawn_pos];
+
+    while let Some(current_pawn) = pawn_stack.pop() {
+      for neighbor_pos in current_pawn.each_neighbor() {
+        if !known_tiles.insert(neighbor_pos) {
+          continue;
+        }
+
+        let neighbor_color = pawn_colors.get(&neighbor_pos);
+        position_bits.push(neighbor_color.is_some());
+
+        if let Some(&color) = neighbor_color {
+          color_bits.push(color);
+          pawn_stack.push(neighbor_pos);
+        }
+      }
+    }
+
+    position_bits
+      .into_iter()
+      .chain(color_bits.iter().map(|c| matches!(c, PawnColor::Black)))
+      .enumerate()
+      .fold(0, |acc, (idx, set)| {
+        acc | ((if set { 1 } else { 0 }) << idx)
+      })
   }
 
   fn decompress(repr: u64) -> Self {
