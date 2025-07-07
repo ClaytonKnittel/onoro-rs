@@ -464,9 +464,10 @@ impl Compress for Onoro16View {
 
   fn compress(&self) -> u64 {
     let pawn_colors: HashMap<_, _> = self.pawns().collect();
-    let Some((start_pawn_pos, start_pawn_color)) = self.pawns().min_by_key(|(pos, _)| *pos) else {
-      return 0;
-    };
+    let (start_pawn_pos, start_pawn_color) = self
+      .pawns()
+      .min_by_key(|(pos, _)| *pos)
+      .expect("Cannot compress empty onoro board");
 
     let mut known_tiles = HashSet::<HexPosOffset>::new();
     known_tiles.insert(start_pawn_pos);
@@ -522,11 +523,15 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Clone
 
 #[cfg(test)]
 mod tests {
-  use googletest::{assert_that, gtest, prelude::container_eq};
+  use googletest::{
+    assert_that, expect_that, gtest,
+    prelude::{any, container_eq},
+  };
   use itertools::{Either, Itertools};
 
   use crate::{
-    groups::SymmetryClass, hex_pos::HexPosOffset, Onoro16, Onoro16View, OnoroView, PawnColor,
+    compress::Compress, groups::SymmetryClass, hex_pos::HexPosOffset, Onoro16, Onoro16View,
+    OnoroView, PawnColor,
   };
 
   fn build_view(board_layout: &str) -> Onoro16View {
@@ -903,5 +908,25 @@ mod tests {
     expect_view_ne(&view1, &view4);
     expect_view_ne(&view2, &view4);
     expect_view_eq(&view3, &view4);
+  }
+
+  #[test]
+  fn test_compress_single_pawn() {
+    assert_eq!(build_view("B").compress(), 0b1000);
+  }
+
+  #[gtest]
+  fn test_compress_two_pawns() {
+    expect_that!(
+      build_view("B W").compress(),
+      any!(
+        0b10_000_100,
+        0b10_000_010,
+        0b10_000_001,
+        0b01_000_100,
+        0b01_000_010,
+        0b01_000_001
+      )
+    );
   }
 }
