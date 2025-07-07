@@ -507,6 +507,17 @@ impl Compress for Onoro16View {
   }
 
   fn decompress(repr: u64) -> Self {
+    const PAWN_COUNT: usize = 16;
+    let board = HashMap::<HexPosOffset, TileState>::new();
+
+    let pawn_idx = PAWN_COUNT;
+    for color_idx in 0..PAWN_COUNT {
+      let color = if ((1 << color_idx) & repr) != 0 {
+        TileState::Black
+      } else {
+        TileState::White
+      };
+    }
     todo!()
   }
 }
@@ -909,6 +920,24 @@ mod tests {
     expect_view_ne(&view1, &view4);
     expect_view_ne(&view2, &view4);
     expect_view_eq(&view3, &view4);
+  }
+
+  #[test]
+  fn test_1() {
+    let onoro_str = build_view(
+      ". W
+        B B",
+    );
+    let onoro_pawns = OnoroView::new(
+      Onoro16::from_pawns(vec![
+        (HexPosOffset::new(0, 0), PawnColor::Black),
+        (HexPosOffset::new(1, 0), PawnColor::Black),
+        (HexPosOffset::new(1, 1), PawnColor::White),
+      ])
+      .unwrap(),
+    );
+
+    assert_eq!(onoro_str, onoro_pawns);
   }
 
   #[test]
