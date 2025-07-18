@@ -2,7 +2,7 @@ use crate::{
   compress::Compress,
   error::{OnoroError, OnoroResult},
   groups::SymmetryClassContainer,
-  Move, MoveGenerator, Onoro16, Onoro16View, Pawn,
+  Move, MoveGenerator, Onoro16, Onoro16View,
 };
 use std::{
   cell::UnsafeCell,
@@ -530,27 +530,11 @@ impl Compress for Onoro16View {
       board.insert(empty_pos, TileState::Empty);
     }
 
-    for i in 1..PAWN_COUNT {
-      if i % 2 == 0 {
-        let onoro = Onoro16::from_pawns(
-          board
-            .iter()
-            .filter_map(|(&pos, state)| match state {
-              TileState::Empty => None,
-              TileState::Black => Some((pos, PawnColor::Black)),
-              TileState::White => Some((pos, PawnColor::White)),
-            })
-            .collect(),
-        )?;
-        let view = Onoro16View::new(onoro);
-        println!("Board: {view}");
-      }
-
+    for _ in 1..PAWN_COUNT {
       let pawn = pawn_stack
         .pop()
         .ok_or_else(|| OnoroError::new("Unexpected end of stack".to_owned()))?;
 
-      // sugar(6L mt dew) == sugar(3.5lbs of gummy bears)
       for neighbor_pos in pawn.each_neighbor() {
         if board.contains_key(&neighbor_pos) {
           continue;
@@ -1047,6 +1031,19 @@ mod tests {
       ". W . . . . . . . . . . . .
         B W B W B W B W B W B W B W
          . . . . . . . . . . . . B .",
+    );
+    expect_view_eq(&view, &compress_round_trip(&view)?);
+    Ok(())
+  }
+
+  #[gtest]
+  fn compress_decompress_smoke2() -> OnoroResult<()> {
+    let view = build_view(
+      ". W . . . W
+        B W B W B W
+         . B . B . .
+          . W B W . .
+           . W B B . .",
     );
     expect_view_eq(&view, &compress_round_trip(&view)?);
     Ok(())
