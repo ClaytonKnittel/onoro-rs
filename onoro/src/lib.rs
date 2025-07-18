@@ -2,7 +2,7 @@ mod canonicalize;
 mod color_print;
 mod compress;
 mod const_rand;
-mod error;
+pub mod error;
 mod groups;
 mod hash;
 mod hex_pos;
@@ -18,6 +18,7 @@ mod util;
 
 pub use crate::onoro::*;
 pub use color_print::*;
+pub use compress::*;
 pub use onoro_defs::*;
 pub use onoro_view::*;
 pub use packed_idx::*;

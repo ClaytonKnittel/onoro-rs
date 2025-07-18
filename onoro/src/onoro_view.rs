@@ -513,6 +513,14 @@ impl Compress for Onoro16View {
 
   fn decompress(repr: u64) -> OnoroResult<Self> {
     const PAWN_COUNT: usize = 16;
+
+    if (repr & 0xffff).count_ones() != PAWN_COUNT as u32 / 2 {
+      return Err(OnoroError::new("Expect 8 of the 16 pawns to be white.".to_owned()).into());
+    }
+    if (repr & !0xffff).count_ones() != PAWN_COUNT as u32 - 1 {
+      return Err(OnoroError::new(format!("Expect {PAWN_COUNT} pawns.")).into());
+    }
+
     let mut board = HashMap::<HexPosOffset, TileState>::new();
 
     let mut pawn_stack = vec![HexPosOffset::origin()];
@@ -539,6 +547,7 @@ impl Compress for Onoro16View {
         if board.contains_key(&neighbor_pos) {
           continue;
         }
+        debug_assert!(position_bits_idx < u64::BITS as usize);
         if ((repr >> position_bits_idx) & 1) != 0 {
           pawn_stack.push(neighbor_pos);
           let color = if ((repr >> color_bits_idx) & 1) != 0 {
@@ -547,6 +556,7 @@ impl Compress for Onoro16View {
             TileState::White
           };
           color_bits_idx += 1;
+          debug_assert!(color_bits_idx <= PAWN_COUNT);
           board.insert(neighbor_pos, color);
         } else {
           board.insert(neighbor_pos, TileState::Empty);

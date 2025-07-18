@@ -1,4 +1,4 @@
-use std::num::Wrapping;
+use std::{fmt::Display, num::Wrapping};
 
 use crate::hex_pos::HexPosOffset;
 
@@ -75,6 +75,12 @@ impl std::ops::Add<IdxOffset> for PackedIdx {
 impl std::ops::AddAssign<IdxOffset> for PackedIdx {
   fn add_assign(&mut self, rhs: IdxOffset) {
     self.bytes += rhs.bytes
+  }
+}
+
+impl Display for PackedIdx {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(f, "({}, {})", self.x(), self.y())
   }
 }
 

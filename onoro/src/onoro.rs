@@ -152,11 +152,19 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Onoro<N, N2, AD
 
   pub fn from_pawns(mut pawns: Vec<(HexPosOffset, PawnColor)>) -> Result<Self, String> {
     let n_pawns = pawns.len();
+    debug_assert!(n_pawns <= N);
     let (min_x, min_y) = pawns
       .iter()
       .fold((i32::MAX, i32::MAX), |(min_x, min_y), (pos, _)| {
         (min_x.min(pos.x()), min_y.min(pos.y()))
       });
+
+    if pawns
+      .iter()
+      .any(|(pos, _)| pos.x() - min_x >= N as i32 - 1 || pos.y() - min_y >= N as i32 - 1)
+    {
+      return Err("Pawns stretch beyond the maximum allowed size of the board, meaning this state is invalid.".to_owned());
+    }
 
     let black_count = pawns
       .iter()
@@ -578,7 +586,7 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Onoro<N, N2, AD
   fn adjust_to_new_pawn_and_check_win(&mut self, pos: PackedIdx) {
     // The amount to shift the whole board by. This will keep pawns off the
     // outer perimeter.
-    let shift = Self::calc_move_shift(&pos);
+    let shift = Self::calc_move_shift(pos);
     // Only shift the pawns if we have to, to avoid extra memory
     // reading/writing.
     if shift != HexPosOffset::origin() {
@@ -599,7 +607,7 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Onoro<N, N2, AD
 
   /// Given the position of a newly placed/moved pawn, returns the offset to
   /// apply to all positions on the board.
-  fn calc_move_shift(m: &PackedIdx) -> HexPosOffset {
+  fn calc_move_shift(m: PackedIdx) -> HexPosOffset {
     let mut offset = HexPosOffset::new(0, 0);
 
     if m.y() == 0 {

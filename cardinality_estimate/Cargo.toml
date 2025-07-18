@@ -1,0 +1,8 @@
+[package]
+name = "cardinality_estimate"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+onoro = { path = "../onoro" }
+rand = "0.9.1"
