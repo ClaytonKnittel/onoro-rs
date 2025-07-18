@@ -1,4 +1,9 @@
-use crate::{compress::Compress, groups::SymmetryClassContainer, Move, MoveGenerator, Onoro16View};
+use crate::{
+  compress::Compress,
+  error::{OnoroError, OnoroResult},
+  groups::SymmetryClassContainer,
+  Move, MoveGenerator, Onoro16, Onoro16View, Pawn,
+};
 use std::{
   cell::UnsafeCell,
   collections::{HashMap, HashSet},
@@ -506,19 +511,77 @@ impl Compress for Onoro16View {
       })
   }
 
-  fn decompress(repr: u64) -> Self {
+  fn decompress(repr: u64) -> OnoroResult<Self> {
     const PAWN_COUNT: usize = 16;
-    let board = HashMap::<HexPosOffset, TileState>::new();
+    let mut board = HashMap::<HexPosOffset, TileState>::new();
 
-    let pawn_idx = PAWN_COUNT;
-    for color_idx in 0..PAWN_COUNT {
-      let color = if ((1 << color_idx) & repr) != 0 {
+    let mut pawn_stack = vec![HexPosOffset::origin()];
+    let mut position_bits_idx = PAWN_COUNT;
+    let mut color_bits_idx = 1;
+    board.insert(
+      HexPosOffset::origin(),
+      if (repr & 1) != 0 {
         TileState::Black
       } else {
         TileState::White
-      };
+      },
+    );
+    for empty_pos in HexPosOffset::origin().each_top_left_neighbor() {
+      board.insert(empty_pos, TileState::Empty);
     }
-    todo!()
+
+    for i in 1..PAWN_COUNT {
+      if i % 2 == 0 {
+        let onoro = Onoro16::from_pawns(
+          board
+            .iter()
+            .filter_map(|(&pos, state)| match state {
+              TileState::Empty => None,
+              TileState::Black => Some((pos, PawnColor::Black)),
+              TileState::White => Some((pos, PawnColor::White)),
+            })
+            .collect(),
+        )?;
+        let view = Onoro16View::new(onoro);
+        println!("Board: {view}");
+      }
+
+      let pawn = pawn_stack
+        .pop()
+        .ok_or_else(|| OnoroError::new("Unexpected end of stack".to_owned()))?;
+
+      // sugar(6L mt dew) == sugar(3.5lbs of gummy bears)
+      for neighbor_pos in pawn.each_neighbor() {
+        if board.contains_key(&neighbor_pos) {
+          continue;
+        }
+        if ((repr >> position_bits_idx) & 1) != 0 {
+          pawn_stack.push(neighbor_pos);
+          let color = if ((repr >> color_bits_idx) & 1) != 0 {
+            TileState::Black
+          } else {
+            TileState::White
+          };
+          color_bits_idx += 1;
+          board.insert(neighbor_pos, color);
+        } else {
+          board.insert(neighbor_pos, TileState::Empty);
+        }
+        position_bits_idx += 1;
+      }
+    }
+
+    let onoro = Onoro16::from_pawns(
+      board
+        .into_iter()
+        .filter_map(|(pos, state)| match state {
+          TileState::Empty => None,
+          TileState::Black => Some((pos, PawnColor::Black)),
+          TileState::White => Some((pos, PawnColor::White)),
+        })
+        .collect(),
+    )?;
+    Ok(Onoro16View::new(onoro))
   }
 }
 
@@ -542,8 +605,8 @@ mod tests {
   use itertools::{Either, Itertools};
 
   use crate::{
-    compress::Compress, groups::SymmetryClass, hex_pos::HexPosOffset, Onoro16, Onoro16View,
-    OnoroView, PawnColor,
+    compress::Compress, error::OnoroResult, groups::SymmetryClass, hex_pos::HexPosOffset, Onoro16,
+    Onoro16View, OnoroView, PawnColor,
   };
 
   fn build_view(board_layout: &str) -> Onoro16View {
@@ -591,6 +654,10 @@ mod tests {
     view2: &OnoroView<N, N2, ADJ_CNT_SIZE>,
   ) {
     assert_ne!(view1, view2);
+  }
+
+  fn compress_round_trip(onoro: &Onoro16View) -> OnoroResult<Onoro16View> {
+    OnoroView::decompress(onoro.compress())
   }
 
   #[gtest]
@@ -972,5 +1039,16 @@ mod tests {
       .compress(),
       anything()
     );
+  }
+
+  #[gtest]
+  fn compress_decompress_smoke() -> OnoroResult<()> {
+    let view = build_view(
+      ". W . . . . . . . . . . . .
+        B W B W B W B W B W B W B W
+         . . . . . . . . . . . . B .",
+    );
+    expect_view_eq(&view, &compress_round_trip(&view)?);
+    Ok(())
   }
 }
