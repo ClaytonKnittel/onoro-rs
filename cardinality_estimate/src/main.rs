@@ -51,8 +51,8 @@ impl<R: Rng> RandomCompressedBoard<R> {
   }
 
   fn random_compressed_val(&mut self) -> u64 {
-    let v1 = self.rng.sample(self.colors_distribution);
-    let v2 = self.rng.sample(self.positions_distribution);
+    let v1 = rand_fixed_bits(self.rng.sample(self.colors_distribution), 16, 8);
+    let v2 = rand_fixed_bits(self.rng.sample(self.positions_distribution), 48, 15);
     v1 | (v2 << 16)
   }
 }
