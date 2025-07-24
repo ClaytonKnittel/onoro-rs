@@ -46,7 +46,7 @@ impl<R: Rng> RandomCompressedBoard<R> {
     Ok(Self {
       rng,
       colors_distribution: Uniform::new(0, ncr(16, 8))?,
-      positions_distribution: Uniform::new(0, ncr(48, 15))?,
+      positions_distribution: Uniform::new(0, ncr(45, 15))?,
     })
   }
 
@@ -60,7 +60,7 @@ impl<R: Rng> RandomCompressedBoard<R> {
 fn main() {
   let mut rng = RandomCompressedBoard::new(rand::rng()).unwrap();
 
-  const ITERS: u64 = 100_000_000;
+  const ITERS: u64 = 1_000_000_000;
 
   let onoro = (0..)
     .find_map(|_| Onoro16View::decompress(rng.random_compressed_val()).ok())
@@ -68,7 +68,9 @@ fn main() {
   println!("{onoro}");
 
   let count = (0..ITERS)
-    .filter(|_| Onoro16View::decompress(rng.random_compressed_val()).is_ok())
+    .map(|_| rng.random_compressed_val())
+    .filter_map(|val| Some((val, Onoro16View::decompress(val).ok()?)))
+    .filter(|(val, onoro)| onoro.compress() == *val)
     .count();
-  println!("{count} / {ITERS} ({})", count as f64 / ITERS as f64,);
+  println!("{count} / {ITERS} ({})", count as f64 / ITERS as f64);
 }

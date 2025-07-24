@@ -6,3 +6,8 @@ edition = "2024"
 [dependencies]
 onoro = { path = "../onoro" }
 rand = "0.9.1"
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true

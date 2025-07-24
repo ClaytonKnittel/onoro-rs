@@ -543,8 +543,12 @@ impl Compress for Onoro16View {
         .pop()
         .ok_or_else(|| OnoroError::new("Unexpected end of stack".to_owned()))?;
 
+      let mut neighbor_count = 0;
       for neighbor_pos in pawn.each_neighbor() {
-        if board.contains_key(&neighbor_pos) {
+        if let Some(tile) = board.get_mut(&neighbor_pos) {
+          if matches!(tile, TileState::Black | TileState::White) {
+            neighbor_count += 1;
+          }
           continue;
         }
         debug_assert!(position_bits_idx < u64::BITS as usize);
@@ -555,6 +559,7 @@ impl Compress for Onoro16View {
           } else {
             TileState::White
           };
+          neighbor_count += 1;
           color_bits_idx += 1;
           debug_assert!(color_bits_idx <= PAWN_COUNT);
           board.insert(neighbor_pos, color);
@@ -563,6 +568,22 @@ impl Compress for Onoro16View {
         }
         position_bits_idx += 1;
       }
+
+      if neighbor_count < 2 {
+        return Err(OnoroError::new("Not enough neighbors of pawn!".to_owned()).into());
+      }
+    }
+
+    let pawn = pawn_stack
+      .pop()
+      .ok_or_else(|| OnoroError::new("Unexpected end of stack".to_owned()))?;
+    let neighbor_count = pawn
+      .each_neighbor()
+      .filter_map(|neighbor_pos| board.get(&neighbor_pos))
+      .filter(|tile| matches!(tile, TileState::Black | TileState::White))
+      .count();
+    if neighbor_count < 2 {
+      return Err(OnoroError::new("Not enough neighbors of pawn!".to_owned()).into());
     }
 
     let onoro = Onoro16::from_pawns(
