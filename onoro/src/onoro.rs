@@ -40,6 +40,15 @@ pub enum TileState {
   White,
 }
 
+impl From<PawnColor> for TileState {
+  fn from(value: PawnColor) -> Self {
+    match value {
+      PawnColor::Black => TileState::Black,
+      PawnColor::White => TileState::White,
+    }
+  }
+}
+
 /// An Onoro game state with `N / 2` pawns per player.
 ///
 /// Note: All of `N`, the total number of pawns in the game, `N2`, the square of
@@ -138,6 +147,58 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Onoro<N, N2, AD
     game.make_move(Move::Phase1Move {
       to: PackedIdx::new(mid_idx + 1, mid_idx),
     });
+    game
+  }
+
+  pub fn from_pawns(mut pawns: Vec<(HexPosOffset, PawnColor)>) -> Result<Self, String> {
+    let n_pawns = pawns.len();
+    debug_assert!(n_pawns <= N);
+    let (min_x, min_y) = pawns
+      .iter()
+      .fold((i32::MAX, i32::MAX), |(min_x, min_y), (pos, _)| {
+        (min_x.min(pos.x()), min_y.min(pos.y()))
+      });
+
+    if pawns
+      .iter()
+      .any(|(pos, _)| pos.x() - min_x >= N as i32 - 1 || pos.y() - min_y >= N as i32 - 1)
+    {
+      return Err("Pawns stretch beyond the maximum allowed size of the board, meaning this state is invalid.".to_owned());
+    }
+
+    let black_count = pawns
+      .iter()
+      .filter(|(_, color)| matches!(color, PawnColor::Black))
+      .count();
+    let white_count = n_pawns - black_count;
+    if !((black_count - 1)..=black_count).contains(&white_count) {
+      return Err(format!(
+        "There must be either one fewer or equally many white pawns as there are black. Found {black_count} black and {white_count} white.",
+      ));
+    }
+
+    // Move all black pawns to the front.
+    pawns.sort_by_key(|(_, color)| matches!(color, PawnColor::White));
+    for i in 0..(n_pawns - 1) / 2 {
+      pawns.swap(2 * i + 1, n_pawns.div_ceil(2) + i);
+    }
+    debug_assert!(pawns
+      .iter()
+      .enumerate()
+      .all(|(idx, (_, color))| { (idx % 2 == 0) == matches!(color, PawnColor::Black) }));
+
+    Ok(Self::from_packed_idxs(pawns.into_iter().map(|(pos, _)| {
+      PackedIdx::new((pos.x() - min_x + 1) as u32, (pos.y() - min_y + 1) as u32)
+    })))
+  }
+
+  pub fn from_packed_idxs(pawns: impl IntoIterator<Item = PackedIdx>) -> Self {
+    let mut game = unsafe { Self::new() };
+    for idx in pawns {
+      unsafe {
+        game.make_move_unchecked(Move::Phase1Move { to: idx });
+      }
+    }
     game
   }
 
@@ -525,7 +586,7 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Onoro<N, N2, AD
   fn adjust_to_new_pawn_and_check_win(&mut self, pos: PackedIdx) {
     // The amount to shift the whole board by. This will keep pawns off the
     // outer perimeter.
-    let shift = Self::calc_move_shift(&pos);
+    let shift = Self::calc_move_shift(pos);
     // Only shift the pawns if we have to, to avoid extra memory
     // reading/writing.
     if shift != HexPosOffset::origin() {
@@ -546,7 +607,7 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Onoro<N, N2, AD
 
   /// Given the position of a newly placed/moved pawn, returns the offset to
   /// apply to all positions on the board.
-  fn calc_move_shift(m: &PackedIdx) -> HexPosOffset {
+  fn calc_move_shift(m: PackedIdx) -> HexPosOffset {
     let mut offset = HexPosOffset::new(0, 0);
 
     if m.y() == 0 {
@@ -862,7 +923,7 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Display
   }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum PawnColor {
   Black,
   White,
