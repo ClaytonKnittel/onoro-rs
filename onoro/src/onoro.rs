@@ -383,14 +383,11 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Onoro<N, N2, AD
     self.onoro_state().turn() + 1
   }
 
-  pub fn pawns_gen(&self) -> PawnMoveGenerator<N, N2, ADJ_CNT_SIZE> {
-    PawnMoveGenerator {
-      pawn_idx: 0,
-      one_color: false,
-    }
+  pub fn pawns_gen(&self) -> PawnGenerator<N, N2, ADJ_CNT_SIZE> {
+    PawnGenerator { pawn_idx: 0 }
   }
 
-  pub fn pawns_typed(&self) -> GameIterator<'_, PawnMoveGenerator<N, N2, ADJ_CNT_SIZE>, Self> {
+  pub fn pawns_typed(&self) -> GameIterator<'_, PawnGenerator<N, N2, ADJ_CNT_SIZE>, Self> {
     self.pawns_gen().to_iter(self)
   }
 
@@ -398,20 +395,19 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Onoro<N, N2, AD
     self.pawns_typed()
   }
 
-  pub fn color_pawns_gen(&self, color: PawnColor) -> PawnMoveGenerator<N, N2, ADJ_CNT_SIZE> {
-    PawnMoveGenerator {
+  pub fn color_pawns_gen(&self, color: PawnColor) -> SingleColorPawnGenerator<N, N2, ADJ_CNT_SIZE> {
+    SingleColorPawnGenerator {
       pawn_idx: match color {
         PawnColor::Black => 0,
         PawnColor::White => 1,
       },
-      one_color: true,
     }
   }
 
   pub fn color_pawns_typed(
     &self,
     color: PawnColor,
-  ) -> GameIterator<'_, PawnMoveGenerator<N, N2, ADJ_CNT_SIZE>, Self> {
+  ) -> GameIterator<'_, SingleColorPawnGenerator<N, N2, ADJ_CNT_SIZE>, Self> {
     self.color_pawns_gen(color).to_iter(self)
   }
 
@@ -950,15 +946,18 @@ impl Display for Pawn {
   }
 }
 
-pub struct PawnMoveGenerator<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> {
+pub struct PawnGeneratorImpl<
+  // If true, only iterates over pawns of one color, otherwise iterating over all pawns.
+  const ONE_COLOR: bool,
+  const N: usize,
+  const N2: usize,
+  const ADJ_CNT_SIZE: usize,
+> {
   pawn_idx: usize,
-  /// If true, only iterates over pawns of one color, otherwise iterating over
-  /// all pawns.
-  one_color: bool,
 }
 
-impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> GameMoveGenerator
-  for PawnMoveGenerator<N, N2, ADJ_CNT_SIZE>
+impl<const ONE_COLOR: bool, const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize>
+  GameMoveGenerator for PawnGeneratorImpl<ONE_COLOR, N, N2, ADJ_CNT_SIZE>
 {
   type Item = Pawn;
   type Game = Onoro<N, N2, ADJ_CNT_SIZE>;
@@ -977,11 +976,16 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> GameMoveGenerat
       },
       board_idx: self.pawn_idx as u8,
     };
-    self.pawn_idx += if self.one_color { 2 } else { 1 };
+    self.pawn_idx += if ONE_COLOR { 2 } else { 1 };
 
     Some(pawn)
   }
 }
+
+pub type PawnGenerator<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> =
+  PawnGeneratorImpl<false, N, N2, ADJ_CNT_SIZE>;
+pub type SingleColorPawnGenerator<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> =
+  PawnGeneratorImpl<true, N, N2, ADJ_CNT_SIZE>;
 
 pub enum MoveGenerator<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> {
   P1Moves(P1MoveGenerator<N, N2, ADJ_CNT_SIZE>),
@@ -1003,7 +1007,7 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> GameMoveGenerat
 }
 
 pub struct P1MoveGenerator<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> {
-  pawn_iter: PawnMoveGenerator<N, N2, ADJ_CNT_SIZE>,
+  pawn_iter: PawnGenerator<N, N2, ADJ_CNT_SIZE>,
   neighbor_iter: Option<std::array::IntoIter<HexPos, 6>>,
 
   /// Bitvector of 2-bit numbers per tile in the whole game board. Each number
@@ -1077,7 +1081,7 @@ struct P2PawnMeta<const N2: usize> {
 pub struct P2MoveGenerator<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> {
   /// The current pawn that is being considered for moving. Only iterates over
   /// the pawns of the current player.
-  pawn_iter: PawnMoveGenerator<N, N2, ADJ_CNT_SIZE>,
+  pawn_iter: SingleColorPawnGenerator<N, N2, ADJ_CNT_SIZE>,
   pawn_meta: Option<P2PawnMeta<N2>>,
 
   /// Bitvector of 2-bit numbers per tile in the whole game board. Each number
