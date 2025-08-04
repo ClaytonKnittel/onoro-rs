@@ -1,0 +1,7 @@
+[package]
+name = "simple_onoro"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+onoro = { path = "../onoro" }

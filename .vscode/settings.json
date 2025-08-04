@@ -6,6 +6,7 @@
     "./cardinality_estimate/Cargo.toml",
     "./cooperate/Cargo.toml",
     "./server/Cargo.toml",
+    "./simple_onoro/Cargo.toml",
     "./onoro/Cargo.toml"
   ],
   "rust-analyzer.check.command": "clippy"
