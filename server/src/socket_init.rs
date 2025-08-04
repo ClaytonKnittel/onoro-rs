@@ -5,7 +5,7 @@ use async_sockets::{
   AsyncSocket, AsyncSocketContext, AsyncSocketEmitters, AsyncSocketListeners, AsyncSocketOptions,
   AsyncSocketResponders, Status,
 };
-use onoro::Onoro16;
+use onoro::{Onoro, Onoro16};
 use tokio::task::JoinHandle;
 
 use crate::proto::GameStateProto;

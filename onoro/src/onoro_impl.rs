@@ -10,12 +10,10 @@ use union_find::ConstUnionFind;
 
 use crate::{
   canonicalize::{board_symm_state, BoardSymmetryState},
-  error::OnoroError,
   groups::{C2, D3, D6, K4},
   make_onoro_error,
-  onoro_util::{pawns_from_board_string, BoardLayoutPawns},
   util::broadcast_u8_to_u64,
-  Color, Colored,
+  Color, Colored, Onoro,
 };
 
 use super::{
@@ -70,116 +68,6 @@ pub struct OnoroImpl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize>
 }
 
 impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroImpl<N, N2, ADJ_CNT_SIZE> {
-  /// Don't publicly expose the constructor, since it produces an invalid board
-  /// state.
-  ///
-  /// # Safety
-  ///
-  /// Any constructor returning an owned instance of `Onoro` _must_ make at
-  /// least one move after initializing an `Onoro` with this function.
-  pub unsafe fn new() -> Self {
-    Self {
-      pawn_poses: [PackedIdx::null(); N],
-      state: OnoroState::new(),
-      sum_of_mass: HexPos::zero().into(),
-    }
-  }
-
-  pub fn from_board_string(board_layout: &str) -> Result<Self, OnoroError> {
-    let BoardLayoutPawns {
-      black_pawns,
-      white_pawns,
-    } = pawns_from_board_string(board_layout, N)?;
-
-    let mut game = unsafe { Self::new() };
-    unsafe {
-      game.make_move_unchecked(Move::Phase1Move { to: black_pawns[0] });
-    }
-    for pos in interleave(white_pawns, black_pawns.into_iter().skip(1)) {
-      game.make_move(Move::Phase1Move { to: pos });
-    }
-
-    Ok(game)
-  }
-
-  pub fn default_start() -> Self {
-    let mid_idx = ((Self::board_width() - 1) / 2) as u32;
-    let mut game = unsafe { Self::new() };
-    unsafe {
-      game.make_move_unchecked(Move::Phase1Move {
-        to: PackedIdx::new(mid_idx, mid_idx),
-      });
-    }
-    game.make_move(Move::Phase1Move {
-      to: PackedIdx::new(mid_idx + 1, mid_idx + 1),
-    });
-    game.make_move(Move::Phase1Move {
-      to: PackedIdx::new(mid_idx + 1, mid_idx),
-    });
-    game
-  }
-
-  pub fn from_pawns(mut pawns: Vec<(HexPosOffset, PawnColor)>) -> Result<Self, String> {
-    let n_pawns = pawns.len();
-    debug_assert!(n_pawns <= N);
-    let (min_x, min_y) = pawns
-      .iter()
-      .fold((i32::MAX, i32::MAX), |(min_x, min_y), (pos, _)| {
-        (min_x.min(pos.x()), min_y.min(pos.y()))
-      });
-
-    if pawns
-      .iter()
-      .any(|(pos, _)| pos.x() - min_x >= N as i32 - 1 || pos.y() - min_y >= N as i32 - 1)
-    {
-      return Err("Pawns stretch beyond the maximum allowed size of the board, meaning this state is invalid.".to_owned());
-    }
-
-    let black_count = pawns
-      .iter()
-      .filter(|(_, color)| matches!(color, PawnColor::Black))
-      .count();
-    let white_count = n_pawns - black_count;
-    if !((black_count - 1)..=black_count).contains(&white_count) {
-      return Err(format!(
-        "There must be either one fewer or equally many white pawns as there are black. Found {black_count} black and {white_count} white.",
-      ));
-    }
-
-    // Move all black pawns to the front.
-    pawns.sort_by_key(|(_, color)| matches!(color, PawnColor::White));
-    for i in 0..(n_pawns - 1) / 2 {
-      pawns.swap(2 * i + 1, n_pawns.div_ceil(2) + i);
-    }
-    debug_assert!(pawns
-      .iter()
-      .enumerate()
-      .all(|(idx, (_, color))| { (idx % 2 == 0) == matches!(color, PawnColor::Black) }));
-
-    Ok(Self::from_packed_idxs(pawns.into_iter().map(|(pos, _)| {
-      PackedIdx::new((pos.x() - min_x + 1) as u32, (pos.y() - min_y + 1) as u32)
-    })))
-  }
-
-  pub fn from_packed_idxs(pawns: impl IntoIterator<Item = PackedIdx>) -> Self {
-    let mut game = unsafe { Self::new() };
-    for idx in pawns {
-      unsafe {
-        game.make_move_unchecked(Move::Phase1Move { to: idx });
-      }
-    }
-    game
-  }
-
-  pub fn hex_start() -> Self {
-    Self::from_board_string(
-      ". B W
-        W . B
-         B W .",
-    )
-    .unwrap()
-  }
-
   /// Constructs an identical Onoro game rotated by `op`.
   fn rotated<G: Group, OpFn: FnMut(&HexPosOffset, &G) -> HexPosOffset>(
     &self,
@@ -334,24 +222,6 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroImpl<N, N2
     HexPos::new((ord % N) as u32, (ord / N) as u32)
   }
 
-  /// If the game is finished, returns `Some(<player color who won>)`, or `None`
-  /// if the game is not over yet.
-  pub fn finished(&self) -> Option<PawnColor> {
-    if self.onoro_state().finished() {
-      if self.onoro_state().black_turn() {
-        Some(PawnColor::White)
-      } else {
-        Some(PawnColor::Black)
-      }
-    } else {
-      None
-    }
-  }
-
-  pub fn pawns_in_play(&self) -> u32 {
-    self.onoro_state().turn() + 1
-  }
-
   pub fn pawns_gen(&self) -> PawnMoveGenerator<N, N2, ADJ_CNT_SIZE> {
     PawnMoveGenerator {
       pawn_idx: 0,
@@ -361,10 +231,6 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroImpl<N, N2
 
   pub fn pawns_typed(&self) -> GameIterator<'_, PawnMoveGenerator<N, N2, ADJ_CNT_SIZE>, Self> {
     self.pawns_gen().to_iter(self)
-  }
-
-  pub fn pawns(&self) -> impl Iterator<Item = Pawn> + '_ {
-    self.pawns_typed()
   }
 
   pub fn color_pawns_gen(&self, color: PawnColor) -> PawnMoveGenerator<N, N2, ADJ_CNT_SIZE> {
@@ -386,17 +252,6 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroImpl<N, N2
 
   pub fn color_pawns(&self, color: PawnColor) -> impl Iterator<Item = Pawn> + '_ {
     self.color_pawns_typed(color)
-  }
-
-  pub fn pawns_mathematica_list(&self) -> String {
-    format!(
-      "{{{}}}",
-      self
-        .pawns()
-        .map(|pawn| format!("{{{},{}}}", pawn.pos.x(), pawn.pos.y()))
-        .reduce(|acc, coord| acc + "," + &coord)
-        .unwrap()
-    )
   }
 
   fn onoro_state(&self) -> &OnoroState {
@@ -430,17 +285,6 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroImpl<N, N2
     truncated_com + symm_state.center_offset
   }
 
-  /// Returns the width of the game board. This is also the upper bound on the
-  /// x and y coordinate values in PackedIdx.
-  pub const fn board_width() -> usize {
-    N
-  }
-
-  /// Returns the total number of tiles in the game board.
-  pub const fn board_size() -> usize {
-    Self::board_width() * Self::board_width()
-  }
-
   pub const fn symm_state_table_width() -> usize {
     N
   }
@@ -450,53 +294,12 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroImpl<N, N2
     Self::symm_state_table_width() * Self::symm_state_table_width()
   }
 
-  pub fn in_phase1(&self) -> bool {
-    self.onoro_state().turn() < 0xf
-  }
-
-  /// Make move without checking that we are in the right phase.
-  ///
-  /// # Safety
-  /// This function should not be called unless the move being made is
-  /// certainly in the right phase.
-  pub unsafe fn make_move_unchecked(&mut self, m: Move) {
-    match m {
-      Move::Phase1Move { to } => {
-        // Increment the turn first, so self.onoro_state().turn() is 0 for turn
-        // 1.
-        self.mut_onoro_state().inc_turn();
-        let pawn_idx = self.onoro_state().turn() as usize;
-        self.place_pawn(pawn_idx, to);
-      }
-      Move::Phase2Move { to, from_idx } => {
-        self.mut_onoro_state().swap_player_turn();
-        self.move_pawn(from_idx as usize, to);
-      }
-    }
-  }
-
-  pub fn make_move(&mut self, m: Move) {
-    match m {
-      Move::Phase1Move { to: _ } => {
-        debug_assert!(self.in_phase1());
-      }
-      Move::Phase2Move { to: _, from_idx: _ } => {
-        debug_assert!(!self.in_phase1());
-      }
-    }
-    unsafe { self.make_move_unchecked(m) }
-  }
-
   pub fn each_move_gen(&self) -> MoveGenerator<N, N2, ADJ_CNT_SIZE> {
     if self.in_phase1() {
       MoveGenerator::P1Moves(self.p1_move_gen())
     } else {
       MoveGenerator::P2Moves(self.p2_move_gen())
     }
-  }
-
-  pub fn each_move(&self) -> GameIterator<'_, MoveGenerator<N, N2, ADJ_CNT_SIZE>, Self> {
-    self.each_move_gen().to_iter(self)
   }
 
   fn p1_move_gen(&self) -> P1MoveGenerator<N, N2, ADJ_CNT_SIZE> {
@@ -695,21 +498,6 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroImpl<N, N2
     None
   }
 
-  /// Given a position on the board, returns the tile state of that position,
-  /// i.e. the color of the piece on that tile, or `Empty` if no piece is there.
-  pub(crate) fn get_tile(&self, idx: PackedIdx) -> TileState {
-    match self.get_pawn_idx(idx) {
-      Some(i) => {
-        if i % 2 == 0 {
-          TileState::Black
-        } else {
-          TileState::White
-        }
-      }
-      None => TileState::Empty,
-    }
-  }
-
   pub fn validate(&self) -> OnoroResult<()> {
     let mut n_b_pawns = 0u32;
     let mut n_w_pawns = 0u32;
@@ -826,6 +614,97 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroImpl<N, N2
   }
 }
 
+impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Onoro
+  for OnoroImpl<N, N2, ADJ_CNT_SIZE>
+{
+  unsafe fn new() -> Self {
+    Self {
+      pawn_poses: [PackedIdx::null(); N],
+      state: OnoroState::new(),
+      sum_of_mass: HexPos::zero().into(),
+    }
+  }
+
+  fn pawns_per_player() -> usize {
+    N / 2
+  }
+
+  fn turn(&self) -> PawnColor {
+    if self.onoro_state().black_turn() {
+      PawnColor::Black
+    } else {
+      PawnColor::White
+    }
+  }
+
+  fn pawns_in_play(&self) -> u32 {
+    self.onoro_state().turn() + 1
+  }
+
+  fn finished(&self) -> Option<PawnColor> {
+    self.onoro_state().finished().then(|| {
+      if self.onoro_state().black_turn() {
+        PawnColor::White
+      } else {
+        PawnColor::Black
+      }
+    })
+  }
+
+  fn get_tile(&self, idx: PackedIdx) -> TileState {
+    match self.get_pawn_idx(idx) {
+      Some(i) => {
+        if i % 2 == 0 {
+          TileState::Black
+        } else {
+          TileState::White
+        }
+      }
+      None => TileState::Empty,
+    }
+  }
+
+  fn pawns(&self) -> impl Iterator<Item = Pawn> + '_ {
+    self.pawns_typed()
+  }
+
+  fn in_phase1(&self) -> bool {
+    self.onoro_state().turn() < 0xf
+  }
+
+  fn each_move(&self) -> impl Iterator<Item = Move> {
+    self.each_move_gen().to_iter(self)
+  }
+
+  fn make_move(&mut self, m: Move) {
+    match m {
+      Move::Phase1Move { to: _ } => {
+        debug_assert!(self.in_phase1());
+      }
+      Move::Phase2Move { to: _, from_idx: _ } => {
+        debug_assert!(!self.in_phase1());
+      }
+    }
+    unsafe { self.make_move_unchecked(m) }
+  }
+
+  unsafe fn make_move_unchecked(&mut self, m: Move) {
+    match m {
+      Move::Phase1Move { to } => {
+        // Increment the turn first, so self.onoro_state().turn() is 0 for turn
+        // 1.
+        self.mut_onoro_state().inc_turn();
+        let pawn_idx = self.onoro_state().turn() as usize;
+        self.place_pawn(pawn_idx, to);
+      }
+      Move::Phase2Move { to, from_idx } => {
+        self.mut_onoro_state().swap_player_turn();
+        self.move_pawn(from_idx as usize, to);
+      }
+    }
+  }
+}
+
 impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Debug
   for OnoroImpl<N, N2, ADJ_CNT_SIZE>
 {
@@ -838,57 +717,7 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Display
   for OnoroImpl<N, N2, ADJ_CNT_SIZE>
 {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    if self.onoro_state().black_turn() {
-      writeln!(f, "black:")?;
-    } else {
-      writeln!(f, "white:")?;
-    }
-
-    let ((min_x, min_y), (max_x, max_y)) = self.pawns().fold(
-      ((N, N), (0, 0)),
-      |((min_x, min_y), (max_x, max_y)), pawn| {
-        (
-          (
-            min_x.min(pawn.pos.x() as usize),
-            min_y.min(pawn.pos.y() as usize),
-          ),
-          (
-            max_x.max(pawn.pos.x() as usize),
-            max_y.max(pawn.pos.y() as usize),
-          ),
-        )
-      },
-    );
-
-    let min_x = min_x.saturating_sub(1);
-    let min_y = min_y.saturating_sub(1);
-    let max_x = (max_x + 1).min(N - 1);
-    let max_y = (max_y + 1).min(N - 1);
-
-    for y in (min_y..=max_y).rev() {
-      write!(f, "{: <width$}", "", width = max_y - y)?;
-      for x in min_x..=max_x {
-        write!(
-          f,
-          "{}",
-          match self.get_tile(PackedIdx::new(x as u32, y as u32)) {
-            TileState::Black => "B",
-            TileState::White => "W",
-            TileState::Empty => ".",
-          }
-        )?;
-
-        if x < Self::board_width() - 1 {
-          write!(f, " ")?;
-        }
-      }
-
-      if y > min_y {
-        writeln!(f)?;
-      }
-    }
-
-    Ok(())
+    self.display(f)
   }
 }
 
@@ -1281,7 +1110,7 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> GameMoveGenerat
 
 #[cfg(test)]
 mod tests {
-  use crate::{onoro_defs::Onoro8, packed_idx::PackedIdx};
+  use crate::{onoro_defs::Onoro8, packed_idx::PackedIdx, Onoro};
 
   #[test]
   fn test_get_tile() {

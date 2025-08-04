@@ -12,7 +12,7 @@ use crate::{
   groups::{SymmetryClass, C2, D3, D6, K4},
   hex_pos::{HexPos, HexPosOffset},
   tile_hash::{TileHash, C_MASK, E_MASK, V_MASK},
-  OnoroImpl,
+  Onoro, OnoroImpl,
 };
 
 #[derive(Debug)]

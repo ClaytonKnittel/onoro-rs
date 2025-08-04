@@ -1,7 +1,7 @@
 use crate::{
   groups::{SymmetryClass, D6},
   util::{max_u32, min_u32, unreachable},
-  OnoroImpl,
+  Onoro, OnoroImpl,
 };
 
 use super::hex_pos::HexPosOffset;

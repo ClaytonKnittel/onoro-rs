@@ -2,7 +2,7 @@ use crate::{
   compress::Compress,
   error::{OnoroError, OnoroResult},
   groups::SymmetryClassContainer,
-  Move, MoveGenerator, Onoro16, Onoro16View,
+  Move, MoveGenerator, Onoro, Onoro16, Onoro16View,
 };
 use std::{
   cell::UnsafeCell,
@@ -620,8 +620,8 @@ mod tests {
   use itertools::{Either, Itertools};
 
   use crate::{
-    compress::Compress, error::OnoroResult, groups::SymmetryClass, hex_pos::HexPosOffset, Onoro16,
-    Onoro16View, OnoroView, PawnColor,
+    compress::Compress, error::OnoroResult, groups::SymmetryClass, hex_pos::HexPosOffset, Onoro,
+    Onoro16, Onoro16View, OnoroView, PawnColor,
   };
 
   fn build_view(board_layout: &str) -> Onoro16View {
