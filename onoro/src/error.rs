@@ -22,7 +22,7 @@ impl Display for OnoroError {
 #[macro_export]
 macro_rules! make_onoro_error {
   ($($args:expr),+) => {
-    $crate::onoro::OnoroError::new(format!($($args),+)).into()
+    $crate::error::OnoroError::new(format!($($args),+)).into()
   };
 }
 

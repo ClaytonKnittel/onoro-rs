@@ -7,8 +7,8 @@ mod groups;
 mod hash;
 mod hex_pos;
 mod r#move;
-mod onoro;
 mod onoro_defs;
+mod onoro_impl;
 mod onoro_state;
 mod onoro_view;
 mod packed_hex_pos;
@@ -16,7 +16,7 @@ mod packed_idx;
 mod tile_hash;
 mod util;
 
-pub use crate::onoro::*;
+pub use crate::onoro_impl::*;
 pub use color_print::*;
 pub use compress::*;
 pub use onoro_defs::*;
