@@ -12,7 +12,7 @@ use crate::{
   groups::{SymmetryClass, C2, D3, D6, K4},
   hex_pos::{HexPos, HexPosOffset},
   tile_hash::{TileHash, C_MASK, E_MASK, V_MASK},
-  Onoro,
+  OnoroImpl,
 };
 
 #[derive(Debug)]
@@ -24,7 +24,7 @@ impl<const N: usize, const N2: usize, G: Group> HashTable<N, N2, G> {
   /// Computes the hash of a game state on a given hash table.
   pub fn hash<const ONORO_N: usize, const ONORO_N2: usize, const ADJ_CNT_SIZE: usize>(
     &self,
-    onoro: &Onoro<ONORO_N, ONORO_N2, ADJ_CNT_SIZE>,
+    onoro: &OnoroImpl<ONORO_N, ONORO_N2, ADJ_CNT_SIZE>,
     symm_state: &BoardSymmetryState,
   ) -> u64 {
     let origin = onoro.origin(symm_state);

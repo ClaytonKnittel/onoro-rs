@@ -1,7 +1,7 @@
 use crate::{
   groups::{SymmetryClass, D6},
   util::{max_u32, min_u32, unreachable},
-  Onoro,
+  OnoroImpl,
 };
 
 use super::hex_pos::HexPosOffset;
@@ -303,7 +303,7 @@ pub const fn gen_symm_state_table<const N: usize, const N2: usize>() -> [BoardSy
 /// to the game state when canonicalizing if the center of mass lies on an e,
 /// since they are symmetries of each other in this K4 group.
 pub fn board_symm_state<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize>(
-  onoro: &Onoro<N, N2, ADJ_CNT_SIZE>,
+  onoro: &OnoroImpl<N, N2, ADJ_CNT_SIZE>,
 ) -> BoardSymmetryState {
   let sum_of_mass = onoro.sum_of_mass();
   let pawns_in_play = onoro.pawns_in_play();

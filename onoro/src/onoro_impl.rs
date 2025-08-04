@@ -10,14 +10,16 @@ use union_find::ConstUnionFind;
 
 use crate::{
   canonicalize::{board_symm_state, BoardSymmetryState},
+  error::OnoroError,
   groups::{C2, D3, D6, K4},
   make_onoro_error,
+  onoro_util::{pawns_from_board_string, BoardLayoutPawns},
   util::broadcast_u8_to_u64,
   Color, Colored,
 };
 
 use super::{
-  error::{OnoroError, OnoroResult},
+  error::OnoroResult,
   hex_pos::{HexPos, HexPosOffset},
   onoro_state::OnoroState,
   packed_hex_pos::PackedHexPos,
@@ -57,7 +59,7 @@ impl From<PawnColor> for TileState {
 /// experimental. See: https://github.com/rust-lang/rust/issues/76560.
 #[derive(Clone)]
 #[repr(align(8))]
-pub struct Onoro<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> {
+pub struct OnoroImpl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> {
   /// Array of indexes of pawn positions. Odd entries (even index) are black
   /// pawns, the others are white. Filled from lowest to highest index as the
   /// first phase proceeds.
@@ -67,7 +69,7 @@ pub struct Onoro<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> {
   sum_of_mass: PackedHexPos,
 }
 
-impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Onoro<N, N2, ADJ_CNT_SIZE> {
+impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroImpl<N, N2, ADJ_CNT_SIZE> {
   /// Don't publicly expose the constructor, since it produces an invalid board
   /// state.
   ///
@@ -83,50 +85,17 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Onoro<N, N2, AD
     }
   }
 
-  pub fn from_board_string(board_layout: &str) -> Result<Self, String> {
-    let mut black_pawns = Vec::new();
-    let mut while_pawns = Vec::new();
-
-    for (y, line) in board_layout.split('\n').enumerate() {
-      for (x, tile) in line.split_ascii_whitespace().enumerate() {
-        let pos = PackedIdx::from(HexPos::new(x as u32 + 1, (N - y - 2) as u32));
-        match tile {
-          "B" | "b" => black_pawns.push(pos),
-          "W" | "w" => while_pawns.push(pos),
-          "." => {}
-          _ => {
-            return Err(format!("Invalid character in game state string: {tile}"));
-          }
-        }
-      }
-    }
-
-    if black_pawns.len() > N || while_pawns.len() > N {
-      return Err(format!(
-        "Too many pawns in board: {} black and {} white",
-        black_pawns.len(),
-        while_pawns.len()
-      ));
-    }
-
-    if black_pawns.is_empty() {
-      return Err(
-        "Must have at least one black pawn placed, since they are the first player.".into(),
-      );
-    }
-
-    if !((black_pawns.len() - 1)..=black_pawns.len()).contains(&while_pawns.len()) {
-      return Err(format!(
-        "There must be either one fewer or equally many white pawns as there are black. Found {} black and {} white.",
-        black_pawns.len(), while_pawns.len()
-      ));
-    }
+  pub fn from_board_string(board_layout: &str) -> Result<Self, OnoroError> {
+    let BoardLayoutPawns {
+      black_pawns,
+      white_pawns,
+    } = pawns_from_board_string(board_layout, N)?;
 
     let mut game = unsafe { Self::new() };
     unsafe {
       game.make_move_unchecked(Move::Phase1Move { to: black_pawns[0] });
     }
-    for pos in interleave(while_pawns, black_pawns.into_iter().skip(1)) {
+    for pos in interleave(white_pawns, black_pawns.into_iter().skip(1)) {
       game.make_move(Move::Phase1Move { to: pos });
     }
 
@@ -858,7 +827,7 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Onoro<N, N2, AD
 }
 
 impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Debug
-  for Onoro<N, N2, ADJ_CNT_SIZE>
+  for OnoroImpl<N, N2, ADJ_CNT_SIZE>
 {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     write!(f, "{self}")
@@ -866,7 +835,7 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Debug
 }
 
 impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Display
-  for Onoro<N, N2, ADJ_CNT_SIZE>
+  for OnoroImpl<N, N2, ADJ_CNT_SIZE>
 {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     if self.onoro_state().black_turn() {
@@ -961,7 +930,7 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> GameMoveGenerat
   for PawnMoveGenerator<N, N2, ADJ_CNT_SIZE>
 {
   type Item = Pawn;
-  type Game = Onoro<N, N2, ADJ_CNT_SIZE>;
+  type Game = OnoroImpl<N, N2, ADJ_CNT_SIZE>;
 
   fn next(&mut self, onoro: &Self::Game) -> Option<Self::Item> {
     if self.pawn_idx >= onoro.pawns_in_play() as usize {
@@ -992,7 +961,7 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> GameMoveGenerat
   for MoveGenerator<N, N2, ADJ_CNT_SIZE>
 {
   type Item = Move;
-  type Game = Onoro<N, N2, ADJ_CNT_SIZE>;
+  type Game = OnoroImpl<N, N2, ADJ_CNT_SIZE>;
 
   fn next(&mut self, onoro: &Self::Game) -> Option<Self::Item> {
     match self {
@@ -1015,7 +984,7 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> GameMoveGenerat
   for P1MoveGenerator<N, N2, ADJ_CNT_SIZE>
 {
   type Item = Move;
-  type Game = Onoro<N, N2, ADJ_CNT_SIZE>;
+  type Game = OnoroImpl<N, N2, ADJ_CNT_SIZE>;
 
   fn next(&mut self, onoro: &Self::Game) -> Option<Self::Item> {
     loop {
@@ -1024,7 +993,7 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> GameMoveGenerat
           continue;
         }
 
-        let ord = Onoro::<N, N2, ADJ_CNT_SIZE>::hex_pos_ord(&neighbor);
+        let ord = OnoroImpl::<N, N2, ADJ_CNT_SIZE>::hex_pos_ord(&neighbor);
         let tb_shift = TILE_BITS * (ord % (64 / TILE_BITS));
         let tbb = unsafe { *self.adjacency_counts.get_unchecked(ord / (64 / TILE_BITS)) };
         let mask = TILE_MASK << tb_shift;
@@ -1088,7 +1057,7 @@ pub struct P2MoveGenerator<const N: usize, const N2: usize, const ADJ_CNT_SIZE: 
 impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize>
   P2MoveGenerator<N, N2, ADJ_CNT_SIZE>
 {
-  fn new(onoro: &Onoro<N, N2, ADJ_CNT_SIZE>) -> Self {
+  fn new(onoro: &OnoroImpl<N, N2, ADJ_CNT_SIZE>) -> Self {
     Self {
       pawn_iter: onoro.color_pawns_gen(onoro.player_color()),
       pawn_meta: None,
@@ -1097,10 +1066,10 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize>
     .populate_neighbor_counts(onoro)
   }
 
-  fn populate_neighbor_counts(mut self, onoro: &Onoro<N, N2, ADJ_CNT_SIZE>) -> Self {
+  fn populate_neighbor_counts(mut self, onoro: &OnoroImpl<N, N2, ADJ_CNT_SIZE>) -> Self {
     for pawn in onoro.pawns() {
       for neighbor in HexPos::from(pawn.pos).each_neighbor() {
-        let ord = Onoro::<N, N2, ADJ_CNT_SIZE>::hex_pos_ord(&neighbor);
+        let ord = OnoroImpl::<N, N2, ADJ_CNT_SIZE>::hex_pos_ord(&neighbor);
         let tb_shift = TILE_BITS * (ord % (64 / TILE_BITS));
         let tbb = unsafe { *self.adjacency_counts.get_unchecked(ord / (64 / TILE_BITS)) };
         let mask = TILE_MASK << tb_shift;
@@ -1126,7 +1095,7 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize>
     &mut self,
     pawn_idx: usize,
     pawn_pos: PackedIdx,
-    onoro: &Onoro<N, N2, ADJ_CNT_SIZE>,
+    onoro: &OnoroImpl<N, N2, ADJ_CNT_SIZE>,
   ) {
     let mut uf = ConstUnionFind::new();
     let pawn_hex_pos: HexPos = pawn_pos.into();
@@ -1138,19 +1107,19 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize>
       if pawn.pos == pawn_pos {
         continue;
       }
-      let pawn_ord = Onoro::<N, N2, ADJ_CNT_SIZE>::hex_pos_ord(&pawn.pos.into());
+      let pawn_ord = OnoroImpl::<N, N2, ADJ_CNT_SIZE>::hex_pos_ord(&pawn.pos.into());
 
       for neighbor in HexPos::from(pawn.pos).each_top_left_neighbor() {
         if onoro.get_tile(neighbor.into()) != TileState::Empty && pawn_hex_pos != neighbor {
           uf.union(
             pawn_ord,
-            Onoro::<N, N2, ADJ_CNT_SIZE>::hex_pos_ord(&neighbor),
+            OnoroImpl::<N, N2, ADJ_CNT_SIZE>::hex_pos_ord(&neighbor),
           );
         }
       }
     }
 
-    let empty_tiles = Onoro::<N, N2, ADJ_CNT_SIZE>::board_size() as u32 - onoro.pawns_in_play();
+    let empty_tiles = OnoroImpl::<N, N2, ADJ_CNT_SIZE>::board_size() as u32 - onoro.pawns_in_play();
     // Note: the pawn we are moving is its own group.
     let pawn_groups = uf.unique_sets() as u32 - empty_tiles - 1;
 
@@ -1158,7 +1127,7 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize>
     let mut neighbors_to_satisfy = 0;
     // decrease neighbor count of all neighbors
     for neighbor in HexPos::from(pawn_pos).each_neighbor() {
-      let neighbor_ord = Onoro::<N, N2, ADJ_CNT_SIZE>::hex_pos_ord(&neighbor);
+      let neighbor_ord = OnoroImpl::<N, N2, ADJ_CNT_SIZE>::hex_pos_ord(&neighbor);
       let tb_idx = neighbor_ord / (64 / TILE_BITS);
       let tb_shift = TILE_BITS * (neighbor_ord % (64 / TILE_BITS));
 
@@ -1188,7 +1157,7 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize>
   /// Cleans up the mutated data in `self` from `prepare_move_pawn`.
   fn cleanup_pawn_visit(&mut self, pawn_pos: PackedIdx) {
     for neighbor in HexPos::from(pawn_pos).each_neighbor() {
-      let neighbor_ord = Onoro::<N, N2, ADJ_CNT_SIZE>::hex_pos_ord(&neighbor);
+      let neighbor_ord = OnoroImpl::<N, N2, ADJ_CNT_SIZE>::hex_pos_ord(&neighbor);
       let tb_idx = neighbor_ord / (64 / TILE_BITS);
       let tb_shift = TILE_BITS * (neighbor_ord % (64 / TILE_BITS));
 
@@ -1205,7 +1174,7 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> GameMoveGenerat
   for P2MoveGenerator<N, N2, ADJ_CNT_SIZE>
 {
   type Item = Move;
-  type Game = Onoro<N, N2, ADJ_CNT_SIZE>;
+  type Game = OnoroImpl<N, N2, ADJ_CNT_SIZE>;
 
   fn next(&mut self, onoro: &Self::Game) -> Option<Self::Item> {
     loop {
@@ -1234,7 +1203,7 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> GameMoveGenerat
 
         // The tile we are considering placing a pawn at, which may be empty
         // and/or legal.
-        let place_to_consider = Onoro::<N, N2, ADJ_CNT_SIZE>::ord_to_hex_pos(next_idx_ord);
+        let place_to_consider = OnoroImpl::<N, N2, ADJ_CNT_SIZE>::ord_to_hex_pos(next_idx_ord);
         let place_to_consider_idx = PackedIdx::from(place_to_consider);
 
         // Skip this tile if it isn't empty (this will also skip the piece's
@@ -1263,7 +1232,7 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> GameMoveGenerat
           if onoro.get_tile(neighbor.into()) == TileState::Empty {
             continue;
           }
-          let neighbor_ord = Onoro::<N, N2, ADJ_CNT_SIZE>::hex_pos_ord(&neighbor);
+          let neighbor_ord = OnoroImpl::<N, N2, ADJ_CNT_SIZE>::hex_pos_ord(&neighbor);
 
           let tb_idx = neighbor_ord / (64 / TILE_BITS);
           let tb_shift = TILE_BITS * (neighbor_ord % (64 / TILE_BITS));
