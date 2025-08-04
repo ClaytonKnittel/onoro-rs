@@ -15,7 +15,7 @@ jobs:
       - name: Install eslint
         working-directory: onoro/web
         run: |
-          npm install eslint
+          npm install
       - name: Generate CSS types
         working-directory: onoro/web
         run: |
