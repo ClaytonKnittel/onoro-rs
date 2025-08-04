@@ -1,7 +1,7 @@
 use std::time::SystemTime;
 
 use cooperate::solve_with_hasher;
-use onoro::{Onoro16, OnoroView};
+use onoro::{Onoro, Onoro16, OnoroView};
 
 use crate::passthrough_hasher::BuildPassThroughHasher;
 
