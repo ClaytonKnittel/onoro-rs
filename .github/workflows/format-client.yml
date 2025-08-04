@@ -15,7 +15,7 @@ jobs:
       - name: Install prettier
         working-directory: onoro/web
         run: |
-          npm install prettier
+          npm install
       - name: Run prettier
         working-directory: onoro/web
         run: |
