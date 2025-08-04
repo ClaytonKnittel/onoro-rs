@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use onoro::{Move, Pawn, PawnColor};
+use onoro::{Move, Onoro, PackedIdx, Pawn, PawnColor, TileState};
 
 struct Pos {
   x: i32,
@@ -11,24 +11,46 @@ pub struct SimpleOnoro {
   positions: HashMap<Pos, Pawn>,
 }
 
-impl SimpleOnoro {
-  pub fn default_start() -> Self {
-    todo!();
+impl Onoro for SimpleOnoro {
+  unsafe fn new() -> Self {
+    todo!()
   }
 
-  pub fn finished(&self) -> Option<PawnColor> {
-    todo!();
+  fn pawns_per_player() -> usize {
+    todo!()
   }
 
-  pub fn pawns(&self) -> impl Iterator<Item = Pawn> + '_ {
-    todo!();
+  fn turn(&self) -> PawnColor {
+    todo!()
   }
 
-  pub fn in_phase1(&self) -> bool {
-    todo!();
+  fn pawns_in_play(&self) -> u32 {
+    todo!()
   }
 
-  pub fn each_move(&self) -> impl Iterator<Item = Move> {}
+  fn finished(&self) -> Option<PawnColor> {
+    todo!()
+  }
 
-  pub fn make_move(&mut self, m: Move) {}
+  fn get_tile(&self, idx: PackedIdx) -> TileState {
+    todo!()
+  }
+
+  fn pawns(&self) -> impl Iterator<Item = Pawn> + '_ {
+    todo!();
+    std::iter::empty()
+  }
+
+  fn in_phase1(&self) -> bool {
+    todo!()
+  }
+
+  fn each_move(&self) -> impl Iterator<Item = Move> {
+    todo!();
+    std::iter::empty()
+  }
+
+  fn make_move(&mut self, m: Move) {
+    todo!()
+  }
 }
