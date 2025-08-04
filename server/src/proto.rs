@@ -1,7 +1,7 @@
 use async_sockets::Status;
 use bytes::BytesMut;
 use itertools::interleave;
-use onoro::{Move, Onoro, PackedIdx, Pawn, PawnColor};
+use onoro::{Move, Onoro, OnoroImpl, PackedIdx, Pawn, PawnColor};
 use prost::Message;
 use serde::{
   de::{self, Visitor},
@@ -38,7 +38,7 @@ pub struct GameStateProto {
 
 impl GameStateProto {
   pub fn from_onoro<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize>(
-    onoro: &Onoro<N, N2, ADJ_CNT_SIZE>,
+    onoro: &OnoroImpl<N, N2, ADJ_CNT_SIZE>,
   ) -> Self {
     Self {
       game_state: proto_impl::GameState {
@@ -59,7 +59,7 @@ impl GameStateProto {
 
   pub fn to_onoro<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize>(
     &self,
-  ) -> Result<Onoro<N, N2, ADJ_CNT_SIZE>, Error> {
+  ) -> Result<OnoroImpl<N, N2, ADJ_CNT_SIZE>, Error> {
     let mut black_moves = Vec::new();
     let mut while_moves = Vec::new();
 
@@ -114,7 +114,7 @@ impl GameStateProto {
       )));
     }
 
-    let mut game = unsafe { Onoro::new() };
+    let mut game = unsafe { OnoroImpl::new() };
     unsafe {
       game.make_move_unchecked(black_moves[0]);
     }
@@ -126,10 +126,10 @@ impl GameStateProto {
   }
 }
 
-impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> From<&Onoro<N, N2, ADJ_CNT_SIZE>>
-  for GameStateProto
+impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize>
+  From<&OnoroImpl<N, N2, ADJ_CNT_SIZE>> for GameStateProto
 {
-  fn from(onoro: &Onoro<N, N2, ADJ_CNT_SIZE>) -> Self {
+  fn from(onoro: &OnoroImpl<N, N2, ADJ_CNT_SIZE>) -> Self {
     Self::from_onoro(onoro)
   }
 }

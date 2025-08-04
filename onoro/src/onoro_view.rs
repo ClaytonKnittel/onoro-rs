@@ -2,7 +2,7 @@ use crate::{
   compress::Compress,
   error::{OnoroError, OnoroResult},
   groups::SymmetryClassContainer,
-  Move, MoveGenerator, Onoro16, Onoro16View,
+  Move, MoveGenerator, Onoro, Onoro16, Onoro16View,
 };
 use std::{
   cell::UnsafeCell,
@@ -26,7 +26,7 @@ use crate::{
   hash::HashTable,
   hex_pos::{HexPos, HexPosOffset},
   tile_hash::HashGroup,
-  Onoro, PawnColor, TileState,
+  OnoroImpl, PawnColor, TileState,
 };
 
 /// Always generate hash tables for the full game. Only a part of the tables
@@ -73,20 +73,20 @@ impl CanonicalView {
 /// different orientations.
 #[derive(Debug)]
 pub struct OnoroView<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> {
-  onoro: Onoro<N, N2, ADJ_CNT_SIZE>,
+  onoro: OnoroImpl<N, N2, ADJ_CNT_SIZE>,
   view: UnsafeCell<CanonicalView>,
 }
 
 impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroView<N, N2, ADJ_CNT_SIZE> {
   /// TODO: Make new lazy
-  pub fn new(onoro: Onoro<N, N2, ADJ_CNT_SIZE>) -> Self {
+  pub fn new(onoro: OnoroImpl<N, N2, ADJ_CNT_SIZE>) -> Self {
     Self {
       onoro,
       view: CanonicalView::new().into(),
     }
   }
 
-  pub fn onoro(&self) -> &Onoro<N, N2, ADJ_CNT_SIZE> {
+  pub fn onoro(&self) -> &OnoroImpl<N, N2, ADJ_CNT_SIZE> {
     &self.onoro
   }
 
@@ -121,7 +121,7 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroView<N, N2
   }
 
   fn find_canonical_orientation_d6(
-    onoro: &Onoro<N, N2, ADJ_CNT_SIZE>,
+    onoro: &OnoroImpl<N, N2, ADJ_CNT_SIZE>,
     symm_state: &BoardSymmetryState,
   ) -> (u64, u8) {
     static D6T: ViewHashTable<D6> = HashTable::new_c();
@@ -136,7 +136,7 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroView<N, N2
   }
 
   fn find_canonical_orientation_d3(
-    onoro: &Onoro<N, N2, ADJ_CNT_SIZE>,
+    onoro: &OnoroImpl<N, N2, ADJ_CNT_SIZE>,
     symm_state: &BoardSymmetryState,
   ) -> (u64, u8) {
     static D3T: ViewHashTable<D3> = HashTable::new_v();
@@ -151,7 +151,7 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroView<N, N2
   }
 
   fn find_canonical_orientation_k4(
-    onoro: &Onoro<N, N2, ADJ_CNT_SIZE>,
+    onoro: &OnoroImpl<N, N2, ADJ_CNT_SIZE>,
     symm_state: &BoardSymmetryState,
   ) -> (u64, u8) {
     static K4T: ViewHashTable<K4> = HashTable::new_e();
@@ -166,7 +166,7 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroView<N, N2
   }
 
   fn find_canonical_orientation_c2_cv(
-    onoro: &Onoro<N, N2, ADJ_CNT_SIZE>,
+    onoro: &OnoroImpl<N, N2, ADJ_CNT_SIZE>,
     symm_state: &BoardSymmetryState,
   ) -> (u64, u8) {
     static C2CVT: ViewHashTable<C2> = HashTable::new_cv();
@@ -181,7 +181,7 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroView<N, N2
   }
 
   fn find_canonical_orientation_c2_ce(
-    onoro: &Onoro<N, N2, ADJ_CNT_SIZE>,
+    onoro: &OnoroImpl<N, N2, ADJ_CNT_SIZE>,
     symm_state: &BoardSymmetryState,
   ) -> (u64, u8) {
     static C2CET: ViewHashTable<C2> = HashTable::new_ce();
@@ -196,7 +196,7 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroView<N, N2
   }
 
   fn find_canonical_orientation_c2_ev(
-    onoro: &Onoro<N, N2, ADJ_CNT_SIZE>,
+    onoro: &OnoroImpl<N, N2, ADJ_CNT_SIZE>,
     symm_state: &BoardSymmetryState,
   ) -> (u64, u8) {
     static C2EVT: ViewHashTable<C2> = HashTable::new_ev();
@@ -211,7 +211,7 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroView<N, N2
   }
 
   fn find_canonical_orientation_trivial(
-    onoro: &Onoro<N, N2, ADJ_CNT_SIZE>,
+    onoro: &OnoroImpl<N, N2, ADJ_CNT_SIZE>,
     symm_state: &BoardSymmetryState,
   ) -> (u64, u8) {
     static TT: ViewHashTable<Trivial> = HashTable::new_trivial();
@@ -620,8 +620,8 @@ mod tests {
   use itertools::{Either, Itertools};
 
   use crate::{
-    compress::Compress, error::OnoroResult, groups::SymmetryClass, hex_pos::HexPosOffset, Onoro16,
-    Onoro16View, OnoroView, PawnColor,
+    compress::Compress, error::OnoroResult, groups::SymmetryClass, hex_pos::HexPosOffset, Onoro,
+    Onoro16, Onoro16View, OnoroView, PawnColor,
   };
 
   fn build_view(board_layout: &str) -> Onoro16View {

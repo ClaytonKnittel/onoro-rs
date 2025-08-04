@@ -7,7 +7,7 @@ const fn adjacency_count_size(n: usize) -> usize {
 #[macro_export]
 macro_rules! onoro_type {
   ($n:literal) => {
-    $crate::Onoro<$n, { $n * $n }, { adjacency_count_size($n) }>
+    $crate::OnoroImpl<$n, { $n * $n }, { adjacency_count_size($n) }>
   };
 }
 
