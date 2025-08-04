@@ -5,7 +5,7 @@ use criterion::{
 };
 use itertools::Itertools;
 use onoro::Onoro16;
-use rand::{thread_rng, Rng};
+use rand::{rngs::StdRng, Rng, SeedableRng};
 
 fn random_playout<R: Rng>(mut onoro: Onoro16, num_moves: usize, rng: &mut R) -> Onoro16 {
   for _ in 0..num_moves {
@@ -33,7 +33,7 @@ fn benchmark_each_move<M: Measurement, R: Rng>(
   let states = generate_random_states(num_games, num_moves, rng);
   group.bench_function(id, |b| {
     b.iter(|| {
-      for onoro in states.iter() {
+      for onoro in &states {
         for m in onoro.each_move() {
           black_box(m);
         }
@@ -49,7 +49,7 @@ fn find_moves_p1(c: &mut Criterion) {
   group.throughput(Throughput::Elements(N_GAMES as u64));
   group.measurement_time(Duration::from_secs(20));
 
-  let mut rng = thread_rng();
+  let mut rng = StdRng::seed_from_u64(392420);
 
   benchmark_each_move(
     &mut group,
@@ -78,5 +78,41 @@ fn find_moves_p1(c: &mut Criterion) {
   group.finish();
 }
 
-criterion_group!(onoro_benches, find_moves_p1);
+fn find_moves_p2(c: &mut Criterion) {
+  const N_GAMES: usize = 5_000;
+
+  let mut group = c.benchmark_group("find moves phase 2");
+  group.throughput(Throughput::Elements(N_GAMES as u64));
+  group.measurement_time(Duration::from_secs(20));
+
+  let mut rng = StdRng::seed_from_u64(392421);
+
+  benchmark_each_move(
+    &mut group,
+    "find moves phase 2 after 13 moves",
+    N_GAMES,
+    13,
+    &mut rng,
+  );
+
+  benchmark_each_move(
+    &mut group,
+    "find moves phase 2 after 15 moves",
+    N_GAMES,
+    15,
+    &mut rng,
+  );
+
+  benchmark_each_move(
+    &mut group,
+    "find moves phase 2 after 17 moves",
+    N_GAMES,
+    17,
+    &mut rng,
+  );
+
+  group.finish();
+}
+
+criterion_group!(onoro_benches, find_moves_p1, find_moves_p2);
 criterion_main!(onoro_benches);
