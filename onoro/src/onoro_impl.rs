@@ -13,7 +13,7 @@ use crate::{
   groups::{C2, D3, D6, K4},
   make_onoro_error,
   util::broadcast_u8_to_u64,
-  Color, Colored, Onoro, OnoroPawn,
+  Color, Colored, Onoro, OnoroPawn, PawnColor, TileState,
 };
 
 use super::{
@@ -32,22 +32,6 @@ const TILE_MASK: u64 = (1u64 << TILE_BITS) - 1;
 
 /// The minimum number of neighbors each pawn must have.
 const MIN_NEIGHBORS_PER_PAWN: u64 = 2;
-
-#[derive(Debug, PartialEq, Eq)]
-pub enum TileState {
-  Empty,
-  Black,
-  White,
-}
-
-impl From<PawnColor> for TileState {
-  fn from(value: PawnColor) -> Self {
-    match value {
-      PawnColor::Black => TileState::Black,
-      PawnColor::White => TileState::White,
-    }
-  }
-}
 
 /// An Onoro game state with `N / 2` pawns per player.
 ///
@@ -722,12 +706,6 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Display
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     self.display(f)
   }
-}
-
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
-pub enum PawnColor {
-  Black,
-  White,
 }
 
 #[derive(Debug, PartialEq, Eq)]
