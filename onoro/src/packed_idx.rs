@@ -1,6 +1,6 @@
 use std::{fmt::Display, num::Wrapping};
 
-use crate::hex_pos::HexPosOffset;
+use crate::{hex_pos::HexPosOffset, OnoroIndex};
 
 use super::hex_pos::HexPos;
 
@@ -53,6 +53,20 @@ impl PackedIdx {
     PackedIdx {
       bytes: Wrapping(self.bytes.0.wrapping_add(other.bytes.0)),
     }
+  }
+}
+
+impl OnoroIndex for PackedIdx {
+  fn from_coords(x: u32, y: u32) -> Self {
+    Self::new(x, y)
+  }
+
+  fn x(&self) -> i32 {
+    self.x() as i32
+  }
+
+  fn y(&self) -> i32 {
+    self.y() as i32
   }
 }
 

@@ -18,7 +18,7 @@ pub enum Move {
   },
 }
 
-impl OnoroMove for Move {
+impl OnoroMove<PackedIdx> for Move {
   fn make_phase1(pos: PackedIdx) -> Self {
     Self::Phase1Move { to: pos }
   }
