@@ -4,10 +4,25 @@ use crate::{
   error::OnoroError,
   hex_pos::HexPosOffset,
   onoro_util::{pawns_from_board_string, BoardLayoutPawns},
-  Move, PackedIdx, Pawn, PawnColor, TileState,
+  PackedIdx, PawnColor, TileState,
 };
 
+pub trait OnoroMove {
+  fn make_phase1(pos: PackedIdx) -> Self;
+}
+
+pub trait OnoroPawn {
+  /// The position of this pawn on the board.
+  fn pos(&self) -> PackedIdx;
+
+  /// The color of this pawn.
+  fn color(&self) -> PawnColor;
+}
+
 pub trait Onoro: Sized {
+  type Move: OnoroMove;
+  type Pawn: OnoroPawn;
+
   /// Initializes an empty game. This should not be called outside the `Onoro`
   /// trait.
   ///
@@ -35,14 +50,14 @@ pub trait Onoro: Sized {
   fn get_tile(&self, idx: PackedIdx) -> TileState;
 
   /// Returns an iterator over all pawns in the game. The order does not matter.
-  fn pawns(&self) -> impl Iterator<Item = Pawn> + '_;
+  fn pawns(&self) -> impl Iterator<Item = Self::Pawn> + '_;
 
   fn pawns_mathematica_list(&self) -> String {
     format!(
       "{{{}}}",
       self
         .pawns()
-        .map(|pawn| format!("{{{},{}}}", pawn.pos.x(), pawn.pos.y()))
+        .map(|pawn| format!("{{{},{}}}", pawn.pos().x(), pawn.pos().y()))
         .reduce(|acc, coord| acc + "," + &coord)
         .unwrap()
     )
@@ -53,10 +68,10 @@ pub trait Onoro: Sized {
   fn in_phase1(&self) -> bool;
 
   /// Returns an iterator over all legal moves that can be made from this state.
-  fn each_move(&self) -> impl Iterator<Item = Move>;
+  fn each_move(&self) -> impl Iterator<Item = Self::Move>;
 
   /// Makes a move, mutating the game state.
-  fn make_move(&mut self, m: Move);
+  fn make_move(&mut self, m: Self::Move);
 
   /// Make move without checking that we are in the right phase. This is used by
   /// the game constructors to place the first pawn on an empty board.
@@ -64,7 +79,7 @@ pub trait Onoro: Sized {
   /// # Safety
   ///
   /// This function should not be called outside the Onoro trait.
-  unsafe fn make_move_unchecked(&mut self, m: Move) {
+  unsafe fn make_move_unchecked(&mut self, m: Self::Move) {
     self.make_move(m);
   }
 
@@ -84,16 +99,16 @@ pub trait Onoro: Sized {
     let mid_idx = ((Self::board_width() - 1) / 2) as u32;
     let mut game = unsafe { Self::new() };
     unsafe {
-      game.make_move_unchecked(Move::Phase1Move {
-        to: PackedIdx::new(mid_idx, mid_idx),
-      });
+      game.make_move_unchecked(Self::Move::make_phase1(PackedIdx::new(mid_idx, mid_idx)));
     }
-    game.make_move(Move::Phase1Move {
-      to: PackedIdx::new(mid_idx + 1, mid_idx + 1),
-    });
-    game.make_move(Move::Phase1Move {
-      to: PackedIdx::new(mid_idx + 1, mid_idx),
-    });
+    game.make_move(Self::Move::make_phase1(PackedIdx::new(
+      mid_idx + 1,
+      mid_idx + 1,
+    )));
+    game.make_move(Self::Move::make_phase1(PackedIdx::new(
+      mid_idx + 1,
+      mid_idx,
+    )));
     game
   }
 
@@ -105,10 +120,10 @@ pub trait Onoro: Sized {
 
     let mut game = unsafe { Self::new() };
     unsafe {
-      game.make_move_unchecked(Move::Phase1Move { to: black_pawns[0] });
+      game.make_move_unchecked(Self::Move::make_phase1(black_pawns[0]));
     }
     for pos in interleave(white_pawns, black_pawns.into_iter().skip(1)) {
-      game.make_move(Move::Phase1Move { to: pos });
+      game.make_move(Self::Move::make_phase1(pos));
     }
 
     Ok(game)
@@ -160,7 +175,7 @@ pub trait Onoro: Sized {
     let mut game = unsafe { Self::new() };
     for idx in pawns {
       unsafe {
-        game.make_move_unchecked(Move::Phase1Move { to: idx });
+        game.make_move_unchecked(Self::Move::make_phase1(idx));
       }
     }
     game
@@ -186,12 +201,12 @@ pub trait Onoro: Sized {
       |((min_x, min_y), (max_x, max_y)), pawn| {
         (
           (
-            min_x.min(pawn.pos.x() as usize),
-            min_y.min(pawn.pos.y() as usize),
+            min_x.min(pawn.pos().x() as usize),
+            min_y.min(pawn.pos().y() as usize),
           ),
           (
-            max_x.max(pawn.pos.x() as usize),
-            max_y.max(pawn.pos.y() as usize),
+            max_x.max(pawn.pos().x() as usize),
+            max_y.max(pawn.pos().y() as usize),
           ),
         )
       },
