@@ -328,9 +328,30 @@ pub fn board_symm_state<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usi
 
 #[cfg(test)]
 mod tests {
+  use std::collections::HashSet;
+
+  use algebra::semigroup::Semigroup;
   use itertools::Itertools;
 
-  use crate::canonicalize::{board_symm_state_op_to_com_offset, symm_state_op, COMOffset};
+  use crate::{
+    canonicalize::{board_symm_state_op_to_com_offset, symm_state_class, symm_state_op, COMOffset},
+    groups::{SymmetryClass, D6},
+    hex_pos::HexPosOffset,
+  };
+
+  struct PawnsConfig {
+    n_pawns: u32,
+    x: u32,
+    y: u32,
+  }
+
+  fn all_pawn_counts_and_coordinates() -> impl Iterator<Item = PawnsConfig> {
+    (1..=16).flat_map(|n_pawns| {
+      (0..n_pawns)
+        .cartesian_product(0..n_pawns)
+        .map(move |(x, y)| PawnsConfig { n_pawns, x, y })
+    })
+  }
 
   /// ```text
   /// +--------------E----------------F
@@ -375,14 +396,61 @@ mod tests {
 
   #[test]
   fn test_board_symm_state_op_to_com_offset() {
-    for (n_pawns, y, x) in (1..=16).flat_map(|n_pawns| {
-      (0..n_pawns)
-        .cartesian_product(0..n_pawns)
-        .map(move |(x, y)| (n_pawns, x, y))
-    }) {
+    for PawnsConfig { n_pawns, y, x } in all_pawn_counts_and_coordinates() {
       assert_eq!(
         board_symm_state_op_to_com_offset(symm_state_op(x, y, n_pawns)),
         com_to_origin_offset(x, y, n_pawns),
+        "With {n_pawns} pawns at ({x}, {y})"
+      );
+    }
+  }
+
+  fn deduce_symmetry_class(x: u32, y: u32, n_pawns: u32) -> SymmetryClass {
+    // Try all symmetry operations and classify by how many symmetries are produced.
+    let hex_pos = HexPosOffset::new(x as i32, y as i32);
+    let rotate = |pos: HexPosOffset, op: D6| -> HexPosOffset {
+      let pos = pos.apply_d6_c(&op);
+      HexPosOffset::new(
+        pos.x().rem_euclid(n_pawns as i32),
+        pos.y().rem_euclid(n_pawns as i32),
+      )
+    };
+    let symmetries: HashSet<_> = D6::for_each().map(|op| rotate(hex_pos, op)).collect();
+
+    match symmetries.len() {
+      1 => SymmetryClass::C,
+      2 => SymmetryClass::V,
+      3 => SymmetryClass::E,
+      6 => {
+        if rotate(hex_pos, D6::Rfl(0)) == hex_pos
+          || rotate(hex_pos, D6::Rfl(2)) == hex_pos
+          || rotate(hex_pos, D6::Rfl(4)) == hex_pos
+        {
+          SymmetryClass::CE
+        } else {
+          let middle_third_x = 3 * x > n_pawns && 3 * x < 2 * n_pawns;
+          let middle_third_y = 3 * y > n_pawns && 3 * y < 2 * n_pawns;
+          if (rotate(hex_pos, D6::Rfl(1)) == hex_pos && middle_third_y)
+            || (rotate(hex_pos, D6::Rfl(3)) == hex_pos && middle_third_x)
+            || (rotate(hex_pos, D6::Rfl(5)) == hex_pos && middle_third_x)
+          {
+            SymmetryClass::EV
+          } else {
+            SymmetryClass::CV
+          }
+        }
+      }
+      12 => SymmetryClass::Trivial,
+      _ => unreachable!(),
+    }
+  }
+
+  #[test]
+  fn test_symm_state_class() {
+    for PawnsConfig { n_pawns, y, x } in all_pawn_counts_and_coordinates() {
+      assert_eq!(
+        symm_state_class(x, y, n_pawns),
+        deduce_symmetry_class(x, y, n_pawns),
         "With {n_pawns} pawns at ({x}, {y})"
       );
     }
