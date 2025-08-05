@@ -13,7 +13,7 @@ use crate::{
   groups::{C2, D3, D6, K4},
   make_onoro_error,
   util::broadcast_u8_to_u64,
-  Color, Colored, Onoro,
+  Color, Colored, Onoro, OnoroPawn, PawnColor, TileState,
 };
 
 use super::{
@@ -32,22 +32,6 @@ const TILE_MASK: u64 = (1u64 << TILE_BITS) - 1;
 
 /// The minimum number of neighbors each pawn must have.
 const MIN_NEIGHBORS_PER_PAWN: u64 = 2;
-
-#[derive(Debug, PartialEq, Eq)]
-pub enum TileState {
-  Empty,
-  Black,
-  White,
-}
-
-impl From<PawnColor> for TileState {
-  fn from(value: PawnColor) -> Self {
-    match value {
-      PawnColor::Black => TileState::Black,
-      PawnColor::White => TileState::White,
-    }
-  }
-}
 
 /// An Onoro game state with `N / 2` pawns per player.
 ///
@@ -617,6 +601,10 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroImpl<N, N2
 impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Onoro
   for OnoroImpl<N, N2, ADJ_CNT_SIZE>
 {
+  type Index = PackedIdx;
+  type Move = Move;
+  type Pawn = Pawn;
+
   unsafe fn new() -> Self {
     Self {
       pawn_poses: [PackedIdx::null(); N],
@@ -721,17 +709,21 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Display
   }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
-pub enum PawnColor {
-  Black,
-  White,
-}
-
 #[derive(Debug, PartialEq, Eq)]
 pub struct Pawn {
   pub pos: PackedIdx,
   pub color: PawnColor,
   board_idx: u8,
+}
+
+impl OnoroPawn<PackedIdx> for Pawn {
+  fn pos(&self) -> PackedIdx {
+    self.pos
+  }
+
+  fn color(&self) -> PawnColor {
+    self.color
+  }
 }
 
 impl Display for Pawn {

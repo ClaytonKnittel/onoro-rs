@@ -1,5 +1,7 @@
 use std::fmt::Display;
 
+use crate::OnoroMove;
+
 use super::{hex_pos::HexPos, packed_idx::PackedIdx};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -14,6 +16,12 @@ pub enum Move {
     /// Position in pawn_poses array to move pawn from.
     from_idx: u32,
   },
+}
+
+impl OnoroMove<PackedIdx> for Move {
+  fn make_phase1(pos: PackedIdx) -> Self {
+    Self::Phase1Move { to: pos }
+  }
 }
 
 impl Display for Move {

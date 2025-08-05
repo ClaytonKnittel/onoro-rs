@@ -1,20 +1,20 @@
-use crate::{error::OnoroError, hex_pos::HexPos, PackedIdx};
+use crate::{error::OnoroError, OnoroIndex};
 
-pub(crate) struct BoardLayoutPawns {
-  pub black_pawns: Vec<PackedIdx>,
-  pub white_pawns: Vec<PackedIdx>,
+pub(crate) struct BoardLayoutPawns<Index: OnoroIndex> {
+  pub black_pawns: Vec<Index>,
+  pub white_pawns: Vec<Index>,
 }
 
-pub(crate) fn pawns_from_board_string(
+pub(crate) fn pawns_from_board_string<Index: OnoroIndex>(
   board_layout: &str,
   n: usize,
-) -> Result<BoardLayoutPawns, OnoroError> {
+) -> Result<BoardLayoutPawns<Index>, OnoroError> {
   let mut black_pawns = Vec::new();
   let mut white_pawns = Vec::new();
 
   for (y, line) in board_layout.split('\n').enumerate() {
     for (x, tile) in line.split_ascii_whitespace().enumerate() {
-      let pos = PackedIdx::from(HexPos::new(x as u32 + 1, (n - y - 2) as u32));
+      let pos = Index::from_coords(x as u32 + 1, (n - y - 2) as u32);
       match tile {
         "B" | "b" => black_pawns.push(pos),
         "W" | "w" => white_pawns.push(pos),

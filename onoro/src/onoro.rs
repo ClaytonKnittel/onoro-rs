@@ -4,10 +4,63 @@ use crate::{
   error::OnoroError,
   hex_pos::HexPosOffset,
   onoro_util::{pawns_from_board_string, BoardLayoutPawns},
-  Move, PackedIdx, Pawn, PawnColor, TileState,
 };
 
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum PawnColor {
+  Black,
+  White,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum TileState {
+  Empty,
+  Black,
+  White,
+}
+
+impl From<PawnColor> for TileState {
+  fn from(value: PawnColor) -> Self {
+    match value {
+      PawnColor::Black => TileState::Black,
+      PawnColor::White => TileState::White,
+    }
+  }
+}
+
+pub trait OnoroIndex {
+  /// Constructs an index from raw coordinates. Will only be called when
+  /// constructing a starting position.
+  ///
+  /// x and y will be within 0..n_pawns
+  fn from_coords(x: u32, y: u32) -> Self;
+
+  /// Returns the x-coordinate of the index. The value is only meaningful
+  /// relative to other indexes.
+  fn x(&self) -> i32;
+
+  /// Returns the y-coordinate of the index. The value is only meaningful
+  /// relative to other indexes.
+  fn y(&self) -> i32;
+}
+
+pub trait OnoroMove<Index: OnoroIndex> {
+  fn make_phase1(pos: Index) -> Self;
+}
+
+pub trait OnoroPawn<Index: OnoroIndex> {
+  /// The position of this pawn on the board.
+  fn pos(&self) -> Index;
+
+  /// The color of this pawn.
+  fn color(&self) -> PawnColor;
+}
+
 pub trait Onoro: Sized {
+  type Index: OnoroIndex + Copy;
+  type Move: OnoroMove<Self::Index>;
+  type Pawn: OnoroPawn<Self::Index>;
+
   /// Initializes an empty game. This should not be called outside the `Onoro`
   /// trait.
   ///
@@ -32,17 +85,17 @@ pub trait Onoro: Sized {
 
   /// Given a position on the board, returns the tile state of that position,
   /// i.e. the color of the piece on that tile, or `Empty` if no piece is there.
-  fn get_tile(&self, idx: PackedIdx) -> TileState;
+  fn get_tile(&self, idx: Self::Index) -> TileState;
 
   /// Returns an iterator over all pawns in the game. The order does not matter.
-  fn pawns(&self) -> impl Iterator<Item = Pawn> + '_;
+  fn pawns(&self) -> impl Iterator<Item = Self::Pawn> + '_;
 
   fn pawns_mathematica_list(&self) -> String {
     format!(
       "{{{}}}",
       self
         .pawns()
-        .map(|pawn| format!("{{{},{}}}", pawn.pos.x(), pawn.pos.y()))
+        .map(|pawn| format!("{{{},{}}}", pawn.pos().x(), pawn.pos().y()))
         .reduce(|acc, coord| acc + "," + &coord)
         .unwrap()
     )
@@ -53,10 +106,10 @@ pub trait Onoro: Sized {
   fn in_phase1(&self) -> bool;
 
   /// Returns an iterator over all legal moves that can be made from this state.
-  fn each_move(&self) -> impl Iterator<Item = Move>;
+  fn each_move(&self) -> impl Iterator<Item = Self::Move>;
 
   /// Makes a move, mutating the game state.
-  fn make_move(&mut self, m: Move);
+  fn make_move(&mut self, m: Self::Move);
 
   /// Make move without checking that we are in the right phase. This is used by
   /// the game constructors to place the first pawn on an empty board.
@@ -64,7 +117,7 @@ pub trait Onoro: Sized {
   /// # Safety
   ///
   /// This function should not be called outside the Onoro trait.
-  unsafe fn make_move_unchecked(&mut self, m: Move) {
+  unsafe fn make_move_unchecked(&mut self, m: Self::Move) {
     self.make_move(m);
   }
 
@@ -84,16 +137,18 @@ pub trait Onoro: Sized {
     let mid_idx = ((Self::board_width() - 1) / 2) as u32;
     let mut game = unsafe { Self::new() };
     unsafe {
-      game.make_move_unchecked(Move::Phase1Move {
-        to: PackedIdx::new(mid_idx, mid_idx),
-      });
+      game.make_move_unchecked(Self::Move::make_phase1(Self::Index::from_coords(
+        mid_idx, mid_idx,
+      )));
     }
-    game.make_move(Move::Phase1Move {
-      to: PackedIdx::new(mid_idx + 1, mid_idx + 1),
-    });
-    game.make_move(Move::Phase1Move {
-      to: PackedIdx::new(mid_idx + 1, mid_idx),
-    });
+    game.make_move(Self::Move::make_phase1(Self::Index::from_coords(
+      mid_idx + 1,
+      mid_idx + 1,
+    )));
+    game.make_move(Self::Move::make_phase1(Self::Index::from_coords(
+      mid_idx + 1,
+      mid_idx,
+    )));
     game
   }
 
@@ -105,10 +160,10 @@ pub trait Onoro: Sized {
 
     let mut game = unsafe { Self::new() };
     unsafe {
-      game.make_move_unchecked(Move::Phase1Move { to: black_pawns[0] });
+      game.make_move_unchecked(Self::Move::make_phase1(black_pawns[0]));
     }
     for pos in interleave(white_pawns, black_pawns.into_iter().skip(1)) {
-      game.make_move(Move::Phase1Move { to: pos });
+      game.make_move(Self::Move::make_phase1(pos));
     }
 
     Ok(game)
@@ -151,16 +206,16 @@ pub trait Onoro: Sized {
       .enumerate()
       .all(|(idx, (_, color))| { (idx % 2 == 0) == matches!(color, PawnColor::Black) }));
 
-    Ok(Self::from_packed_idxs(pawns.into_iter().map(|(pos, _)| {
-      PackedIdx::new((pos.x() - min_x + 1) as u32, (pos.y() - min_y + 1) as u32)
+    Ok(Self::from_indexes(pawns.into_iter().map(|(pos, _)| {
+      Self::Index::from_coords((pos.x() - min_x + 1) as u32, (pos.y() - min_y + 1) as u32)
     })))
   }
 
-  fn from_packed_idxs(pawns: impl IntoIterator<Item = PackedIdx>) -> Self {
+  fn from_indexes(pawns: impl IntoIterator<Item = Self::Index>) -> Self {
     let mut game = unsafe { Self::new() };
     for idx in pawns {
       unsafe {
-        game.make_move_unchecked(Move::Phase1Move { to: idx });
+        game.make_move_unchecked(Self::Move::make_phase1(idx));
       }
     }
     game
@@ -186,12 +241,12 @@ pub trait Onoro: Sized {
       |((min_x, min_y), (max_x, max_y)), pawn| {
         (
           (
-            min_x.min(pawn.pos.x() as usize),
-            min_y.min(pawn.pos.y() as usize),
+            min_x.min(pawn.pos().x() as usize),
+            min_y.min(pawn.pos().y() as usize),
           ),
           (
-            max_x.max(pawn.pos.x() as usize),
-            max_y.max(pawn.pos.y() as usize),
+            max_x.max(pawn.pos().x() as usize),
+            max_y.max(pawn.pos().y() as usize),
           ),
         )
       },
@@ -208,7 +263,7 @@ pub trait Onoro: Sized {
         write!(
           f,
           "{}",
-          match self.get_tile(PackedIdx::new(x as u32, y as u32)) {
+          match self.get_tile(Self::Index::from_coords(x as u32, y as u32)) {
             TileState::Black => "B",
             TileState::White => "W",
             TileState::Empty => ".",
