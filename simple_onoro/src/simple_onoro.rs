@@ -1,10 +1,47 @@
 use std::collections::HashMap;
 
-use onoro::{Move, Onoro, PackedIdx, Pawn, PawnColor, TileState};
+use onoro::{Onoro, OnoroIndex, OnoroMove, OnoroPawn, PawnColor, TileState};
 
 struct Pos {
   x: i32,
   y: i32,
+}
+
+#[derive(Clone, Copy)]
+pub struct Index {}
+
+impl OnoroIndex for Index {
+  fn from_coords(x: u32, y: u32) -> Self {
+    todo!()
+  }
+
+  fn x(&self) -> i32 {
+    todo!()
+  }
+
+  fn y(&self) -> i32 {
+    todo!()
+  }
+}
+
+pub struct Move {}
+
+impl OnoroMove<Index> for Move {
+  fn make_phase1(pos: Index) -> Self {
+    todo!()
+  }
+}
+
+pub struct Pawn {}
+
+impl OnoroPawn<Index> for Pawn {
+  fn pos(&self) -> Index {
+    todo!()
+  }
+
+  fn color(&self) -> PawnColor {
+    todo!()
+  }
 }
 
 pub struct SimpleOnoro {
@@ -12,6 +49,10 @@ pub struct SimpleOnoro {
 }
 
 impl Onoro for SimpleOnoro {
+  type Index = Index;
+  type Move = Move;
+  type Pawn = Pawn;
+
   unsafe fn new() -> Self {
     todo!()
   }
@@ -32,7 +73,7 @@ impl Onoro for SimpleOnoro {
     todo!()
   }
 
-  fn get_tile(&self, idx: PackedIdx) -> TileState {
+  fn get_tile(&self, idx: Index) -> TileState {
     todo!()
   }
 
