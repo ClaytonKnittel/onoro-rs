@@ -4,8 +4,30 @@ use crate::{
   error::OnoroError,
   hex_pos::HexPosOffset,
   onoro_util::{pawns_from_board_string, BoardLayoutPawns},
-  PackedIdx, PawnColor, TileState,
+  PackedIdx,
 };
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum PawnColor {
+  Black,
+  White,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum TileState {
+  Empty,
+  Black,
+  White,
+}
+
+impl From<PawnColor> for TileState {
+  fn from(value: PawnColor) -> Self {
+    match value {
+      PawnColor::Black => TileState::Black,
+      PawnColor::White => TileState::White,
+    }
+  }
+}
 
 pub trait OnoroMove {
   fn make_phase1(pos: PackedIdx) -> Self;
