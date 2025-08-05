@@ -348,3 +348,144 @@ impl Onoro for OnoroGame {
     }
   }
 }
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  fn count_moves(game: &OnoroGame) -> usize {
+    game.each_move().count()
+  }
+
+  fn pawn_count(game: &OnoroGame, color: PawnColor) -> usize {
+    game.pawns().filter(|p| p.color == color).count()
+  }
+
+  fn get_tile_color(game: &OnoroGame, pos: PackedIdx) -> TileState {
+    game.get_tile(pos.into())
+  }
+
+  fn make_legal_move(game: &mut OnoroGame) {
+    let m = game.each_move().next().expect("no legal moves");
+    game.make_move(m);
+  }
+
+  #[test]
+  fn test_initial_setup() {
+    unsafe {
+      let game = OnoroGame::new();
+
+      assert_eq!(game.turn(), PawnColor::White);
+      assert_eq!(game.pawns_in_play(), 3);
+      assert!(game.in_phase1());
+
+      assert_eq!(pawn_count(&game, PawnColor::Black), 2);
+      assert_eq!(pawn_count(&game, PawnColor::White), 1);
+    }
+  }
+
+  #[test]
+  fn test_phase1_moves_exist() {
+    unsafe {
+      let game = OnoroGame::new();
+      let moves: Vec<_> = game.each_move().collect();
+      assert!(!moves.is_empty());
+      for m in &moves {
+        if let Move::Place(pos) = m {
+          // Placement must be onto empty tile
+          assert_eq!(game.get_tile((*pos).into()), TileState::Empty);
+        } else {
+          panic!("expected only placement moves in phase 1");
+        }
+      }
+    }
+  }
+
+  #[test]
+  fn test_win_detection_four_in_line() {
+    // Manually construct a win situation for black
+    let mut game = unsafe { OnoroGame::new() };
+
+    // Place until phase 2
+    while game.in_phase1() {
+      make_legal_move(&mut game);
+    }
+
+    // Clear board and simulate 4 in a line
+    game.board.clear();
+    game.phase1 = false;
+    game.white_pawns_remaining = 0;
+    game.black_pawns_remaining = 0;
+
+    let line = [
+      PackedIdx(0, 0),
+      PackedIdx(1, 0),
+      PackedIdx(2, 0),
+      PackedIdx(3, 0),
+    ];
+    for pos in &line {
+      game.board.insert(*pos, PawnColor::Black);
+    }
+
+    assert_eq!(game.check_win(PackedIdx(1, 0)), Some(PawnColor::Black));
+    assert_eq!(game.check_win(PackedIdx(2, 0)), Some(PawnColor::Black));
+  }
+
+  #[test]
+  fn test_illegal_move_due_to_disconnection() {
+    // Make a connected ring
+    let mut game = unsafe { OnoroGame::new() };
+    game.board.clear();
+    game.phase1 = false;
+    game.white_pawns_remaining = 0;
+    game.black_pawns_remaining = 0;
+
+    let ring = [
+      PackedIdx(0, 0),
+      PackedIdx(1, 0),
+      PackedIdx(1, -1),
+      PackedIdx(0, -1),
+      PackedIdx(-1, 0),
+      PackedIdx(-1, 1),
+    ];
+
+    for &pos in &ring {
+      game.board.insert(pos, PawnColor::Black);
+    }
+
+    game.to_move = PawnColor::Black;
+
+    // Attempt to move a pawn that disconnects the ring
+    let from = PackedIdx(0, 0);
+    let to = PackedIdx(2, 2);
+
+    assert!(!game.is_legal_move(from, to));
+  }
+
+  #[test]
+  fn test_legal_move_preserves_connection_and_no_lonely_pawns() {
+    let mut game = unsafe { OnoroGame::new() };
+    game.board.clear();
+    game.phase1 = false;
+    game.white_pawns_remaining = 0;
+    game.black_pawns_remaining = 0;
+
+    let group = [
+      PackedIdx(0, 0),
+      PackedIdx(1, 0),
+      PackedIdx(0, 1),
+      PackedIdx(1, 1),
+    ];
+
+    for &pos in &group {
+      game.board.insert(pos, PawnColor::White);
+    }
+
+    game.to_move = PawnColor::White;
+
+    let from = PackedIdx(1, 1);
+    let to = PackedIdx(2, 0);
+
+    assert!(game.is_legal_move(from, to));
+  }
+}
