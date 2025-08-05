@@ -1,6 +1,6 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
-use onoro::{Onoro, PawnColor, TileState};
+use onoro::{Onoro, OnoroMove, OnoroPawn, PawnColor, TileState};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct PackedIdx(i32, i32); // Axial hex coordinates
@@ -15,9 +15,31 @@ impl PackedIdx {
   }
 }
 
+impl PackedIdx {
+  pub fn neighbors(&self) -> [PackedIdx; 6] {
+    let &PackedIdx(q, r) = self;
+    [
+      PackedIdx(q + 1, r),     // east
+      PackedIdx(q - 1, r),     // west
+      PackedIdx(q, r + 1),     // southeast
+      PackedIdx(q, r - 1),     // northwest
+      PackedIdx(q + 1, r - 1), // northeast
+      PackedIdx(q - 1, r + 1), // southwest
+    ]
+  }
+}
+
 impl From<onoro::PackedIdx> for PackedIdx {
   fn from(value: onoro::PackedIdx) -> Self {
     Self(value.x() as i32, value.y() as i32)
+  }
+}
+
+impl From<PackedIdx> for onoro::PackedIdx {
+  fn from(value: PackedIdx) -> Self {
+    debug_assert!(value.0 >= 0);
+    debug_assert!(value.1 >= 0);
+    Self::new(value.0 as u32, value.1 as u32)
   }
 }
 
@@ -27,10 +49,57 @@ pub enum Move {
   Move(PackedIdx, PackedIdx), // from, to
 }
 
+impl OnoroMove for Move {
+  fn make_phase1(pos: onoro::PackedIdx) -> Self {
+    Move::Place(pos.into())
+  }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Pawn {
   pub color: PawnColor,
   pub pos: PackedIdx,
+}
+
+impl OnoroPawn for Pawn {
+  fn pos(&self) -> onoro::PackedIdx {
+    self.pos.into()
+  }
+
+  fn color(&self) -> PawnColor {
+    self.color
+  }
+}
+
+fn opponent(pawn_color: PawnColor) -> PawnColor {
+  match pawn_color {
+    PawnColor::Black => PawnColor::White,
+    PawnColor::White => PawnColor::Black,
+  }
+}
+
+fn is_fully_connected(board: &HashMap<PackedIdx, PawnColor>) -> bool {
+  if board.is_empty() {
+    return true;
+  }
+
+  let mut visited = HashSet::new();
+  let mut stack = Vec::new();
+
+  // Start from any pawn
+  let &start = board.keys().next().unwrap();
+  stack.push(start);
+  visited.insert(start);
+
+  while let Some(current) = stack.pop() {
+    for neighbor in current.neighbors() {
+      if board.contains_key(&neighbor) && visited.insert(neighbor) {
+        stack.push(neighbor);
+      }
+    }
+  }
+
+  visited.len() == board.len()
 }
 
 /// The main struct implementing the game state.
@@ -99,9 +168,43 @@ impl OnoroGame {
 
     None
   }
+
+  pub fn is_legal_move(&self, from: PackedIdx, to: PackedIdx) -> bool {
+    // 1. from must contain current player's pawn, to must be empty
+    if self.board.get(&from) != Some(&self.to_move) || self.board.contains_key(&to) {
+      return false;
+    }
+
+    // 2. Simulate move
+    let mut temp_board = self.board.clone();
+    temp_board.remove(&from);
+    temp_board.insert(to, self.to_move);
+
+    // 3. Check connectivity
+    if !is_fully_connected(&temp_board) {
+      return false;
+    }
+
+    // 4. Check no lonely pawns
+    for &pos in temp_board.keys() {
+      let neighbors = pos.neighbors();
+      let neighbor_count = neighbors
+        .iter()
+        .filter(|n| temp_board.contains_key(n))
+        .count();
+      if neighbor_count <= 1 {
+        return false;
+      }
+    }
+
+    true
+  }
 }
 
 impl Onoro for OnoroGame {
+  type Move = Move;
+  type Pawn = Pawn;
+
   unsafe fn new() -> Self {
     let mut board = HashMap::new();
 
@@ -152,7 +255,7 @@ impl Onoro for OnoroGame {
     self.phase1
   }
 
-  fn each_move(&self) -> impl Iterator<Item = Move> + '_ {
+  fn each_move(&self) -> impl Iterator<Item = Move> {
     if self.phase1 {
       let mut candidates = HashSet::new();
 
@@ -181,7 +284,7 @@ impl Onoro for OnoroGame {
       self
         .board
         .iter()
-        .filter(move |(_, &c)| c == self.to_move)
+        .filter(move |&(_, &c)| c == self.to_move)
         .flat_map(move |(&from, _)| {
           from
             .neighbors()
@@ -198,8 +301,7 @@ impl Onoro for OnoroGame {
     match m {
       Move::Place(pos) => {
         assert!(self.phase1, "Cannot place during phase 2");
-        let remaining = self.pawns_remaining_mut(self.to_move);
-        assert!(*remaining > 0);
+        assert!(self.pawns_remaining(self.to_move) > 0);
         assert!(!self.board.contains_key(&pos));
 
         let touching = pos
@@ -210,7 +312,7 @@ impl Onoro for OnoroGame {
         assert!(touching >= 2);
 
         self.board.insert(pos, self.to_move);
-        *remaining -= 1;
+        *self.pawns_remaining_mut(self.to_move) -= 1;
 
         if self.white_pawns_remaining == 0 && self.black_pawns_remaining == 0 {
           self.phase1 = false;
@@ -220,10 +322,7 @@ impl Onoro for OnoroGame {
           self.winner = Some(winner);
         }
 
-        self.to_move = match self.to_move {
-          PawnColor::Black => PawnColor::White,
-          PawnColor::White => PawnColor::Black,
-        };
+        self.to_move = opponent(self.to_move);
       }
 
       Move::Move(from, to) => {
@@ -239,13 +338,13 @@ impl Onoro for OnoroGame {
           self.winner = Some(winner);
         }
 
-        self.to_move = self.to_move.opponent();
+        self.to_move = opponent(self.to_move);
       }
     }
 
     // If no legal moves exist, the current player loses
     if self.each_move().next().is_none() {
-      self.winner = Some(self.to_move.opponent());
+      self.winner = Some(opponent(self.to_move));
     }
   }
 }
