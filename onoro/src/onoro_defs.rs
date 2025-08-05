@@ -41,5 +41,8 @@ pub type Onoro16View = onoro_view_type!(16);
 pub type Onoro8MoveIterator = onoro_iter_type!(8);
 pub type Onoro16MoveIterator = onoro_iter_type!(16);
 
+// TODO: use these
+#[allow(unused)]
 pub(crate) const SYMM_TABLE_8: [BoardSymmetryState; 64] = gen_onoro_symm_state_table!(8);
+#[allow(unused)]
 pub(crate) const SYMM_TABLE_16: [BoardSymmetryState; 256] = gen_onoro_symm_state_table!(16);
