@@ -13,7 +13,7 @@ use crate::{
   groups::{C2, D3, D6, K4},
   make_onoro_error,
   util::broadcast_u8_to_u64,
-  Color, Colored, Onoro,
+  Color, Colored, Onoro, OnoroPawn,
 };
 
 use super::{
@@ -617,6 +617,9 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroImpl<N, N2
 impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Onoro
   for OnoroImpl<N, N2, ADJ_CNT_SIZE>
 {
+  type Move = Move;
+  type Pawn = Pawn;
+
   unsafe fn new() -> Self {
     Self {
       pawn_poses: [PackedIdx::null(); N],
@@ -732,6 +735,16 @@ pub struct Pawn {
   pub pos: PackedIdx,
   pub color: PawnColor,
   board_idx: u8,
+}
+
+impl OnoroPawn for Pawn {
+  fn pos(&self) -> PackedIdx {
+    self.pos
+  }
+
+  fn color(&self) -> PawnColor {
+    self.color
+  }
 }
 
 impl Display for Pawn {
