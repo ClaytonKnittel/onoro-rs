@@ -601,6 +601,7 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroImpl<N, N2
 impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Onoro
   for OnoroImpl<N, N2, ADJ_CNT_SIZE>
 {
+  type Index = PackedIdx;
   type Move = Move;
   type Pawn = Pawn;
 
@@ -715,7 +716,7 @@ pub struct Pawn {
   board_idx: u8,
 }
 
-impl OnoroPawn for Pawn {
+impl OnoroPawn<PackedIdx> for Pawn {
   fn pos(&self) -> PackedIdx {
     self.pos
   }
