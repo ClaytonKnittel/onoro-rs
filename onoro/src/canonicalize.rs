@@ -36,6 +36,7 @@ impl BoardSymmetryState {
   }
 }
 
+#[derive(Debug, PartialEq, Eq)]
 enum COMOffset {
   /// Offset by (0, 0)
   X0Y0,
@@ -55,7 +56,7 @@ enum COMOffset {
 /// hex tile this region is a part of, indexed by the D6 symmetry op associated
 /// with the region. See the description of genSymmStateTable() for this mapping
 /// from symmetry op to region.
-const fn board_symm_state_op_to_com_offset(op: &D6) -> COMOffset {
+const fn board_symm_state_op_to_com_offset(op: D6) -> COMOffset {
   match op {
     D6::Rot(0) => COMOffset::X0Y0,
     D6::Rot(1) => COMOffset::X0Y1,
@@ -188,7 +189,7 @@ pub const fn gen_symm_state_table<const N: usize, const N2: usize>() -> [BoardSy
     let mut x = 0;
     while x < N {
       let op = symm_state_op(x as u32, y as u32, N as u32);
-      let offset = board_symm_state_op_to_com_offset(&op);
+      let offset = board_symm_state_op_to_com_offset(op);
       table[x + y * N] = BoardSymmetryState {
         op,
         symm_class: symm_state_class(x as u32, y as u32, N as u32),
@@ -316,11 +317,74 @@ pub fn board_symm_state<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usi
 
   let op = symm_state_op(x, y, pawns_in_play);
   let symm_class = symm_state_class(x, y, pawns_in_play);
-  let center_offset = com_offset_to_hex_pos(board_symm_state_op_to_com_offset(&op));
+  let center_offset = com_offset_to_hex_pos(board_symm_state_op_to_com_offset(op));
 
   BoardSymmetryState {
     op,
     symm_class,
     center_offset,
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use itertools::Itertools;
+
+  use crate::canonicalize::{board_symm_state_op_to_com_offset, symm_state_op, COMOffset};
+
+  /// ```text
+  /// +--------------E----------------F
+  /// |`            /           . .   |
+  /// |  `         /       . .        |
+  /// |    `      /   . .             |
+  /// |      `   / .                  |
+  /// |     _ _`v                    .|
+  /// |  _     . \                  . |
+  /// D       .    \               .  |
+  /// |      .       \            .   |
+  /// |     .          \         .    |
+  /// |    .             \      .    -C
+  /// |   .                \   .- -   |
+  /// |  .                 . `v       |
+  /// | .             . .    / `      |
+  /// |.         . .        /    `    |
+  /// |     . .            /       `  |
+  /// A-------------------B-----------+
+  /// ```
+  fn com_to_origin_offset(x: u32, y: u32, n_pawns: u32) -> COMOffset {
+    debug_assert!(x < n_pawns);
+    debug_assert!(y < n_pawns);
+
+    let bottom_left = x < n_pawns - y;
+    let below_a_e = 2 * x > y;
+    let below_d_f = x + n_pawns > 2 * y;
+    let above_a_c = 2 * y > x;
+    let above_b_f = y + n_pawns > 2 * x;
+
+    if bottom_left && below_d_f && above_b_f {
+      COMOffset::X0Y0
+    } else if !below_a_e && !below_d_f {
+      COMOffset::X0Y1
+    } else if !above_a_c && !above_b_f {
+      COMOffset::X1Y0
+    } else {
+      debug_assert!(!bottom_left && below_a_e && above_a_c);
+      COMOffset::X1Y1
+    }
+  }
+
+  #[test]
+  fn test_board_symm_state_op_to_com_offset() {
+    for (n_pawns, y, x) in (1..=16).flat_map(|n_pawns| {
+      (0..n_pawns)
+        .cartesian_product(0..n_pawns)
+        .map(move |(x, y)| (n_pawns, x, y))
+    }) {
+      assert_eq!(
+        board_symm_state_op_to_com_offset(symm_state_op(x, y, n_pawns)),
+        com_to_origin_offset(x, y, n_pawns),
+        "With {n_pawns} pawns at ({x}, {y})"
+      );
+    }
   }
 }
