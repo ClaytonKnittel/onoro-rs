@@ -1,9 +1,23 @@
 use std::collections::{HashMap, HashSet};
 
-use onoro::{Onoro, OnoroMove, OnoroPawn, PawnColor, TileState};
+use onoro::{Onoro, OnoroIndex, OnoroMove, OnoroPawn, PawnColor, TileState};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct PackedIdx(i32, i32); // Axial hex coordinates
+
+impl OnoroIndex for PackedIdx {
+  fn from_coords(x: u32, y: u32) -> Self {
+    Self(x as i32, y as i32)
+  }
+
+  fn x(&self) -> i32 {
+    self.0
+  }
+
+  fn y(&self) -> i32 {
+    self.1
+  }
+}
 
 impl PackedIdx {
   pub fn add(&self, dq: i32, dr: i32) -> PackedIdx {
@@ -29,29 +43,15 @@ impl PackedIdx {
   }
 }
 
-impl From<onoro::PackedIdx> for PackedIdx {
-  fn from(value: onoro::PackedIdx) -> Self {
-    Self(value.x() as i32, value.y() as i32)
-  }
-}
-
-impl From<PackedIdx> for onoro::PackedIdx {
-  fn from(value: PackedIdx) -> Self {
-    debug_assert!(value.0 >= 0);
-    debug_assert!(value.1 >= 0);
-    Self::new(value.0 as u32, value.1 as u32)
-  }
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Move {
   Place(PackedIdx),
   Move(PackedIdx, PackedIdx), // from, to
 }
 
-impl OnoroMove for Move {
-  fn make_phase1(pos: onoro::PackedIdx) -> Self {
-    Move::Place(pos.into())
+impl OnoroMove<PackedIdx> for Move {
+  fn make_phase1(pos: PackedIdx) -> Self {
+    Move::Place(pos)
   }
 }
 
@@ -61,9 +61,9 @@ pub struct Pawn {
   pub pos: PackedIdx,
 }
 
-impl OnoroPawn for Pawn {
-  fn pos(&self) -> onoro::PackedIdx {
-    self.pos.into()
+impl OnoroPawn<PackedIdx> for Pawn {
+  fn pos(&self) -> PackedIdx {
+    self.pos
   }
 
   fn color(&self) -> PawnColor {
@@ -202,6 +202,7 @@ impl OnoroGame {
 }
 
 impl Onoro for OnoroGame {
+  type Index = PackedIdx;
   type Move = Move;
   type Pawn = Pawn;
 
@@ -239,8 +240,8 @@ impl Onoro for OnoroGame {
     self.winner
   }
 
-  fn get_tile(&self, idx: onoro::PackedIdx) -> TileState {
-    match self.board.get(&(idx.into())) {
+  fn get_tile(&self, idx: PackedIdx) -> TileState {
+    match self.board.get(&idx) {
       Some(PawnColor::Black) => TileState::Black,
       Some(PawnColor::White) => TileState::White,
       None => TileState::Empty,
