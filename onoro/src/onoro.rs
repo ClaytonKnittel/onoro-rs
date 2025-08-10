@@ -70,10 +70,16 @@ pub trait OnoroIndex: Clone + Copy + Eq + Debug {
   }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum OnoroMoveWrapper<Index: OnoroIndex> {
   Phase1 { to: Index },
   Phase2 { from: Index, to: Index },
+}
+
+impl<Index: OnoroIndex> OnoroMove<Index> for OnoroMoveWrapper<Index> {
+  fn make_phase1(pos: Index) -> Self {
+    Self::Phase1 { to: pos }
+  }
 }
 
 pub trait OnoroMove<Index: OnoroIndex> {
