@@ -207,18 +207,11 @@ impl Onoro for OnoroGame {
   type Pawn = Pawn;
 
   unsafe fn new() -> Self {
-    let mut board = HashMap::new();
-
-    // Initial triangle: 2 black, 1 white
-    board.insert(PackedIdx(0, 0), PawnColor::Black);
-    board.insert(PackedIdx(1, 0), PawnColor::Black);
-    board.insert(PackedIdx(0, 1), PawnColor::White);
-
     OnoroGame {
-      board,
-      to_move: PawnColor::White,
-      white_pawns_remaining: 7,
-      black_pawns_remaining: 6,
+      board: HashMap::new(),
+      to_move: PawnColor::Black,
+      white_pawns_remaining: 8,
+      black_pawns_remaining: 8,
       phase1: true,
       winner: None,
     }
@@ -311,7 +304,22 @@ impl Onoro for OnoroGame {
           .filter(|n| self.board.contains_key(n))
           .count();
         assert!(touching >= 2);
+      }
 
+      Move::Move(from, to) => {
+        assert!(!self.phase1, "Cannot move during phase 1");
+        assert_eq!(self.board.get(&from), Some(&self.to_move));
+        assert!(!self.board.contains_key(&to));
+        assert!(self.is_legal_move(from, to));
+      }
+    }
+
+    unsafe { self.make_move_unchecked(m) };
+  }
+
+  unsafe fn make_move_unchecked(&mut self, m: Move) {
+    match m {
+      Move::Place(pos) => {
         self.board.insert(pos, self.to_move);
         *self.pawns_remaining_mut(self.to_move) -= 1;
 
@@ -327,11 +335,6 @@ impl Onoro for OnoroGame {
       }
 
       Move::Move(from, to) => {
-        assert!(!self.phase1, "Cannot move during phase 1");
-        assert_eq!(self.board.get(&from), Some(&self.to_move));
-        assert!(!self.board.contains_key(&to));
-        assert!(self.is_legal_move(from, to));
-
         self.board.remove(&from);
         self.board.insert(to, self.to_move);
 
