@@ -146,3 +146,57 @@ fn test_make_move_hex_start<T: OnoroFactory>(_factory: T) -> OnoroResult {
 
   Ok(())
 }
+
+#[apply(onoro_factory)]
+#[gtest]
+fn test_make_move_phase2_few_options<T: OnoroFactory>(_factory: T) -> OnoroResult {
+  let onoro = T::from_board_string(
+    ". . B W B W
+      . W . . . B
+       B . . . . W
+        W . . . . B
+         B . . . W .
+          W B W B  .",
+  )?;
+  let moves = all_moves(&onoro);
+
+  expect_that!(
+    moves.iter().map(OnoroCmp).collect_vec(),
+    unordered_elements_are![
+      &OnoroCmp(&T::from_board_string(
+        ". . B W B W
+          . W . . . B
+           . B . . . W
+            W . . . . B
+             B . . . W .
+              W B W B  .",
+      )?),
+      &OnoroCmp(&T::from_board_string(
+        ". . . W B W
+          . W B . . B
+           B . . . . W
+            W . . . . B
+             B . . . W .
+              W B W B  .",
+      )?),
+      &OnoroCmp(&T::from_board_string(
+        ". . B W B W
+          . W . . . B
+           B . . . . W
+            W . . . B .
+             B . . . W .
+              W B W B  .",
+      )?),
+      &OnoroCmp(&T::from_board_string(
+        ". . B W B W
+          . W . . . B
+           B . . . . W
+            W . . . . B
+             B . . B W .
+              W B W .  .",
+      )?),
+    ]
+  );
+
+  Ok(())
+}
