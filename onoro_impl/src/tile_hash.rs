@@ -2,7 +2,7 @@ use std::{fmt::Display, marker::PhantomData};
 
 use algebra::group::{Cyclic, Group};
 
-use super::groups::{C2, D3, D6, K4};
+use onoro::groups::{C2, D3, D6, K4};
 
 pub(crate) const C_MASK: u64 = 0x0fff_ffff_ffff_ffff;
 pub(crate) const V_MASK: u64 = 0x0fff_ffff_ffff_ffff;

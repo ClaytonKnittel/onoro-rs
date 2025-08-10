@@ -4,8 +4,6 @@ use algebra::group::{Cyclic, Trivial};
 
 use crate::groups::{C2, D3, D6, K4};
 
-use super::{packed_hex_pos::PackedHexPos, packed_idx::PackedIdx};
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct HexPos {
   x: u32,
@@ -85,24 +83,6 @@ impl HexPos {
     Self {
       x: (self.x as i32 - rhs.x) as u32,
       y: (self.y as i32 - rhs.y) as u32,
-    }
-  }
-}
-
-impl From<PackedHexPos> for HexPos {
-  fn from(value: PackedHexPos) -> Self {
-    Self {
-      x: value.x() as u32,
-      y: value.y() as u32,
-    }
-  }
-}
-
-impl From<PackedIdx> for HexPos {
-  fn from(value: PackedIdx) -> Self {
-    Self {
-      x: value.x(),
-      y: value.y(),
     }
   }
 }
@@ -460,15 +440,6 @@ impl HexPosOffset {
     Self {
       x: self.x - rhs.x,
       y: self.y - rhs.y,
-    }
-  }
-}
-
-impl From<PackedIdx> for HexPosOffset {
-  fn from(value: PackedIdx) -> Self {
-    Self {
-      x: value.x() as i32,
-      y: value.y() as i32,
     }
   }
 }

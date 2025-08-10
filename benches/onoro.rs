@@ -4,7 +4,8 @@ use criterion::{
   criterion_group, criterion_main, measurement::Measurement, BenchmarkGroup, Criterion, Throughput,
 };
 use itertools::Itertools;
-use onoro::{Onoro, Onoro16};
+use onoro::Onoro;
+use onoro_impl::Onoro16;
 use rand::{rngs::StdRng, Rng, SeedableRng};
 
 fn random_playout<R: Rng>(mut onoro: Onoro16, num_moves: usize, rng: &mut R) -> Onoro16 {

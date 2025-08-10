@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 onoro = { path = "../onoro" }
+onoro_impl = { path = "../onoro_impl" }
 rand = "0.9.1"
 
 [profile.release]

@@ -1,4 +1,4 @@
-use crate::{canonicalize::BoardSymmetryState, TILE_BITS};
+use crate::{TILE_BITS, canonicalize::BoardSymmetryState};
 
 const fn adjacency_count_size(n: usize) -> usize {
   (n * n * TILE_BITS).div_ceil(64)
@@ -14,7 +14,7 @@ macro_rules! onoro_type {
 #[macro_export]
 macro_rules! onoro_view_type {
   ($n:literal) => {
-    $crate::OnoroView<$n, { $n * $n }, { adjacency_count_size($n) }>
+    $crate::onoro_view::OnoroView<$n, { $n * $n }, { adjacency_count_size($n) }>
   };
 }
 

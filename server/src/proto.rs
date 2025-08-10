@@ -1,7 +1,7 @@
-use async_sockets::Status;
 use bytes::BytesMut;
 use itertools::interleave;
-use onoro::{Move, Onoro, OnoroImpl, PackedIdx, Pawn, PawnColor};
+use onoro::{Onoro, PawnColor};
+use onoro_impl::{Move, OnoroImpl, PackedIdx};
 use prost::Message;
 use serde::{
   de::{self, Visitor},

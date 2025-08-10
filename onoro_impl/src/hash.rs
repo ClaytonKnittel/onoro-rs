@@ -6,13 +6,17 @@ use algebra::{
 };
 use const_random::const_random;
 
+use onoro::{
+  Onoro,
+  groups::{C2, D3, D6, K4, SymmetryClass},
+  hex_pos::{HexPos, HexPosOffset},
+};
+
 use crate::{
+  OnoroImpl,
   canonicalize::BoardSymmetryState,
   const_rand::Xoroshiro128,
-  groups::{SymmetryClass, C2, D3, D6, K4},
-  hex_pos::{HexPos, HexPosOffset},
-  tile_hash::{TileHash, C_MASK, E_MASK, V_MASK},
-  Onoro, OnoroImpl,
+  tile_hash::{C_MASK, E_MASK, TileHash, V_MASK},
 };
 
 #[derive(Debug)]
@@ -388,11 +392,9 @@ impl<const N: usize, const N2: usize, G: Group> Index<usize> for HashTable<N, N2
 #[cfg(test)]
 mod test {
   use algebra::{finite::Finite, group::Cyclic, monoid::Monoid};
+  use onoro::groups::{C2, D3, D6, K4};
 
-  use crate::{
-    groups::{C2, D3, D6, K4},
-    hash::HashTable,
-  };
+  use crate::hash::HashTable;
 
   type HD6 = HashTable<16, 256, D6>;
   type HD3 = HashTable<16, 256, D3>;

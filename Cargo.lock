@@ -794,11 +794,26 @@ dependencies = [
  "itertools 0.14.0",
  "multiqueue",
  "onoro",
+ "onoro_impl",
  "pprof",
  "rand 0.8.5",
  "rayon",
  "rstest",
  "rstest_reuse",
+]
+
+[[package]]
+name = "onoro_impl"
+version = "0.1.0"
+dependencies = [
+ "abstract_game",
+ "algebra",
+ "const-random",
+ "googletest",
+ "itertools 0.11.0",
+ "onoro",
+ "rand 0.8.5",
+ "union_find",
 ]
 
 [[package]]
