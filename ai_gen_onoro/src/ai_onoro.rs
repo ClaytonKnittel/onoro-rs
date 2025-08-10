@@ -3,7 +3,9 @@ use std::{
   fmt::Debug,
 };
 
-use onoro::{Onoro, OnoroIndex, OnoroMove, OnoroMoveWrapper, OnoroPawn, PawnColor, TileState};
+use onoro::{Onoro, OnoroIndex, OnoroMoveWrapper, OnoroPawn, PawnColor, TileState};
+
+type Move = OnoroMoveWrapper<PackedIdx>;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct PackedIdx(i32, i32); // Axial hex coordinates
@@ -43,18 +45,6 @@ impl PackedIdx {
       PackedIdx(q + 1, r - 1), // northeast
       PackedIdx(q - 1, r + 1), // southwest
     ]
-  }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Move {
-  Place(PackedIdx),
-  Move(PackedIdx, PackedIdx), // from, to
-}
-
-impl OnoroMove<PackedIdx> for Move {
-  fn make_phase1(pos: PackedIdx) -> Self {
-    Move::Place(pos)
   }
 }
 
@@ -265,7 +255,7 @@ impl Onoro for OnoroGame {
 
       candidates
         .into_iter()
-        .map(Move::Place)
+        .map(|to| Move::Phase1 { to })
         .collect::<Vec<_>>()
         .into_iter()
     } else {
@@ -279,7 +269,7 @@ impl Onoro for OnoroGame {
             .neighbors()
             .into_iter()
             .filter(move |to| !self.board.contains_key(to) && self.is_legal_move(from, *to))
-            .map(move |to| Move::Move(from, to))
+            .map(move |to| Move::Phase2 { from, to })
         })
         .collect::<Vec<_>>()
         .into_iter()
@@ -288,12 +278,12 @@ impl Onoro for OnoroGame {
 
   fn make_move(&mut self, m: Move) {
     match m {
-      Move::Place(pos) => {
+      Move::Phase1 { to } => {
         assert!(self.phase1, "Cannot place during phase 2");
         assert!(self.pawns_remaining(self.to_move) > 0);
-        assert!(!self.board.contains_key(&pos));
+        assert!(!self.board.contains_key(&to));
 
-        let touching = pos
+        let touching = to
           .neighbors()
           .iter()
           .filter(|n| self.board.contains_key(n))
@@ -301,7 +291,7 @@ impl Onoro for OnoroGame {
         assert!(touching >= 2);
       }
 
-      Move::Move(from, to) => {
+      Move::Phase2 { from, to } => {
         assert!(!self.phase1, "Cannot move during phase 1");
         assert_eq!(self.board.get(&from), Some(&self.to_move));
         assert!(!self.board.contains_key(&to));
@@ -314,22 +304,22 @@ impl Onoro for OnoroGame {
 
   unsafe fn make_move_unchecked(&mut self, m: Move) {
     match m {
-      Move::Place(pos) => {
-        self.board.insert(pos, self.to_move);
+      Move::Phase1 { to } => {
+        self.board.insert(to, self.to_move);
         *self.pawns_remaining_mut(self.to_move) -= 1;
 
         if self.white_pawns_remaining == 0 && self.black_pawns_remaining == 0 {
           self.phase1 = false;
         }
 
-        if let Some(winner) = self.check_win(pos) {
+        if let Some(winner) = self.check_win(to) {
           self.winner = Some(winner);
         }
 
         self.to_move = opponent(self.to_move);
       }
 
-      Move::Move(from, to) => {
+      Move::Phase2 { from, to } => {
         self.board.remove(&from);
         self.board.insert(to, self.to_move);
 
@@ -348,10 +338,7 @@ impl Onoro for OnoroGame {
   }
 
   fn to_move_wrapper(&self, m: Move) -> OnoroMoveWrapper<PackedIdx> {
-    match m {
-      Move::Place(to) => OnoroMoveWrapper::Phase1 { to },
-      Move::Move(from, to) => OnoroMoveWrapper::Phase2 { from, to },
-    }
+    m
   }
 }
 
@@ -401,9 +388,9 @@ mod tests {
       let moves: Vec<_> = game.each_move().collect();
       assert!(!moves.is_empty());
       for m in &moves {
-        if let Move::Place(pos) = m {
+        if let Move::Phase1 { to } = m {
           // Placement must be onto empty tile
-          assert_eq!(game.get_tile((*pos).into()), TileState::Empty);
+          assert_eq!(game.get_tile(*to), TileState::Empty);
         } else {
           panic!("expected only placement moves in phase 1");
         }
