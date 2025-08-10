@@ -116,6 +116,16 @@ fn many_positions(
     onoro::Onoro16::from_board_string(BOARD_POSITIONS[7]).unwrap(),
     onoro::Onoro16::from_board_string(BOARD_POSITIONS[8]).unwrap(),
     onoro::Onoro16::from_board_string(BOARD_POSITIONS[9]).unwrap(),
+    ai_gen_onoro::OnoroGame::from_board_string(BOARD_POSITIONS[0]).unwrap(),
+    ai_gen_onoro::OnoroGame::from_board_string(BOARD_POSITIONS[1]).unwrap(),
+    ai_gen_onoro::OnoroGame::from_board_string(BOARD_POSITIONS[2]).unwrap(),
+    ai_gen_onoro::OnoroGame::from_board_string(BOARD_POSITIONS[3]).unwrap(),
+    ai_gen_onoro::OnoroGame::from_board_string(BOARD_POSITIONS[4]).unwrap(),
+    ai_gen_onoro::OnoroGame::from_board_string(BOARD_POSITIONS[5]).unwrap(),
+    ai_gen_onoro::OnoroGame::from_board_string(BOARD_POSITIONS[6]).unwrap(),
+    ai_gen_onoro::OnoroGame::from_board_string(BOARD_POSITIONS[7]).unwrap(),
+    ai_gen_onoro::OnoroGame::from_board_string(BOARD_POSITIONS[8]).unwrap(),
+    ai_gen_onoro::OnoroGame::from_board_string(BOARD_POSITIONS[9]).unwrap(),
   )]
   onoro: impl Onoro,
 ) {

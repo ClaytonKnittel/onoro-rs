@@ -138,11 +138,7 @@ impl OnoroGame {
 
   fn check_win(&self, pos: PackedIdx) -> Option<PawnColor> {
     let color = self.board.get(&pos)?;
-    let directions = [
-      (1, 0),  // east-west
-      (0, 1),  // southeast-northwest
-      (1, -1), // northeast-southwest
-    ];
+    let directions = [(1, 0), (0, 1), (1, 1)];
 
     for &(dq, dr) in &directions {
       let mut count = 1;
