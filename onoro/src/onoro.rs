@@ -173,7 +173,7 @@ pub trait Onoro: Sized {
     let BoardLayoutPawns {
       black_pawns,
       white_pawns,
-    } = pawns_from_board_string(board_layout, Self::pawns_per_player())?;
+    } = pawns_from_board_string(board_layout, 2 * Self::pawns_per_player())?;
 
     let mut game = unsafe { Self::new() };
     unsafe {

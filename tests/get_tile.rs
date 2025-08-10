@@ -5,9 +5,121 @@ use rstest::rstest;
 use rstest_reuse::{apply, template};
 use std::collections::HashMap;
 
+const BOARD_POSITIONS: [&str; 10] = [
+  ". . . . . . . 
+    . . W . . . . 
+     . W W B B B . 
+      . . . . W . . 
+       . . . . W . . 
+        . . . B B . . 
+         . . . B B . . 
+          . . . . W . . 
+           . . . . W . . 
+            . . . B W . . 
+             . . . . . . .",
+  ". . . . . . . . . . . 
+    . . . . . . . . B W . 
+     . . B B . . B W W W . 
+      . . W . . W B . . . . 
+       . . B . B . . . . . . 
+        . B W W . . . . . . . 
+         . . . . . . . . . . .",
+  ". . . . . . . . . . . . 
+    . . . . . . . . . W W . 
+     . . . . . . . . . W . . 
+      . . . . . B W . B . . . 
+       . . . . . W B . B . . . 
+        . . . . W . B W . . . . 
+         . . . W . . . . . . . . 
+          . . B . . . . . . . . . 
+           . B B . . . . . . . . . 
+            . . . . . . . . . . . .",
+  ". . . . . . . . . . . . 
+    . . . . . . . . . . B . 
+     . . . . . . . W B W W . 
+      . . . . . B B . . . . . 
+       . . . W W . . . . . . . 
+        . . B . W . . . . . . . 
+         . B W . B B . . . . . . 
+          . . . . W . . . . . . . 
+           . . . . . . . . . . . .",
+  ". . . . . . . . 
+    . . . . . W . . 
+     . . . . B B B . 
+      . . B W . B . . 
+       . . W . W . B . 
+        . B W . B W W . 
+         . . . . . W . . 
+          . . . . . . . .",
+  ". . . . . . . . . . . 
+    . . . . . . . . . W . 
+     . . . B W . . . W B . 
+      . . W . W . B W . . . 
+       . B B B . . W . . . . 
+        . . . B B W . . . . . 
+         . . . . . . . . . . .",
+  ". . . . . . . . . . . 
+    . . . . . . . . W B . 
+     . . . . . . . B W . . 
+      . . . . . . . B . . . 
+       . . W . . . . W . . . 
+        . B W . . . B . . . . 
+         . . W B B W B . . . . 
+          . . . . W . . . . . . 
+           . . . . . . . . . . .",
+  ". . . . . . . 
+    . . . . . W . 
+     . . . . W W . 
+      . B W B . . . 
+       . B B W W . . 
+        . . . B . . . 
+         . . . B . . . 
+          . . . W B B . 
+           . . . . W . . 
+            . . . . . . .",
+  ". . . . . . . . . . . . 
+    . . . . . . . . . W W . 
+     . . . . . . . . B B . . 
+      . . . . . . W B W . . . 
+       . . . . . B . B . . . . 
+        . . . . . B . . . . . . 
+         . . . W W B . . . . . . 
+          . B W . . . . . . . . . 
+           . W . . . . . . . . . . 
+            . . . . . . . . . . . .",
+  ". . . . . . 
+    . . . B . . 
+     . . W W W . 
+      . . . B . . 
+       . . B B . . 
+        . . B . . . 
+         . . W B . . 
+          . . . W . . 
+           . . . W . . 
+            . . B . . . 
+             . . B . . . 
+              . W W . . . 
+               . . . . . .",
+];
+
 #[template]
 #[rstest]
-fn many_positions(#[values(onoro::Onoro16::default_start())] onoro: impl Onoro) {}
+fn many_positions(
+  #[values(
+    onoro::Onoro16::from_board_string(BOARD_POSITIONS[0]).unwrap(),
+    onoro::Onoro16::from_board_string(BOARD_POSITIONS[1]).unwrap(),
+    onoro::Onoro16::from_board_string(BOARD_POSITIONS[2]).unwrap(),
+    onoro::Onoro16::from_board_string(BOARD_POSITIONS[3]).unwrap(),
+    onoro::Onoro16::from_board_string(BOARD_POSITIONS[4]).unwrap(),
+    onoro::Onoro16::from_board_string(BOARD_POSITIONS[5]).unwrap(),
+    onoro::Onoro16::from_board_string(BOARD_POSITIONS[6]).unwrap(),
+    onoro::Onoro16::from_board_string(BOARD_POSITIONS[7]).unwrap(),
+    onoro::Onoro16::from_board_string(BOARD_POSITIONS[8]).unwrap(),
+    onoro::Onoro16::from_board_string(BOARD_POSITIONS[9]).unwrap(),
+  )]
+  onoro: impl Onoro,
+) {
+}
 
 fn expect_pawns_in_bounds<T: Onoro>(onoro: &T) {
   let n_pawns = 2 * T::pawns_per_player() as i32;
