@@ -490,7 +490,7 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroImpl<N, N2
     }
   }
 
-  pub fn validate(&self) -> OnoroResult<()> {
+  pub fn validate(&self) -> OnoroResult {
     let mut n_b_pawns = 0u32;
     let mut n_w_pawns = 0u32;
     let mut sum_of_mass = HexPos::zero();
