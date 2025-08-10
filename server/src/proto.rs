@@ -1,6 +1,6 @@
 use bytes::BytesMut;
 use itertools::interleave;
-use onoro::{Move, Onoro, OnoroImpl, OnoroInitialize, PackedIdx, PawnColor};
+use onoro::{Move, Onoro, OnoroExt, OnoroImpl, PackedIdx, PawnColor};
 use prost::Message;
 use serde::{
   de::{self, Visitor},
