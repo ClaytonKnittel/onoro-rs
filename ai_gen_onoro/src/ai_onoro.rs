@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-use onoro::{Onoro, OnoroIndex, OnoroMove, OnoroPawn, PawnColor, TileState};
+use onoro::{Onoro, OnoroIndex, OnoroInitialize, OnoroMove, OnoroPawn, PawnColor, TileState};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct PackedIdx(i32, i32); // Axial hex coordinates
@@ -206,24 +206,6 @@ impl Onoro for OnoroGame {
   type Move = Move;
   type Pawn = Pawn;
 
-  unsafe fn new() -> Self {
-    let mut board = HashMap::new();
-
-    // Initial triangle: 2 black, 1 white
-    board.insert(PackedIdx(0, 0), PawnColor::Black);
-    board.insert(PackedIdx(1, 0), PawnColor::Black);
-    board.insert(PackedIdx(0, 1), PawnColor::White);
-
-    OnoroGame {
-      board,
-      to_move: PawnColor::White,
-      white_pawns_remaining: 7,
-      black_pawns_remaining: 6,
-      phase1: true,
-      winner: None,
-    }
-  }
-
   fn pawns_per_player() -> usize {
     8
   }
@@ -346,6 +328,26 @@ impl Onoro for OnoroGame {
     // If no legal moves exist, the current player loses
     if self.each_move().next().is_none() {
       self.winner = Some(opponent(self.to_move));
+    }
+  }
+}
+
+impl OnoroInitialize for OnoroGame {
+  unsafe fn new() -> Self {
+    let mut board = HashMap::new();
+
+    // Initial triangle: 2 black, 1 white
+    board.insert(PackedIdx(0, 0), PawnColor::Black);
+    board.insert(PackedIdx(1, 0), PawnColor::Black);
+    board.insert(PackedIdx(0, 1), PawnColor::White);
+
+    OnoroGame {
+      board,
+      to_move: PawnColor::White,
+      white_pawns_remaining: 7,
+      black_pawns_remaining: 6,
+      phase1: true,
+      winner: None,
     }
   }
 }
