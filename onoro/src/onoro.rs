@@ -42,6 +42,23 @@ pub trait OnoroIndex {
   /// Returns the y-coordinate of the index. The value is only meaningful
   /// relative to other indexes.
   fn y(&self) -> i32;
+
+  fn neighbors(&self) -> impl Iterator<Item = Self>
+  where
+    Self: Sized,
+  {
+    debug_assert!(self.x() > 0);
+    debug_assert!(self.y() > 0);
+    [
+      Self::from_coords((self.x() - 1) as u32, (self.y() - 1) as u32),
+      Self::from_coords(self.x() as u32, (self.y() - 1) as u32),
+      Self::from_coords((self.x() - 1) as u32, self.y() as u32),
+      Self::from_coords((self.x() + 1) as u32, self.y() as u32),
+      Self::from_coords(self.x() as u32, (self.y() + 1) as u32),
+      Self::from_coords((self.x() + 1) as u32, (self.y() + 1) as u32),
+    ]
+    .into_iter()
+  }
 }
 
 pub trait OnoroMove<Index: OnoroIndex> {
