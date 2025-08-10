@@ -373,16 +373,14 @@ mod tests {
 
   #[test]
   fn test_initial_setup() {
-    unsafe {
-      let game = OnoroGame::new();
+    let game = OnoroGame::default_start();
 
-      assert_eq!(game.turn(), PawnColor::White);
-      assert_eq!(game.pawns_in_play(), 3);
-      assert!(game.in_phase1());
+    assert_eq!(game.turn(), PawnColor::White);
+    assert_eq!(game.pawns_in_play(), 3);
+    assert!(game.in_phase1());
 
-      assert_eq!(pawn_count(&game, PawnColor::Black), 2);
-      assert_eq!(pawn_count(&game, PawnColor::White), 1);
-    }
+    assert_eq!(pawn_count(&game, PawnColor::Black), 2);
+    assert_eq!(pawn_count(&game, PawnColor::White), 1);
   }
 
   #[test]

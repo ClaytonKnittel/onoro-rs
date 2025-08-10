@@ -1,1 +1,3 @@
-pub mod ai_onoro;
+mod ai_onoro;
+
+pub use ai_onoro::*;
