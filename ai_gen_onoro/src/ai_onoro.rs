@@ -186,18 +186,14 @@ impl OnoroGame {
     }
 
     // 4. Check no lonely pawns
-    for &pos in temp_board.keys() {
-      let neighbors = pos.neighbors();
-      let neighbor_count = neighbors
+    temp_board.keys().all(|&pos| {
+      pos
+        .neighbors()
         .iter()
         .filter(|n| temp_board.contains_key(n))
-        .count();
-      if neighbor_count <= 1 {
-        return false;
-      }
-    }
-
-    true
+        .count()
+        >= 2
+    })
   }
 }
 
@@ -235,8 +231,7 @@ impl Onoro for OnoroGame {
 
   fn get_tile(&self, idx: PackedIdx) -> TileState {
     match self.board.get(&idx) {
-      Some(PawnColor::Black) => TileState::Black,
-      Some(PawnColor::White) => TileState::White,
+      Some(&color) => color.into(),
       None => TileState::Empty,
     }
   }
