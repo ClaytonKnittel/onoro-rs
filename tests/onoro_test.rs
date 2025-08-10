@@ -1,4 +1,4 @@
-use onoro::{Onoro, OnoroExt};
+use onoro::Onoro;
 use rstest::rstest;
 use rstest_reuse::{apply, template};
 
