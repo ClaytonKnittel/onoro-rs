@@ -1,3 +1,5 @@
+use std::fmt::Debug;
+
 use itertools::interleave;
 
 use crate::{
@@ -28,7 +30,7 @@ impl From<PawnColor> for TileState {
   }
 }
 
-pub trait OnoroIndex {
+pub trait OnoroIndex: Clone + Copy + Debug {
   /// Constructs an index from raw coordinates. Will only be called when
   /// constructing a starting position.
   ///
@@ -42,6 +44,13 @@ pub trait OnoroIndex {
   /// Returns the y-coordinate of the index. The value is only meaningful
   /// relative to other indexes.
   fn y(&self) -> i32;
+
+  /// Returns true if two indices are adjacent on the board.
+  fn adjacent(&self, other: Self) -> bool {
+    let dx = self.x() - other.x();
+    let dy = self.y() - other.y();
+    (-1..=1).contains(&dx) && (-1..=1).contains(&dy) && dx * dy != -1
+  }
 
   fn neighbors(&self) -> impl Iterator<Item = Self>
   where
@@ -59,6 +68,12 @@ pub trait OnoroIndex {
     ]
     .into_iter()
   }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub enum OnoroMoveWrapper<Index: OnoroIndex> {
+  Phase1 { to: Index },
+  Phase2 { from: Index, to: Index },
 }
 
 pub trait OnoroMove<Index: OnoroIndex> {
@@ -137,6 +152,9 @@ pub trait Onoro: Sized {
   unsafe fn make_move_unchecked(&mut self, m: Self::Move) {
     self.make_move(m);
   }
+
+  /// Only used in tests.
+  fn to_move_wrapper(&self, m: Self::Move) -> OnoroMoveWrapper<Self::Index>;
 
   /// Returns the width of the game board, e.g. the maximum distance between
   /// two pawns in any legal board configuration.

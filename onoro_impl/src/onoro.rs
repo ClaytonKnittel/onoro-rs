@@ -7,7 +7,7 @@ use abstract_game::{GameIterator, GameMoveGenerator};
 use algebra::group::Group;
 use itertools::interleave;
 use onoro::{
-  Color, Colored, Onoro, OnoroPawn, PawnColor, TileState,
+  Color, Colored, Onoro, OnoroMoveWrapper, OnoroPawn, PawnColor, TileState,
   error::OnoroResult,
   groups::{C2, D3, D6, K4},
   hex_pos::{HexPos, HexPosOffset},
@@ -688,6 +688,16 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Onoro
         self.mut_onoro_state().swap_player_turn();
         self.move_pawn(from_idx as usize, to);
       }
+    }
+  }
+
+  fn to_move_wrapper(&self, m: Move) -> OnoroMoveWrapper<PackedIdx> {
+    match m {
+      Move::Phase1Move { to } => OnoroMoveWrapper::Phase1 { to },
+      Move::Phase2Move { to, from_idx } => OnoroMoveWrapper::Phase2 {
+        from: *self.pawn_poses.get(from_idx as usize).unwrap(),
+        to,
+      },
     }
   }
 }
