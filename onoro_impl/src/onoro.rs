@@ -481,6 +481,15 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroImpl<N, N2
     None
   }
 
+  /// Bounds checks a hex pos before turning it into a PackedIdx for lookup.
+  fn get_tile_hex_pos(&self, idx: HexPos) -> TileState {
+    if idx.x() >= N as u32 || idx.y() >= N as u32 {
+      TileState::Empty
+    } else {
+      self.get_tile(idx.into())
+    }
+  }
+
   pub fn validate(&self) -> OnoroResult<()> {
     let mut n_b_pawns = 0u32;
     let mut n_w_pawns = 0u32;
@@ -532,7 +541,7 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroImpl<N, N2
       HexPos::from(pawn.pos)
         .each_top_left_neighbor()
         .for_each(|neighbor_pos| {
-          if self.get_tile(neighbor_pos.into()) != TileState::Empty {
+          if self.get_tile_hex_pos(neighbor_pos) != TileState::Empty {
             uf.union(
               Self::hex_pos_ord(&HexPos::from(pawn.pos)),
               Self::hex_pos_ord(&neighbor_pos),
@@ -819,6 +828,8 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> GameMoveGenerat
   fn next(&mut self, onoro: &Self::Game) -> Option<Self::Item> {
     loop {
       if let Some(neighbor) = self.neighbor_iter.as_mut().and_then(|iter| iter.next()) {
+        // Bypass the bounds check in get_tile_hex_pos, since we know all pawns
+        // are within a margin of 1 from the border.
         if onoro.get_tile(neighbor.into()) != TileState::Empty {
           continue;
         }
@@ -940,6 +951,8 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize>
       let pawn_ord = OnoroImpl::<N, N2, ADJ_CNT_SIZE>::hex_pos_ord(&pawn.pos.into());
 
       for neighbor in HexPos::from(pawn.pos).each_top_left_neighbor() {
+        // Bypass the bounds check in get_tile_hex_pos, since we know all pawns
+        // are within a margin of 1 from the border.
         if onoro.get_tile(neighbor.into()) != TileState::Empty && pawn_hex_pos != neighbor {
           uf.union(
             pawn_ord,
@@ -1059,7 +1072,7 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> GameMoveGenerat
         // considered.
         let mut groups_touching = 0;
         for neighbor in place_to_consider.each_neighbor() {
-          if onoro.get_tile(neighbor.into()) == TileState::Empty {
+          if onoro.get_tile_hex_pos(neighbor) == TileState::Empty {
             continue;
           }
           let neighbor_ord = OnoroImpl::<N, N2, ADJ_CNT_SIZE>::hex_pos_ord(&neighbor);

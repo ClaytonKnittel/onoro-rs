@@ -30,7 +30,7 @@ impl From<PawnColor> for TileState {
   }
 }
 
-pub trait OnoroIndex: Clone + Copy + Debug {
+pub trait OnoroIndex: Clone + Copy + Eq + Debug {
   /// Constructs an index from raw coordinates. Will only be called when
   /// constructing a starting position.
   ///
@@ -89,7 +89,7 @@ pub trait OnoroPawn<Index: OnoroIndex> {
 }
 
 pub trait Onoro: Sized {
-  type Index: OnoroIndex + Copy;
+  type Index: OnoroIndex;
   type Move: OnoroMove<Self::Index>;
   type Pawn: OnoroPawn<Self::Index>;
 
