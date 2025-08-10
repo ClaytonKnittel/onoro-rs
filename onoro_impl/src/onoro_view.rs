@@ -1,9 +1,3 @@
-use crate::{
-  compress::Compress,
-  error::{OnoroError, OnoroResult},
-  groups::SymmetryClassContainer,
-  Move, MoveGenerator, Onoro, Onoro16, Onoro16View,
-};
 use std::{
   cell::UnsafeCell,
   collections::{HashMap, HashSet},
@@ -19,14 +13,20 @@ use algebra::{
 };
 
 use abstract_game::{Game, GameMoveGenerator, GameResult};
+use onoro::{
+  Compress, Onoro, PawnColor, TileState,
+  error::{OnoroError, OnoroResult},
+  groups::{C2, D3, D6, K4, SymmetryClass, SymmetryClassContainer},
+  hex_pos::{HexPos, HexPosOffset},
+};
 
 use crate::{
-  canonicalize::{board_symm_state, BoardSymmetryState},
-  groups::{SymmetryClass, C2, D3, D6, K4},
+  MoveGenerator, OnoroImpl,
+  canonicalize::{BoardSymmetryState, board_symm_state},
   hash::HashTable,
-  hex_pos::{HexPos, HexPosOffset},
+  r#move::Move,
+  onoro_defs::{Onoro16, Onoro16View},
   tile_hash::HashGroup,
-  OnoroImpl, PawnColor, TileState,
 };
 
 /// Always generate hash tables for the full game. Only a part of the tables
@@ -619,10 +619,11 @@ mod tests {
   };
   use itertools::{Either, Itertools};
 
-  use crate::{
-    compress::Compress, error::OnoroResult, groups::SymmetryClass, hex_pos::HexPosOffset, Onoro,
-    Onoro16, Onoro16View, OnoroView, PawnColor,
+  use onoro::{
+    Compress, Onoro, PawnColor, error::OnoroResult, groups::SymmetryClass, hex_pos::HexPosOffset,
   };
+
+  use super::{Onoro16, Onoro16View, OnoroView};
 
   fn build_view(board_layout: &str) -> Onoro16View {
     let view = OnoroView::new(Onoro16::from_board_string(board_layout).unwrap());

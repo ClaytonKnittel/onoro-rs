@@ -1,4 +1,5 @@
-use onoro::{Compress, Onoro16View, error::OnoroResult};
+use onoro::{Compress, error::OnoroResult};
+use onoro_impl::Onoro16View;
 use rand::{Rng, distr::Uniform};
 
 fn ncr(n: u64, k: u64) -> u64 {
