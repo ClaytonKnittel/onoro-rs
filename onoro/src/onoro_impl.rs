@@ -12,9 +12,8 @@ use crate::{
   canonicalize::{board_symm_state, BoardSymmetryState},
   groups::{C2, D3, D6, K4},
   make_onoro_error,
-  onoro_initialize::OnoroInitialize,
   util::broadcast_u8_to_u64,
-  Color, Colored, Onoro, OnoroPawn, PawnColor, TileState,
+  Color, Colored, Onoro, OnoroExt, OnoroPawn, PawnColor, TileState,
 };
 
 use super::{
@@ -606,10 +605,6 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Onoro
   type Move = Move;
   type Pawn = Pawn;
 
-  fn pawns_per_player() -> usize {
-    N / 2
-  }
-
   fn turn(&self) -> PawnColor {
     if self.onoro_state().black_turn() {
       PawnColor::Black
@@ -686,7 +681,7 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Onoro
   }
 }
 
-impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroInitialize
+impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroExt
   for OnoroImpl<N, N2, ADJ_CNT_SIZE>
 {
   unsafe fn new() -> Self {
@@ -695,6 +690,10 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroInitialize
       state: OnoroState::new(),
       sum_of_mass: HexPos::zero().into(),
     }
+  }
+
+  fn pawns_per_player() -> usize {
+    N / 2
   }
 }
 
@@ -1107,9 +1106,7 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> GameMoveGenerat
 
 #[cfg(test)]
 mod tests {
-  use crate::{
-    onoro_defs::Onoro8, onoro_initialize::OnoroInitialize, packed_idx::PackedIdx, Onoro,
-  };
+  use crate::{onoro_defs::Onoro8, packed_idx::PackedIdx, Onoro, OnoroExt};
 
   #[test]
   fn test_get_tile() {

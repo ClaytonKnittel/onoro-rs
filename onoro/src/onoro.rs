@@ -53,9 +53,6 @@ pub trait Onoro {
   type Move: OnoroMove<Self::Index>;
   type Pawn: OnoroPawn<Self::Index>;
 
-  /// Returns the number of pawns each player has.
-  fn pawns_per_player() -> usize;
-
   /// Returns the color of the player whose turn it is.
   fn turn(&self) -> PawnColor;
 
@@ -102,70 +99,5 @@ pub trait Onoro {
   /// This function should not be called outside the Onoro trait.
   unsafe fn make_move_unchecked(&mut self, m: Self::Move) {
     self.make_move(m);
-  }
-
-  /// Returns the width of the game board, e.g. the maximum distance between
-  /// two pawns in any legal board configuration.
-  fn board_width() -> usize {
-    2 * Self::pawns_per_player()
-  }
-
-  /// Returns the total number of tiles in the game board that would fit any
-  /// legal configuration of pawns.
-  fn board_size() -> usize {
-    Self::board_width() * Self::board_width()
-  }
-
-  fn display(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    match self.turn() {
-      PawnColor::Black => writeln!(f, "black:")?,
-      PawnColor::White => writeln!(f, "white:")?,
-    }
-
-    let ((min_x, min_y), (max_x, max_y)) = self.pawns().fold(
-      ((Self::board_width(), Self::board_width()), (0, 0)),
-      |((min_x, min_y), (max_x, max_y)), pawn| {
-        (
-          (
-            min_x.min(pawn.pos().x() as usize),
-            min_y.min(pawn.pos().y() as usize),
-          ),
-          (
-            max_x.max(pawn.pos().x() as usize),
-            max_y.max(pawn.pos().y() as usize),
-          ),
-        )
-      },
-    );
-
-    let min_x = min_x.saturating_sub(1);
-    let min_y = min_y.saturating_sub(1);
-    let max_x = (max_x + 1).min(Self::board_width() - 1);
-    let max_y = (max_y + 1).min(Self::board_width() - 1);
-
-    for y in (min_y..=max_y).rev() {
-      write!(f, "{: <width$}", "", width = max_y - y)?;
-      for x in min_x..=max_x {
-        write!(
-          f,
-          "{}",
-          match self.get_tile(Self::Index::from_coords(x as u32, y as u32)) {
-            TileState::Black => "B",
-            TileState::White => "W",
-            TileState::Empty => ".",
-          }
-        )?;
-
-        if x < Self::board_width() - 1 {
-          write!(f, " ")?;
-        }
-      }
-
-      if y > min_y {
-        writeln!(f)?;
-      }
-    }
-
-    Ok(())
   }
 }
