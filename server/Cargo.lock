@@ -692,6 +692,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "onoro_impl"
+version = "0.1.0"
+dependencies = [
+ "abstract_game",
+ "algebra",
+ "const-random",
+ "googletest",
+ "itertools 0.11.0",
+ "onoro",
+ "rand",
+ "union_find",
+]
+
+[[package]]
 name = "overload"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1067,6 +1081,7 @@ dependencies = [
  "bytes",
  "itertools 0.12.0",
  "onoro",
+ "onoro_impl",
  "prost",
  "prost-build",
  "serde",

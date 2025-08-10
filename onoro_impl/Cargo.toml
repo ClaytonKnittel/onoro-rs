@@ -1,0 +1,14 @@
+[package]
+name = "onoro_impl"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+abstract_game = { path = "../abstract_game" }
+algebra = { path = "../algebra" }
+const-random = "0.1"
+googletest = "0.14.2"
+itertools = "0.11"
+onoro = { path = "../onoro" }
+rand = "0.8"
+union_find = { path = "../union_find" }

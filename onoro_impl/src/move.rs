@@ -1,8 +1,8 @@
 use std::fmt::Display;
 
-use crate::OnoroMove;
+use onoro::{OnoroMove, hex_pos::HexPos};
 
-use super::{hex_pos::HexPos, packed_idx::PackedIdx};
+use super::packed_idx::PackedIdx;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Move {

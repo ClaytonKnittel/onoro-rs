@@ -6,7 +6,7 @@ use rstest_reuse::{apply, template};
 
 #[template]
 #[rstest]
-fn default_start(#[values(onoro::Onoro16::default_start())] onoro: impl Onoro) {}
+fn default_start(#[values(onoro_impl::Onoro16::default_start())] onoro: impl Onoro) {}
 
 #[apply(default_start)]
 #[gtest]

@@ -1,8 +1,9 @@
 use std::{fmt::Display, num::Wrapping};
 
-use crate::{hex_pos::HexPosOffset, OnoroIndex};
-
-use super::hex_pos::HexPos;
+use onoro::{
+  OnoroIndex,
+  hex_pos::{HexPos, HexPosOffset},
+};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct PackedIdx {
@@ -73,6 +74,18 @@ impl OnoroIndex for PackedIdx {
 impl From<HexPos> for PackedIdx {
   fn from(value: HexPos) -> Self {
     Self::new(value.x(), value.y())
+  }
+}
+
+impl From<PackedIdx> for HexPos {
+  fn from(value: PackedIdx) -> Self {
+    Self::new(value.x(), value.y())
+  }
+}
+
+impl From<PackedIdx> for HexPosOffset {
+  fn from(value: PackedIdx) -> Self {
+    Self::new(value.x() as i32, value.y() as i32)
   }
 }
 

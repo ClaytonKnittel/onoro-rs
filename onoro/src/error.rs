@@ -6,7 +6,7 @@ pub struct OnoroError {
 }
 
 impl OnoroError {
-  pub(crate) fn new(message: String) -> Self {
+  pub fn new(message: String) -> Self {
     OnoroError { message }
   }
 }

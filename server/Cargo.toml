@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 async_sockets = { path = "modules/async-sockets/rust" }
 onoro = { path = "../onoro" }
+onoro_impl = { path = "../onoro_impl" }
 bytes = "1.5.0"
 prost = "0.12.3"
 serde = { version = "1.0.195", features = ["derive"] }
