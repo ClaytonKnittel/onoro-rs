@@ -790,6 +790,7 @@ dependencies = [
  "cooperate",
  "criterion",
  "dashmap",
+ "googletest",
  "itertools 0.14.0",
  "multiqueue",
  "onoro",
