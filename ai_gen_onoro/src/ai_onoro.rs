@@ -1,6 +1,9 @@
-use std::collections::{HashMap, HashSet};
+use std::{
+  collections::{HashMap, HashSet},
+  fmt::Debug,
+};
 
-use onoro::{Onoro, OnoroIndex, OnoroMove, OnoroPawn, PawnColor, TileState};
+use onoro::{Onoro, OnoroIndex, OnoroMove, OnoroMoveWrapper, OnoroPawn, PawnColor, TileState};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct PackedIdx(i32, i32); // Axial hex coordinates
@@ -103,6 +106,7 @@ fn is_fully_connected(board: &HashMap<PackedIdx, PawnColor>) -> bool {
 }
 
 /// The main struct implementing the game state.
+#[derive(Clone)]
 pub struct OnoroGame {
   /// Map from board coordinates to the color of the occupying pawn.
   board: HashMap<PackedIdx, PawnColor>,
@@ -346,6 +350,19 @@ impl Onoro for OnoroGame {
     if self.each_move().next().is_none() {
       self.winner = Some(opponent(self.to_move));
     }
+  }
+
+  fn to_move_wrapper(&self, m: Move) -> OnoroMoveWrapper<PackedIdx> {
+    match m {
+      Move::Place(to) => OnoroMoveWrapper::Phase1 { to },
+      Move::Move(from, to) => OnoroMoveWrapper::Phase2 { from, to },
+    }
+  }
+}
+
+impl Debug for OnoroGame {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    self.display(f)
   }
 }
 

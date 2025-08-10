@@ -6,7 +6,6 @@ use onoro::{
   error::{OnoroError, OnoroResult},
   Onoro, OnoroIndex, OnoroMoveWrapper, OnoroPawn, PawnColor,
 };
-use onoro_impl::Onoro16;
 use rstest::rstest;
 use rstest_reuse::{apply, template};
 
@@ -23,7 +22,12 @@ trait OnoroFactory {
 
 struct Onoro16Factory;
 impl OnoroFactory for Onoro16Factory {
-  type T = Onoro16;
+  type T = onoro_impl::Onoro16;
+}
+
+struct AiOnoroFactory;
+impl OnoroFactory for AiOnoroFactory {
+  type T = ai_gen_onoro::OnoroGame;
 }
 
 struct Phase2Move<Index: OnoroIndex> {
@@ -33,7 +37,7 @@ struct Phase2Move<Index: OnoroIndex> {
 
 #[template]
 #[rstest]
-fn onoro_factory(#[values(Onoro16Factory)] factory: impl OnoroFactory) {}
+fn onoro_factory(#[values(Onoro16Factory, AiOnoroFactory)] factory: impl OnoroFactory) {}
 
 type NeighborColors = Vec<PawnColor>;
 
