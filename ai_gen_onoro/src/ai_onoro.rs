@@ -3,6 +3,7 @@ use std::{
   fmt::Debug,
 };
 
+use itertools::{Either, Itertools};
 use onoro::{Onoro, OnoroIndex, OnoroMoveWrapper, OnoroPawn, PawnColor, TileState};
 
 type Move = OnoroMoveWrapper<PackedIdx>;
@@ -38,12 +39,12 @@ impl PackedIdx {
   pub fn neighbors(&self) -> [PackedIdx; 6] {
     let &PackedIdx(q, r) = self;
     [
-      PackedIdx(q + 1, r),     // east
-      PackedIdx(q - 1, r),     // west
-      PackedIdx(q, r + 1),     // southeast
-      PackedIdx(q, r - 1),     // northwest
-      PackedIdx(q + 1, r - 1), // northeast
-      PackedIdx(q - 1, r + 1), // southwest
+      PackedIdx(q + 1, r),
+      PackedIdx(q - 1, r),
+      PackedIdx(q, r + 1),
+      PackedIdx(q, r - 1),
+      PackedIdx(q + 1, r + 1),
+      PackedIdx(q - 1, r - 1),
     ]
   }
 }
@@ -104,34 +105,23 @@ pub struct OnoroGame {
   /// Whose turn it is to play.
   to_move: PawnColor,
 
-  /// How many pawns each player has remaining to place.
-  white_pawns_remaining: usize,
-  black_pawns_remaining: usize,
-
-  /// Whether the game is in the placement phase (Phase 1).
-  phase1: bool,
-
   /// Cached result of the game, if known. (None = ongoing)
   winner: Option<PawnColor>,
 }
 
 impl OnoroGame {
   fn pawns_remaining(&self, color: PawnColor) -> usize {
-    match color {
-      PawnColor::White => self.white_pawns_remaining,
-      PawnColor::Black => self.black_pawns_remaining,
-    }
-  }
-
-  fn pawns_remaining_mut(&mut self, color: PawnColor) -> &mut usize {
-    match color {
-      PawnColor::White => &mut self.white_pawns_remaining,
-      PawnColor::Black => &mut self.black_pawns_remaining,
-    }
+    Self::pawns_per_player()
+      - self
+        .board
+        .values()
+        .filter(|&&pawn_color| pawn_color == color)
+        .count()
   }
 
   fn check_win(&self, pos: PackedIdx) -> Option<PawnColor> {
-    let color = self.board.get(&pos)?;
+    debug_assert!(self.board.contains_key(&pos));
+    let color = self.board.get(&pos).unwrap();
     let directions = [(1, 0), (0, 1), (1, 1)];
 
     for &(dq, dr) in &directions {
@@ -196,9 +186,6 @@ impl Onoro for OnoroGame {
     OnoroGame {
       board: HashMap::new(),
       to_move: PawnColor::Black,
-      white_pawns_remaining: 8,
-      black_pawns_remaining: 8,
-      phase1: true,
       winner: None,
     }
   }
@@ -231,71 +218,80 @@ impl Onoro for OnoroGame {
   }
 
   fn in_phase1(&self) -> bool {
-    self.phase1
+    self.board.len() < 2 * Self::pawns_per_player()
   }
 
   fn each_move(&self) -> impl Iterator<Item = Move> {
-    if self.phase1 {
-      let mut candidates = HashSet::new();
-
-      for pos in self.board.keys() {
-        for neighbor in pos.neighbors() {
-          if !self.board.contains_key(&neighbor) {
-            let touching = neighbor
+    if self.in_phase1() {
+      Either::Left(
+        self
+          .board
+          .keys()
+          .flat_map(PackedIdx::neighbors)
+          // Remove duplicates
+          .collect::<HashSet<_>>()
+          .into_iter()
+          // Remove occupied locations
+          .filter(|neighbor| !self.board.contains_key(neighbor))
+          // Remove locations which aren't adjacent to at least 2 pawns.
+          .filter(|neighbor| {
+            neighbor
               .neighbors()
               .iter()
               .filter(|n| self.board.contains_key(n))
-              .count();
-            if touching >= 2 {
-              candidates.insert(neighbor);
-            }
-          }
-        }
-      }
-
-      candidates
-        .into_iter()
-        .map(|to| Move::Phase1 { to })
-        .collect::<Vec<_>>()
-        .into_iter()
+              .count()
+              >= 2
+          })
+          .map(|to| Move::Phase1 { to }),
+      )
     } else {
-      // Phase 2: generate all valid (from, to) moves
-      self
-        .board
-        .iter()
-        .filter(move |&(_, &c)| c == self.to_move)
-        .flat_map(move |(&from, _)| {
-          from
-            .neighbors()
-            .into_iter()
-            .filter(move |to| !self.board.contains_key(to) && self.is_legal_move(from, *to))
-            .map(move |to| Move::Phase2 { from, to })
-        })
-        .collect::<Vec<_>>()
-        .into_iter()
+      Either::Right(
+        self
+          .board
+          .iter()
+          // Filter out other player's pawns.
+          .filter_map(|(&pos, &c)| (c == self.to_move).then_some(pos))
+          // Expand each position to all neighbors of all pawns
+          .cartesian_product(
+            self
+              .board
+              .keys()
+              .flat_map(PackedIdx::neighbors)
+              // Remove duplicates
+              .collect::<HashSet<_>>()
+              .into_iter()
+              .filter(|to| !self.board.contains_key(to))
+              .collect_vec(),
+          )
+          .filter(|&(from, to)| self.is_legal_move(from, to))
+          .map(|(from, to)| Move::Phase2 { from, to }),
+      )
     }
   }
 
   fn make_move(&mut self, m: Move) {
+    debug_assert!(self.winner.is_none());
+
     match m {
       Move::Phase1 { to } => {
-        assert!(self.phase1, "Cannot place during phase 2");
-        assert!(self.pawns_remaining(self.to_move) > 0);
-        assert!(!self.board.contains_key(&to));
+        debug_assert!(self.in_phase1(), "Cannot place during phase 2");
+        debug_assert!(self.pawns_remaining(self.to_move) > 0);
+        debug_assert!(!self.board.contains_key(&to));
 
-        let touching = to
-          .neighbors()
-          .iter()
-          .filter(|n| self.board.contains_key(n))
-          .count();
-        assert!(touching >= 2);
+        debug_assert!(
+          to.neighbors()
+            .iter()
+            .filter(|n| self.board.contains_key(n))
+            .count()
+            >= 2
+        );
       }
 
       Move::Phase2 { from, to } => {
-        assert!(!self.phase1, "Cannot move during phase 1");
-        assert_eq!(self.board.get(&from), Some(&self.to_move));
-        assert!(!self.board.contains_key(&to));
-        assert!(self.is_legal_move(from, to));
+        debug_assert!(!self.in_phase1(), "Cannot move during phase 1");
+        debug_assert_eq!(self.board.get(&from), Some(&self.to_move));
+        debug_assert!(!self.board.contains_key(&to));
+        debug_assert!(self.is_legal_move(from, to));
       }
     }
 
@@ -303,33 +299,17 @@ impl Onoro for OnoroGame {
   }
 
   unsafe fn make_move_unchecked(&mut self, m: Move) {
-    match m {
-      Move::Phase1 { to } => {
-        self.board.insert(to, self.to_move);
-        *self.pawns_remaining_mut(self.to_move) -= 1;
-
-        if self.white_pawns_remaining == 0 && self.black_pawns_remaining == 0 {
-          self.phase1 = false;
-        }
-
-        if let Some(winner) = self.check_win(to) {
-          self.winner = Some(winner);
-        }
-
-        self.to_move = opponent(self.to_move);
-      }
-
+    let to = match m {
+      Move::Phase1 { to } => to,
       Move::Phase2 { from, to } => {
         self.board.remove(&from);
-        self.board.insert(to, self.to_move);
-
-        if let Some(winner) = self.check_win(to) {
-          self.winner = Some(winner);
-        }
-
-        self.to_move = opponent(self.to_move);
+        to
       }
-    }
+    };
+    self.board.insert(to, self.to_move);
+
+    self.winner = self.check_win(to);
+    self.to_move = opponent(self.to_move);
 
     // If no legal moves exist, the current player loses
     if self.each_move().next().is_none() {
@@ -352,16 +332,8 @@ impl Debug for OnoroGame {
 mod tests {
   use super::*;
 
-  fn count_moves(game: &OnoroGame) -> usize {
-    game.each_move().count()
-  }
-
   fn pawn_count(game: &OnoroGame, color: PawnColor) -> usize {
     game.pawns().filter(|p| p.color == color).count()
-  }
-
-  fn get_tile_color(game: &OnoroGame, pos: PackedIdx) -> TileState {
-    game.get_tile(pos.into())
   }
 
   fn make_legal_move(game: &mut OnoroGame) {
@@ -410,9 +382,6 @@ mod tests {
 
     // Clear board and simulate 4 in a line
     game.board.clear();
-    game.phase1 = false;
-    game.white_pawns_remaining = 0;
-    game.black_pawns_remaining = 0;
 
     let line = [
       PackedIdx(0, 0),
@@ -433,9 +402,6 @@ mod tests {
     // Make a connected ring
     let mut game = unsafe { OnoroGame::new() };
     game.board.clear();
-    game.phase1 = false;
-    game.white_pawns_remaining = 0;
-    game.black_pawns_remaining = 0;
 
     let ring = [
       PackedIdx(0, 0),
@@ -463,9 +429,6 @@ mod tests {
   fn test_legal_move_preserves_connection_and_no_lonely_pawns() {
     let mut game = unsafe { OnoroGame::new() };
     game.board.clear();
-    game.phase1 = false;
-    game.white_pawns_remaining = 0;
-    game.black_pawns_remaining = 0;
 
     let group = [
       PackedIdx(0, 0),
