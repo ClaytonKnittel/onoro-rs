@@ -1058,7 +1058,7 @@ mod tests {
   }
 
   #[gtest]
-  fn compress_decompress_smoke() -> OnoroResult<()> {
+  fn compress_decompress_smoke() -> OnoroResult {
     let view = build_view(
       ". W . . . . . . . . . . . .
         B W B W B W B W B W B W B W
@@ -1069,7 +1069,7 @@ mod tests {
   }
 
   #[gtest]
-  fn compress_decompress_smoke2() -> OnoroResult<()> {
+  fn compress_decompress_smoke2() -> OnoroResult {
     let view = build_view(
       ". W . . . W
         B W B W B W
