@@ -33,7 +33,7 @@ struct Phase2Move<Index: OnoroIndex> {
 
 #[template]
 #[rstest]
-fn many_positions(#[values(Onoro16Factory)] factory: impl OnoroFactory) {}
+fn onoro_factory(#[values(Onoro16Factory)] factory: impl OnoroFactory) {}
 
 type NeighborColors = Vec<PawnColor>;
 
@@ -119,7 +119,7 @@ fn phase2_move_adjacencies<T: Onoro>(
   )
 }
 
-#[apply(many_positions)]
+#[apply(onoro_factory)]
 #[gtest]
 fn test_each_move_default_start<T: OnoroFactory>(_factory: T) -> OnoroResult {
   let onoro = T::from_board_string(
@@ -140,7 +140,7 @@ fn test_each_move_default_start<T: OnoroFactory>(_factory: T) -> OnoroResult {
   Ok(())
 }
 
-#[apply(many_positions)]
+#[apply(onoro_factory)]
 #[gtest]
 fn test_each_move_hex_start<T: OnoroFactory>(_factory: T) -> OnoroResult {
   let onoro = T::from_board_string(
@@ -166,7 +166,7 @@ fn test_each_move_hex_start<T: OnoroFactory>(_factory: T) -> OnoroResult {
   Ok(())
 }
 
-#[apply(many_positions)]
+#[apply(onoro_factory)]
 #[gtest]
 fn test_each_move_line<T: OnoroFactory>(_factory: T) -> OnoroResult {
   let onoro = T::from_board_string(
@@ -195,7 +195,7 @@ fn test_each_move_line<T: OnoroFactory>(_factory: T) -> OnoroResult {
   Ok(())
 }
 
-#[apply(many_positions)]
+#[apply(onoro_factory)]
 #[gtest]
 fn test_each_move_phase2_few_options<T: OnoroFactory>(_factory: T) -> OnoroResult {
   let onoro = T::from_board_string(
