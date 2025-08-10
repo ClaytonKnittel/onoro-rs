@@ -3,7 +3,6 @@ use std::{collections::HashMap, fmt::Debug};
 use googletest::{expect_that, gtest, prelude::unordered_elements_are};
 use itertools::Itertools;
 use onoro::{error::OnoroResult, Onoro, OnoroIndex, OnoroPawn, PawnColor};
-use onoro_impl::Onoro16;
 use rstest::rstest;
 use rstest_reuse::{apply, template};
 
@@ -17,7 +16,12 @@ trait OnoroFactory {
 
 struct Onoro16Factory;
 impl OnoroFactory for Onoro16Factory {
-  type T = Onoro16;
+  type T = onoro_impl::Onoro16;
+}
+
+struct AiOnoroFactory;
+impl OnoroFactory for AiOnoroFactory {
+  type T = ai_gen_onoro::OnoroGame;
 }
 
 fn pawn_map<T: Onoro>(onoro: &T) -> HashMap<(i32, i32), PawnColor> {
@@ -45,7 +49,7 @@ impl<'a, T: Onoro + Debug> Eq for OnoroCmp<'a, T> {}
 
 #[template]
 #[rstest]
-fn onoro_factory(#[values(Onoro16Factory)] factory: impl OnoroFactory) {}
+fn onoro_factory(#[values(Onoro16Factory, AiOnoroFactory)] factory: impl OnoroFactory) {}
 
 fn all_moves<T: Onoro + Clone>(onoro: &T) -> Vec<T> {
   onoro
