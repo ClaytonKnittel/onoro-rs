@@ -6,23 +6,22 @@ use std::{
 use abstract_game::{GameIterator, GameMoveGenerator};
 use algebra::group::Group;
 use itertools::interleave;
+use onoro::{
+  Color, Colored, Onoro, OnoroPawn, PawnColor, TileState,
+  error::OnoroResult,
+  groups::{C2, D3, D6, K4},
+  hex_pos::{HexPos, HexPosOffset},
+  make_onoro_error,
+};
 use union_find::ConstUnionFind;
 
 use crate::{
-  canonicalize::{board_symm_state, BoardSymmetryState},
-  groups::{C2, D3, D6, K4},
-  make_onoro_error,
-  util::broadcast_u8_to_u64,
-  Color, Colored, Onoro, OnoroPawn, PawnColor, TileState,
-};
-
-use super::{
-  error::OnoroResult,
-  hex_pos::{HexPos, HexPosOffset},
+  canonicalize::{BoardSymmetryState, board_symm_state},
+  r#move::Move,
   onoro_state::OnoroState,
   packed_hex_pos::PackedHexPos,
   packed_idx::{IdxOffset, PackedIdx},
-  r#move::Move,
+  util::broadcast_u8_to_u64,
 };
 
 /// For move generation, the number of bits to use per-tile (for counting
@@ -435,7 +434,7 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroImpl<N, N2
       .pawn_poses
       .iter()
       .enumerate()
-      .find(|(_, &pos)| pos == idx)
+      .find(|&(_, &pos)| pos == idx)
     {
       Some((idx, _)) => {
         if idx % 2 == 0 {
@@ -1102,7 +1101,9 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> GameMoveGenerat
 
 #[cfg(test)]
 mod tests {
-  use crate::{onoro_defs::Onoro8, packed_idx::PackedIdx, Onoro};
+  use onoro::Onoro;
+
+  use crate::{onoro_defs::Onoro8, packed_idx::PackedIdx};
 
   #[test]
   fn test_get_tile() {

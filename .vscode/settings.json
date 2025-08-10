@@ -7,7 +7,8 @@
     "./cooperate/Cargo.toml",
     "./server/Cargo.toml",
     "./simple_onoro/Cargo.toml",
-    "./onoro/Cargo.toml"
+    "./onoro/Cargo.toml",
+    "./onoro_impl/Cargo.toml"
   ],
   "rust-analyzer.check.command": "clippy"
 }

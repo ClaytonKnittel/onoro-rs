@@ -1,3 +1,4 @@
+use onoro_impl::Onoro16;
 use serde::Deserialize;
 use std::time::Duration;
 
@@ -5,7 +6,7 @@ use async_sockets::{
   AsyncSocket, AsyncSocketContext, AsyncSocketEmitters, AsyncSocketListeners, AsyncSocketOptions,
   AsyncSocketResponders, Status,
 };
-use onoro::{Onoro, Onoro16};
+use onoro::Onoro;
 use tokio::task::JoinHandle;
 
 use crate::proto::GameStateProto;

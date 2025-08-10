@@ -1,10 +1,13 @@
-use crate::{
-  groups::{SymmetryClass, D6},
-  util::{max_u32, min_u32, unreachable},
-  Onoro, OnoroImpl,
+use onoro::{
+  Onoro,
+  groups::{D6, SymmetryClass},
+  hex_pos::HexPosOffset,
 };
 
-use super::hex_pos::HexPosOffset;
+use crate::{
+  OnoroImpl,
+  util::{max_u32, min_u32, unreachable},
+};
 
 /// Describes the layout of the game state, and provides enough information to
 /// canonicalize the state for hash computation.
@@ -332,11 +335,13 @@ mod tests {
 
   use algebra::semigroup::Semigroup;
   use itertools::Itertools;
-
-  use crate::{
-    canonicalize::{board_symm_state_op_to_com_offset, symm_state_class, symm_state_op, COMOffset},
-    groups::{SymmetryClass, D6},
+  use onoro::{
+    groups::{D6, SymmetryClass},
     hex_pos::HexPosOffset,
+  };
+
+  use crate::canonicalize::{
+    COMOffset, board_symm_state_op_to_com_offset, symm_state_class, symm_state_op,
   };
 
   struct PawnsConfig {
