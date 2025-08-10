@@ -157,11 +157,11 @@ pub trait Onoro: Sized {
       game.make_move_unchecked(Self::Move::make_phase1(Self::Index::from_coords(
         mid_idx, mid_idx,
       )));
+      game.make_move_unchecked(Self::Move::make_phase1(Self::Index::from_coords(
+        mid_idx + 1,
+        mid_idx + 1,
+      )));
     }
-    game.make_move(Self::Move::make_phase1(Self::Index::from_coords(
-      mid_idx + 1,
-      mid_idx + 1,
-    )));
     game.make_move(Self::Move::make_phase1(Self::Index::from_coords(
       mid_idx + 1,
       mid_idx,
@@ -176,11 +176,8 @@ pub trait Onoro: Sized {
     } = pawns_from_board_string(board_layout, 2 * Self::pawns_per_player())?;
 
     let mut game = unsafe { Self::new() };
-    unsafe {
-      game.make_move_unchecked(Self::Move::make_phase1(black_pawns[0]));
-    }
-    for pos in interleave(white_pawns, black_pawns.into_iter().skip(1)) {
-      game.make_move(Self::Move::make_phase1(pos));
+    for pos in interleave(black_pawns, white_pawns) {
+      unsafe { game.make_move_unchecked(Self::Move::make_phase1(pos)) };
     }
 
     Ok(game)
