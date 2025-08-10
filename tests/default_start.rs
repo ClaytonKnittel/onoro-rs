@@ -1,4 +1,4 @@
-use googletest::{expect_eq, expect_that, gtest, prelude::none};
+use googletest::{expect_eq, expect_that, expect_true, gtest, prelude::none};
 use itertools::Itertools;
 use onoro::{Onoro, OnoroPawn, PawnColor};
 use rstest::rstest;
@@ -35,4 +35,10 @@ fn test_pawns(onoro: impl Onoro) {
   for pawn in pawns {
     expect_eq!(onoro.get_tile(pawn.pos()), pawn.color().into());
   }
+}
+
+#[apply(default_start)]
+#[gtest]
+fn test_in_phase1(onoro: impl Onoro) {
+  expect_true!(onoro.in_phase1());
 }
