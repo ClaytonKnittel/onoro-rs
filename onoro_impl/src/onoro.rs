@@ -382,6 +382,14 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroImpl<N, N2
   fn check_win_fast(pawn_poses: &[PackedIdx; N], last_move: HexPos, black_turn: bool) -> bool {
     debug_assert_eq!(N, 16);
 
+    const LSB_ONES: u64 = 0x0101_0101_0101_0101;
+    const MSB_ONES: u64 = 0x8080_8080_8080_8080;
+
+    const IDX_OFFSET: u32 = 2;
+    const IDX_TRANSLATE: u64 = LSB_ONES * IDX_OFFSET as u64;
+
+    const SELECT_X_MASK: u64 = 0x0f0f_0f0f_0f0f_0f0f;
+
     #[cfg(target_endian = "little")]
     const MASK: u64 = 0x00ff00ff_00ff00ff;
     #[cfg(target_endian = "big")]
@@ -403,15 +411,12 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroImpl<N, N2
 
     let all_pawns = low_positions | hi_positions;
 
-    let pawns_x = (all_pawns & 0x0f0f_0f0f_0f0f_0f0f) + 0x0202_0202_0202_0202;
-    let pawns_y = ((all_pawns >> 4) & 0x0f0f_0f0f_0f0f_0f0f) + 0x0202_0202_0202_0202;
-    let pawns_delta = pawns_x + 0x0f0f_0f0f_0f0f_0f0f - pawns_y;
+    let pawns_x = (all_pawns & SELECT_X_MASK) + IDX_TRANSLATE;
+    let pawns_y = ((all_pawns >> 4) & SELECT_X_MASK) + IDX_TRANSLATE;
+    let pawns_delta = pawns_x + SELECT_X_MASK - pawns_y;
 
     // bitmask of 0xff in byte if that byte = needle in byte_vec, 0 otherwise
     let equal_mask = |byte_vec: u64, needle: u8| -> u64 {
-      const LSB_ONES: u64 = 0x0101_0101_0101_0101;
-      const MSB_ONES: u64 = 0x8080_8080_8080_8080;
-
       debug_assert_eq!(byte_vec & MSB_ONES, 0);
 
       let search_mask = broadcast_u8_to_u64(needle);
@@ -422,8 +427,8 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroImpl<N, N2
       (diff >> 7) * 0xff
     };
 
-    let x_equal_mask = equal_mask(pawns_x, (last_move.x() + 2) as u8);
-    let y_equal_mask = equal_mask(pawns_y, (last_move.y() + 2) as u8);
+    let x_equal_mask = equal_mask(pawns_x, (last_move.x() + IDX_OFFSET) as u8);
+    let y_equal_mask = equal_mask(pawns_y, (last_move.y() + IDX_OFFSET) as u8);
     let delta_equal_mask = equal_mask(pawns_delta, (last_move.x() + 0xf - last_move.y()) as u8);
 
     let broadcast_to_bit_indices = |byte_vec: u64| -> u64 {
@@ -447,13 +452,13 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroImpl<N, N2
 
   pub(crate) fn check_win(&self, last_move: HexPos) -> bool {
     if N != 16 {
-      return self.check_win_old(last_move);
+      return self.check_win_slow(last_move);
     }
 
     Self::check_win_fast(&self.pawn_poses, last_move, self.onoro_state().black_turn())
   }
 
-  pub(crate) fn check_win_old(&self, last_move: HexPos) -> bool {
+  pub(crate) fn check_win_slow(&self, last_move: HexPos) -> bool {
     // Bitvector of positions occupied by pawns of this color along the 3 lines
     // extending out from last_move. Intentionally leave a zero bit between each
     // of the 3 sets so they can't form a continuous string of 1's across
