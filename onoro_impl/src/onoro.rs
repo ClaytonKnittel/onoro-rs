@@ -380,6 +380,72 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroImpl<N, N2
   }
 
   pub(crate) fn check_win(&self, last_move: HexPos) -> bool {
+    let mut s = 0;
+
+    if N != 16 {
+      return self.check_win_old(last_move);
+    }
+
+    let black_turn = self.onoro_state().black_turn();
+
+    #[cfg(target_endian = "little")]
+    const MASK: u64 = 0x00ff00ff_00ff00ff;
+    #[cfg(target_endian = "big")]
+    const MASK: u64 = 0xff00ff00_ff00ff00;
+    let mask = -(black_turn as i64) as u64 ^ MASK;
+
+    let align_to_mask = |array: &[PackedIdx]| -> u64 {
+      let positions = unsafe { *(array.as_ptr() as *const u64) };
+      let positions = positions & mask;
+      positions >> (black_turn as u32 * 8)
+    };
+
+    let low_positions = align_to_mask(&self.pawn_poses[0..8]);
+    let low_positions = (low_positions | (low_positions >> 24)) & 0x00000000_ffffffff;
+
+    let hi_positions = align_to_mask(&self.pawn_poses[8..16]);
+    let hi_positions = (hi_positions | (hi_positions << 40)) & 0xffffffff_00000000;
+
+    let all_pawns = low_positions | hi_positions;
+
+    let pawns_x = all_pawns & 0x0f0f_0f0f_0f0f_0f0f;
+    let pawns_y = all_pawns & 0xf0f0_f0f0_f0f0_f0f0;
+
+    let last_x = broadcast_u8_to_u64(last_move.x() as u8);
+    debug_assert_eq!(last_x & 0xf0f0_f0f0_f0f0_f0f0, 0);
+    let diff = !(pawns_x ^ last_x) & !0x8080_8080_8080_8080;
+    let diff = (diff + 0x0101_0101_0101_0101) & 0x8080_8080_8080_8080;
+    // bitmask of 0xff in byte if x-coords equal, 0 otherwise
+    let diff = (diff >> 7) * 0xff;
+
+    // Unsafe pawn iteration: rely on the fact that idx_t::null_idx() will not
+    // complete a line in the first phase of the game (can't reach the border
+    // without being able to move pawns), and for phase two, all pawns are
+    // placed, so this is safe.
+    for i in (0..N)
+      // If it is currently the black player's turn, then white placed the last
+      // piece at `last_move`, so check if white is winning. Otherwise, check if
+      // black is winning.
+      .skip(self.onoro_state().black_turn() as usize)
+      .step_by(2)
+    {
+      let pos: HexPos = unsafe { *self.pawn_poses.get_unchecked(i) }.into();
+      let delta = pos - last_move;
+      let dx = delta.x();
+      let dy = delta.y();
+
+      s |= if dy == 0 { 0x1u64 } else { 0 } << pos.x();
+      s |= if dx == dy { 0x20000u64 } else { 0 } << cmp::min(pos.x(), pos.y());
+      s |= if dx == 0 { 0x400000000u64 } else { 0 } << pos.y();
+    }
+
+    // Check if any 4 bits in a row are set:
+    s = s & (s << 2);
+    s = s & (s << 1);
+    s != 0
+  }
+
+  pub(crate) fn check_win_old(&self, last_move: HexPos) -> bool {
     // Bitvector of positions occupied by pawns of this color along the 3 lines
     // extending out from last_move. Intentionally leave a zero bit between each
     // of the 3 sets so they can't form a continuous string of 1's across
