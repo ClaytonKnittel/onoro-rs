@@ -1,13 +1,14 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt::Debug};
 
-use onoro::{Onoro, OnoroIndex, OnoroMove, OnoroPawn, PawnColor, TileState};
+use onoro::{Onoro, OnoroIndex, OnoroMove, OnoroMoveWrapper, OnoroPawn, PawnColor, TileState};
 
+#[derive(Clone)]
 struct Pos {
   x: i32,
   y: i32,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Index {}
 
 impl OnoroIndex for Index {
@@ -24,17 +25,23 @@ impl OnoroIndex for Index {
   }
 }
 
+#[derive(Clone, Debug)]
 pub struct Move {}
 
-impl OnoroMove<Index> for Move {
+impl OnoroMove for Move {
+  type Index = Index;
+
   fn make_phase1(pos: Index) -> Self {
     todo!()
   }
 }
 
+#[derive(Clone, Debug)]
 pub struct Pawn {}
 
-impl OnoroPawn<Index> for Pawn {
+impl OnoroPawn for Pawn {
+  type Index = Index;
+
   fn pos(&self) -> Index {
     todo!()
   }
@@ -44,6 +51,7 @@ impl OnoroPawn<Index> for Pawn {
   }
 }
 
+#[derive(Clone)]
 pub struct SimpleOnoro {
   positions: HashMap<Pos, Pawn>,
 }
@@ -93,5 +101,15 @@ impl Onoro for SimpleOnoro {
 
   fn make_move(&mut self, m: Move) {
     todo!()
+  }
+
+  fn to_move_wrapper(&self, m: &Self::Move) -> OnoroMoveWrapper<Self::Index> {
+    todo!()
+  }
+}
+
+impl Debug for SimpleOnoro {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    self.display(f)
   }
 }

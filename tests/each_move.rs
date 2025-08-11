@@ -3,8 +3,8 @@ use std::collections::HashMap;
 use googletest::{expect_that, gtest, prelude::unordered_elements_are};
 use itertools::Itertools;
 use onoro::{
-  error::{OnoroError, OnoroResult},
   Onoro, OnoroIndex, OnoroMoveWrapper, OnoroPawn, PawnColor,
+  error::{OnoroError, OnoroResult},
 };
 use rstest::rstest;
 use rstest_reuse::{apply, template};
@@ -30,6 +30,11 @@ impl OnoroFactory for AiOnoroFactory {
   type T = ai_gen_onoro::OnoroGame;
 }
 
+struct SimpleOnoroFactory;
+impl OnoroFactory for SimpleOnoroFactory {
+  type T = simple_onoro::SimpleOnoro;
+}
+
 struct Phase2Move<Index: OnoroIndex> {
   from: Index,
   to: Index,
@@ -37,7 +42,10 @@ struct Phase2Move<Index: OnoroIndex> {
 
 #[template]
 #[rstest]
-fn onoro_factory(#[values(Onoro16Factory, AiOnoroFactory)] factory: impl OnoroFactory) {}
+fn onoro_factory(
+  #[values(Onoro16Factory, AiOnoroFactory, SimpleOnoroFactory)] factory: impl OnoroFactory,
+) {
+}
 
 type NeighborColors = Vec<PawnColor>;
 

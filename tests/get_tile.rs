@@ -1,6 +1,6 @@
 use googletest::{expect_true, gtest};
 use itertools::Itertools;
-use onoro::{test_util::BOARD_POSITIONS, Onoro, OnoroIndex, OnoroPawn};
+use onoro::{Onoro, OnoroIndex, OnoroPawn, test_util::BOARD_POSITIONS};
 use rstest::rstest;
 use rstest_reuse::{apply, template};
 use std::collections::HashMap;
@@ -33,6 +33,18 @@ fn many_positions(
     ai_gen_onoro::OnoroGame::from_board_string(BOARD_POSITIONS[9]).unwrap(),
     ai_gen_onoro::OnoroGame::from_board_string(BOARD_POSITIONS[10]).unwrap(),
     ai_gen_onoro::OnoroGame::from_board_string(BOARD_POSITIONS[11]).unwrap(),
+    simple_onoro::SimpleOnoro::from_board_string(BOARD_POSITIONS[0]).unwrap(),
+    simple_onoro::SimpleOnoro::from_board_string(BOARD_POSITIONS[1]).unwrap(),
+    simple_onoro::SimpleOnoro::from_board_string(BOARD_POSITIONS[2]).unwrap(),
+    simple_onoro::SimpleOnoro::from_board_string(BOARD_POSITIONS[3]).unwrap(),
+    simple_onoro::SimpleOnoro::from_board_string(BOARD_POSITIONS[4]).unwrap(),
+    simple_onoro::SimpleOnoro::from_board_string(BOARD_POSITIONS[5]).unwrap(),
+    simple_onoro::SimpleOnoro::from_board_string(BOARD_POSITIONS[6]).unwrap(),
+    simple_onoro::SimpleOnoro::from_board_string(BOARD_POSITIONS[7]).unwrap(),
+    simple_onoro::SimpleOnoro::from_board_string(BOARD_POSITIONS[8]).unwrap(),
+    simple_onoro::SimpleOnoro::from_board_string(BOARD_POSITIONS[9]).unwrap(),
+    simple_onoro::SimpleOnoro::from_board_string(BOARD_POSITIONS[10]).unwrap(),
+    simple_onoro::SimpleOnoro::from_board_string(BOARD_POSITIONS[11]).unwrap(),
   )]
   onoro: impl Onoro,
 ) {

@@ -801,6 +801,7 @@ dependencies = [
  "rayon",
  "rstest",
  "rstest_reuse",
+ "simple_onoro",
 ]
 
 [[package]]
@@ -1263,6 +1264,13 @@ dependencies = [
  "memchr",
  "ryu",
  "serde",
+]
+
+[[package]]
+name = "simple_onoro"
+version = "0.1.0"
+dependencies = [
+ "onoro",
 ]
 
 [[package]]

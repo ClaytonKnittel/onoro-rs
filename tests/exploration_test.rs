@@ -1,10 +1,10 @@
 use googletest::{assert_that, gtest, prelude::container_eq};
 use onoro::{
-  error::{OnoroError, OnoroResult},
-  test_util::{normalized_ordered_moves, OnoroCmp, OnoroFactory, BOARD_POSITIONS},
   Onoro,
+  error::{OnoroError, OnoroResult},
+  test_util::{BOARD_POSITIONS, OnoroCmp, OnoroFactory, normalized_ordered_moves},
 };
-use rand::{rngs::StdRng, Rng, SeedableRng};
+use rand::{Rng, SeedableRng, rngs::StdRng};
 use rstest::rstest;
 use rstest_reuse::{apply, template};
 
@@ -18,11 +18,20 @@ impl OnoroFactory for AiOnoroFactory {
   type T = ai_gen_onoro::OnoroGame;
 }
 
+struct SimpleOnoroFactory;
+impl OnoroFactory for SimpleOnoroFactory {
+  type T = simple_onoro::SimpleOnoro;
+}
+
 #[template]
 #[rstest]
 #[rustfmt::skip]
 fn onoro_pairs(
-  #[values((Onoro16Factory, AiOnoroFactory))] factories: (impl OnoroFactory, impl OnoroFactory),
+  #[values(
+    (Onoro16Factory, AiOnoroFactory),
+    (Onoro16Factory, SimpleOnoroFactory),
+  )]
+  factories: (impl OnoroFactory, impl OnoroFactory),
   #[values(
     BOARD_POSITIONS[0],
     BOARD_POSITIONS[1],

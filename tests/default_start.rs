@@ -9,7 +9,8 @@ use rstest_reuse::{apply, template};
 fn default_start(
   #[values(
     onoro_impl::Onoro16::default_start(),
-    ai_gen_onoro::OnoroGame::default_start()
+    ai_gen_onoro::OnoroGame::default_start(),
+    simple_onoro::SimpleOnoro::default_start()
   )]
   onoro: impl Onoro,
 ) {

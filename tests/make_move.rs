@@ -1,9 +1,9 @@
 use googletest::{expect_that, gtest, prelude::unordered_elements_are};
 use itertools::Itertools;
 use onoro::{
+  Onoro,
   error::OnoroResult,
   test_util::{OnoroCmp, OnoroFactory},
-  Onoro,
 };
 use rstest::rstest;
 use rstest_reuse::{apply, template};
@@ -18,9 +18,17 @@ impl OnoroFactory for AiOnoroFactory {
   type T = ai_gen_onoro::OnoroGame;
 }
 
+struct SimpleOnoroFactory;
+impl OnoroFactory for SimpleOnoroFactory {
+  type T = simple_onoro::SimpleOnoro;
+}
+
 #[template]
 #[rstest]
-fn onoro_factory(#[values(Onoro16Factory, AiOnoroFactory)] factory: impl OnoroFactory) {}
+fn onoro_factory(
+  #[values(Onoro16Factory, AiOnoroFactory, SimpleOnoroFactory)] factory: impl OnoroFactory,
+) {
+}
 
 fn all_moves<T: Onoro + Clone>(onoro: &T) -> Vec<T> {
   onoro
