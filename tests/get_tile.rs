@@ -1,106 +1,9 @@
 use googletest::{expect_true, gtest};
 use itertools::Itertools;
-use onoro::{Onoro, OnoroIndex, OnoroPawn};
+use onoro::{test_util::BOARD_POSITIONS, Onoro, OnoroIndex, OnoroPawn};
 use rstest::rstest;
 use rstest_reuse::{apply, template};
 use std::collections::HashMap;
-
-const BOARD_POSITIONS: [&str; 10] = [
-  ". . . . . . . 
-    . . W . . . . 
-     . W W B B B . 
-      . . . . W . . 
-       . . . . W . . 
-        . . . B B . . 
-         . . . B B . . 
-          . . . . W . . 
-           . . . . W . . 
-            . . . B W . . 
-             . . . . . . .",
-  ". . . . . . . . . . . 
-    . . . . . . . . B W . 
-     . . B B . . B W W W . 
-      . . W . . W B . . . . 
-       . . B . B . . . . . . 
-        . B W W . . . . . . . 
-         . . . . . . . . . . .",
-  ". . . . . . . . . . . . 
-    . . . . . . . . . W W . 
-     . . . . . . . . . W . . 
-      . . . . . B W . B . . . 
-       . . . . . W B . B . . . 
-        . . . . W . B W . . . . 
-         . . . W . . . . . . . . 
-          . . B . . . . . . . . . 
-           . B B . . . . . . . . . 
-            . . . . . . . . . . . .",
-  ". . . . . . . . . . . . 
-    . . . . . . . . . . B . 
-     . . . . . . . W B W W . 
-      . . . . . B B . . . . . 
-       . . . W W . . . . . . . 
-        . . B . W . . . . . . . 
-         . B W . B B . . . . . . 
-          . . . . W . . . . . . . 
-           . . . . . . . . . . . .",
-  ". . . . . . . . 
-    . . . . . W . . 
-     . . . . B B B . 
-      . . B W . B . . 
-       . . W . W . B . 
-        . B W . B W W . 
-         . . . . . W . . 
-          . . . . . . . .",
-  ". . . . . . . . . . . 
-    . . . . . . . . . W . 
-     . . . B W . . . W B . 
-      . . W . W . B W . . . 
-       . B B B . . W . . . . 
-        . . . B B W . . . . . 
-         . . . . . . . . . . .",
-  ". . . . . . . . . . . 
-    . . . . . . . . W B . 
-     . . . . . . . B W . . 
-      . . . . . . . B . . . 
-       . . W . . . . W . . . 
-        . B W . . . B . . . . 
-         . . W B B W B . . . . 
-          . . . . W . . . . . . 
-           . . . . . . . . . . .",
-  ". . . . . . . 
-    . . . . . W . 
-     . . . . W W . 
-      . B W B . . . 
-       . B B W W . . 
-        . . . B . . . 
-         . . . B . . . 
-          . . . W B B . 
-           . . . . W . . 
-            . . . . . . .",
-  ". . . . . . . . . . . . 
-    . . . . . . . . . W W . 
-     . . . . . . . . B B . . 
-      . . . . . . W B W . . . 
-       . . . . . B . B . . . . 
-        . . . . . B . . . . . . 
-         . . . W W B . . . . . . 
-          . B W . . . . . . . . . 
-           . W . . . . . . . . . . 
-            . . . . . . . . . . . .",
-  ". . . . . . 
-    . . . B . . 
-     . . W W W . 
-      . . . B . . 
-       . . B B . . 
-        . . B . . . 
-         . . W B . . 
-          . . . W . . 
-           . . . W . . 
-            . . B . . . 
-             . . B . . . 
-              . W W . . . 
-               . . . . . .",
-];
 
 #[template]
 #[rstest]
@@ -116,6 +19,20 @@ fn many_positions(
     onoro_impl::Onoro16::from_board_string(BOARD_POSITIONS[7]).unwrap(),
     onoro_impl::Onoro16::from_board_string(BOARD_POSITIONS[8]).unwrap(),
     onoro_impl::Onoro16::from_board_string(BOARD_POSITIONS[9]).unwrap(),
+    onoro_impl::Onoro16::from_board_string(BOARD_POSITIONS[10]).unwrap(),
+    onoro_impl::Onoro16::from_board_string(BOARD_POSITIONS[11]).unwrap(),
+    ai_gen_onoro::OnoroGame::from_board_string(BOARD_POSITIONS[0]).unwrap(),
+    ai_gen_onoro::OnoroGame::from_board_string(BOARD_POSITIONS[1]).unwrap(),
+    ai_gen_onoro::OnoroGame::from_board_string(BOARD_POSITIONS[2]).unwrap(),
+    ai_gen_onoro::OnoroGame::from_board_string(BOARD_POSITIONS[3]).unwrap(),
+    ai_gen_onoro::OnoroGame::from_board_string(BOARD_POSITIONS[4]).unwrap(),
+    ai_gen_onoro::OnoroGame::from_board_string(BOARD_POSITIONS[5]).unwrap(),
+    ai_gen_onoro::OnoroGame::from_board_string(BOARD_POSITIONS[6]).unwrap(),
+    ai_gen_onoro::OnoroGame::from_board_string(BOARD_POSITIONS[7]).unwrap(),
+    ai_gen_onoro::OnoroGame::from_board_string(BOARD_POSITIONS[8]).unwrap(),
+    ai_gen_onoro::OnoroGame::from_board_string(BOARD_POSITIONS[9]).unwrap(),
+    ai_gen_onoro::OnoroGame::from_board_string(BOARD_POSITIONS[10]).unwrap(),
+    ai_gen_onoro::OnoroGame::from_board_string(BOARD_POSITIONS[11]).unwrap(),
   )]
   onoro: impl Onoro,
 ) {

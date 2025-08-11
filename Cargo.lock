@@ -43,6 +43,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "ai_gen_onoro"
+version = "0.1.0"
+dependencies = [
+ "itertools 0.14.0",
+ "onoro",
+]
+
+[[package]]
 name = "algebra"
 version = "0.1.0"
 
@@ -779,6 +787,7 @@ name = "onoro-rs"
 version = "0.1.0"
 dependencies = [
  "abstract_game",
+ "ai_gen_onoro",
  "cooperate",
  "criterion",
  "dashmap",

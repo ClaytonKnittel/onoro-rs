@@ -26,4 +26,4 @@ macro_rules! make_onoro_error {
   };
 }
 
-pub type OnoroResult<T> = Result<T, Box<dyn Error + Send + Sync + 'static>>;
+pub type OnoroResult<T = ()> = Result<T, Box<dyn Error + Send + Sync + 'static>>;

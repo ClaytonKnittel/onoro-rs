@@ -1,3 +1,5 @@
+use std::fmt::Debug;
+
 use itertools::interleave;
 
 use crate::{
@@ -28,7 +30,7 @@ impl From<PawnColor> for TileState {
   }
 }
 
-pub trait OnoroIndex {
+pub trait OnoroIndex: Clone + Copy + Eq + Debug {
   /// Constructs an index from raw coordinates. Will only be called when
   /// constructing a starting position.
   ///
@@ -42,6 +44,13 @@ pub trait OnoroIndex {
   /// Returns the y-coordinate of the index. The value is only meaningful
   /// relative to other indexes.
   fn y(&self) -> i32;
+
+  /// Returns true if two indices are adjacent on the board.
+  fn adjacent(&self, other: Self) -> bool {
+    let dx = self.x() - other.x();
+    let dy = self.y() - other.y();
+    (-1..=1).contains(&dx) && (-1..=1).contains(&dy) && dx * dy != -1
+  }
 
   fn neighbors(&self) -> impl Iterator<Item = Self>
   where
@@ -61,22 +70,54 @@ pub trait OnoroIndex {
   }
 }
 
-pub trait OnoroMove<Index: OnoroIndex> {
-  fn make_phase1(pos: Index) -> Self;
+impl OnoroIndex for (i32, i32) {
+  fn from_coords(x: u32, y: u32) -> Self {
+    (x as i32, y as i32)
+  }
+
+  fn x(&self) -> i32 {
+    self.0
+  }
+
+  fn y(&self) -> i32 {
+    self.1
+  }
 }
 
-pub trait OnoroPawn<Index: OnoroIndex> {
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum OnoroMoveWrapper<Index: OnoroIndex> {
+  Phase1 { to: Index },
+  Phase2 { from: Index, to: Index },
+}
+
+impl<Index: OnoroIndex> OnoroMove for OnoroMoveWrapper<Index> {
+  type Index = Index;
+
+  fn make_phase1(pos: Index) -> Self {
+    Self::Phase1 { to: pos }
+  }
+}
+
+pub trait OnoroMove: Clone {
+  type Index: OnoroIndex;
+
+  fn make_phase1(pos: Self::Index) -> Self;
+}
+
+pub trait OnoroPawn {
+  type Index: OnoroIndex;
+
   /// The position of this pawn on the board.
-  fn pos(&self) -> Index;
+  fn pos(&self) -> Self::Index;
 
   /// The color of this pawn.
   fn color(&self) -> PawnColor;
 }
 
 pub trait Onoro: Sized {
-  type Index: OnoroIndex + Copy;
-  type Move: OnoroMove<Self::Index>;
-  type Pawn: OnoroPawn<Self::Index>;
+  type Index: OnoroIndex;
+  type Move: OnoroMove<Index = Self::Index>;
+  type Pawn: OnoroPawn<Index = Self::Index>;
 
   /// Initializes an empty game. This should not be called outside the `Onoro`
   /// trait.
@@ -137,6 +178,9 @@ pub trait Onoro: Sized {
   unsafe fn make_move_unchecked(&mut self, m: Self::Move) {
     self.make_move(m);
   }
+
+  /// Only used in tests.
+  fn to_move_wrapper(&self, m: &Self::Move) -> OnoroMoveWrapper<Self::Index>;
 
   /// Returns the width of the game board, e.g. the maximum distance between
   /// two pawns in any legal board configuration.

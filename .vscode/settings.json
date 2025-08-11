@@ -2,6 +2,7 @@
   "rust-analyzer.linkedProjects": [
     "./Cargo.toml",
     "./algebra/Cargo.toml",
+    "./ai_gen_onoro/Cargo.toml",
     "./abstract_game/Cargo.toml",
     "./cardinality_estimate/Cargo.toml",
     "./cooperate/Cargo.toml",

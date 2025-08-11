@@ -7,6 +7,7 @@ edition = "2021"
 
 [dependencies]
 abstract_game = { path = "./abstract_game" }
+ai_gen_onoro = { path = "./ai_gen_onoro" }
 dashmap = "5.5"
 multiqueue = "0.3"
 cooperate = { path = "./cooperate" }
