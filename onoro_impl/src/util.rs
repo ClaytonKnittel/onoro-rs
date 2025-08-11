@@ -68,6 +68,14 @@ unsafe fn packed_positions_to_mask_sse3(packed_positions: u64) -> u64 {
     "Packed positions must be unique and non-zero: {packed_positions:#016x}"
   );
 
+  // We construct a map from index to (1 << (index - 1)) (0 if index == 0).
+  // We will be invoking _mm_shuffle_epi8, which uses these vectors as a lookup
+  // table.
+  //
+  // Since the range of bytes we support is 0 - 15, we need 2 bytes to
+  // represent (1 << (index - 1)) for all possible indices. The size of entries
+  // in the lookup table is 8 bytes, so we have two lookup tables, one holding
+  // the lower half of the masks and one holding the upper half.
   #[rustfmt::skip]
   let lo_data = _mm_set_epi8(
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x80u8 as i8,
@@ -79,17 +87,28 @@ unsafe fn packed_positions_to_mask_sse3(packed_positions: u64) -> u64 {
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
   );
 
+  // Fill the lower half of a __m128i register with the packed positions.
   let shuffle_mask = _mm_set_epi64x(0, packed_positions as i64);
+
+  // Construct masks containing the lower and upper halves of the corresponding
+  // masks for each packed position. Note that only the first 8 bytes of each
+  // will be non-zero, since `shuffle_mask` has a zero upper half.
   let lo_masks = _mm_shuffle_epi8(lo_data, shuffle_mask);
   let hi_masks = _mm_shuffle_epi8(hi_data, shuffle_mask);
 
+  // Interleave the byte of these two masks. Now, each 16-byte entry of `masks`
+  // contains a complete masks for some packed position.
   let masks = _mm_unpacklo_epi8(lo_masks, hi_masks);
 
+  // Pull out the lower and upper halves of the masks array into two u64's.
   let lo_masks = _mm_cvtsi128_si64x(masks) as u64;
   let masks = _mm_unpackhi_epi64(masks, masks);
   let hi_masks = _mm_cvtsi128_si64x(masks) as u64;
-  let masks = lo_masks + hi_masks;
 
+  // Merge all masks into a single 16-bit mask. Note that all masks are
+  // guaranteed to be unique, so we can add them instead of bitwise-or'ing
+  // them.
+  let masks = lo_masks + hi_masks;
   let masks = masks + (masks >> 16);
   let masks = masks + (masks >> 32);
   masks & 0x0000_0000_0000_ffff
