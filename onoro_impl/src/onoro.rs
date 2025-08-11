@@ -379,14 +379,8 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroImpl<N, N2
     offset
   }
 
-  pub(crate) fn check_win(&self, last_move: HexPos) -> bool {
-    let mut s = 0;
-
-    if N != 16 {
-      return self.check_win_old(last_move);
-    }
-
-    let black_turn = self.onoro_state().black_turn();
+  fn check_win_fast(pawn_poses: &[PackedIdx; N], last_move: HexPos, black_turn: bool) -> bool {
+    debug_assert_eq!(N, 16);
 
     #[cfg(target_endian = "little")]
     const MASK: u64 = 0x00ff00ff_00ff00ff;
@@ -400,49 +394,62 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroImpl<N, N2
       positions >> (black_turn as u32 * 8)
     };
 
-    let low_positions = align_to_mask(&self.pawn_poses[0..8]);
+    let low_positions = align_to_mask(&pawn_poses[0..8]);
     let low_positions = (low_positions | (low_positions >> 24)) & 0x00000000_ffffffff;
 
-    let hi_positions = align_to_mask(&self.pawn_poses[8..16]);
+    let hi_positions = align_to_mask(&pawn_poses[8..16]);
     let hi_positions = (hi_positions | (hi_positions << 40)) & 0xffffffff_00000000;
 
     let all_pawns = low_positions | hi_positions;
 
     let pawns_x = all_pawns & 0x0f0f_0f0f_0f0f_0f0f;
-    let pawns_y = all_pawns & 0xf0f0_f0f0_f0f0_f0f0;
+    let pawns_y = (all_pawns >> 4) & 0x0f0f_0f0f_0f0f_0f0f;
+    let pawns_delta = pawns_x + 0x0f0f_0f0f_0f0f_0f0f - pawns_y;
 
-    let last_x = broadcast_u8_to_u64(last_move.x() as u8);
-    debug_assert_eq!(last_x & 0xf0f0_f0f0_f0f0_f0f0, 0);
-    let diff = !(pawns_x ^ last_x) & !0x8080_8080_8080_8080;
-    let diff = (diff + 0x0101_0101_0101_0101) & 0x8080_8080_8080_8080;
-    // bitmask of 0xff in byte if x-coords equal, 0 otherwise
-    let diff = (diff >> 7) * 0xff;
+    // bitmask of 0xff in byte if that byte = needle in byte_vec, 0 otherwise
+    let equal_mask = |byte_vec: u64, needle: u8| -> u64 {
+      const LSB_ONES: u64 = 0x0101_0101_0101_0101;
+      const MSB_ONES: u64 = 0x8080_8080_8080_8080;
 
-    // Unsafe pawn iteration: rely on the fact that idx_t::null_idx() will not
-    // complete a line in the first phase of the game (can't reach the border
-    // without being able to move pawns), and for phase two, all pawns are
-    // placed, so this is safe.
-    for i in (0..N)
-      // If it is currently the black player's turn, then white placed the last
-      // piece at `last_move`, so check if white is winning. Otherwise, check if
-      // black is winning.
-      .skip(self.onoro_state().black_turn() as usize)
-      .step_by(2)
-    {
-      let pos: HexPos = unsafe { *self.pawn_poses.get_unchecked(i) }.into();
-      let delta = pos - last_move;
-      let dx = delta.x();
-      let dy = delta.y();
+      debug_assert_eq!(byte_vec & MSB_ONES, 0);
 
-      s |= if dy == 0 { 0x1u64 } else { 0 } << pos.x();
-      s |= if dx == dy { 0x20000u64 } else { 0 } << cmp::min(pos.x(), pos.y());
-      s |= if dx == 0 { 0x400000000u64 } else { 0 } << pos.y();
-    }
+      let search_mask = broadcast_u8_to_u64(needle);
+      debug_assert_eq!(search_mask & MSB_ONES, 0);
+
+      let diff = !(byte_vec ^ search_mask) & !MSB_ONES;
+      let diff = (diff + LSB_ONES) & MSB_ONES;
+      (diff >> 7) * 0xff
+    };
+
+    let x_equal_mask = equal_mask(pawns_x, last_move.x() as u8);
+    let y_equal_mask = equal_mask(pawns_y, last_move.y() as u8);
+    let delta_equal_mask = equal_mask(pawns_delta, (last_move.x() + 0xf - last_move.y()) as u8);
+
+    let broadcast_to_bit_indices = |byte_vec: u64| -> u64 {
+      let mut result = 0;
+      for byte in byte_vec.to_ne_bytes() {
+        result |= 1u64 << byte;
+      }
+      result
+    };
+
+    let y_in_a_row = broadcast_to_bit_indices(x_equal_mask & pawns_y);
+    let x_in_a_row = broadcast_to_bit_indices(y_equal_mask & pawns_x);
+    let xy_in_a_row = broadcast_to_bit_indices(delta_equal_mask & pawns_x);
+    let all_in_a_row = x_in_a_row | (y_in_a_row << 17) | (xy_in_a_row << 34);
 
     // Check if any 4 bits in a row are set:
-    s = s & (s << 2);
-    s = s & (s << 1);
-    s != 0
+    let all_in_a_row = all_in_a_row & (all_in_a_row >> 1);
+    let all_in_a_row = all_in_a_row & (all_in_a_row >> 2);
+    all_in_a_row != 0
+  }
+
+  pub(crate) fn check_win(&self, last_move: HexPos) -> bool {
+    if N != 16 {
+      return self.check_win_old(last_move);
+    }
+
+    Self::check_win_fast(&self.pawn_poses, last_move, self.onoro_state().black_turn())
   }
 
   pub(crate) fn check_win_old(&self, last_move: HexPos) -> bool {
@@ -1192,9 +1199,10 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> GameMoveGenerat
 
 #[cfg(test)]
 mod tests {
-  use onoro::Onoro;
+  use googletest::{expect_false, expect_true, gtest};
+  use onoro::{Onoro, hex_pos::HexPos};
 
-  use crate::{onoro_defs::Onoro8, packed_idx::PackedIdx};
+  use crate::{Onoro16, onoro_defs::Onoro8, packed_idx::PackedIdx};
 
   #[test]
   fn test_get_tile() {
@@ -1208,5 +1216,110 @@ mod tests {
         );
       }
     }
+  }
+
+  #[gtest]
+  fn test_check_win_simple() {
+    let mut pawn_poses: [PackedIdx; 16] = [PackedIdx::null(); 16];
+    pawn_poses[0] = PackedIdx::new(5, 5);
+    pawn_poses[2] = PackedIdx::new(6, 5);
+    pawn_poses[4] = PackedIdx::new(7, 5);
+    pawn_poses[6] = PackedIdx::new(8, 5);
+
+    expect_true!(Onoro16::check_win_fast(
+      &pawn_poses,
+      HexPos::new(6, 5),
+      false
+    ));
+  }
+
+  #[gtest]
+  fn test_check_win_hole() {
+    let mut pawn_poses: [PackedIdx; 16] = [PackedIdx::null(); 16];
+    pawn_poses[0] = PackedIdx::new(5, 5);
+    pawn_poses[2] = PackedIdx::new(6, 5);
+    pawn_poses[4] = PackedIdx::new(8, 5);
+    pawn_poses[6] = PackedIdx::new(9, 5);
+
+    expect_false!(Onoro16::check_win_fast(
+      &pawn_poses,
+      HexPos::new(6, 5),
+      false
+    ));
+  }
+
+  #[gtest]
+  fn test_check_win_wrong_row() {
+    let mut pawn_poses: [PackedIdx; 16] = [PackedIdx::null(); 16];
+    pawn_poses[0] = PackedIdx::new(5, 5);
+    pawn_poses[2] = PackedIdx::new(6, 5);
+    pawn_poses[4] = PackedIdx::new(7, 5);
+    pawn_poses[6] = PackedIdx::new(8, 5);
+
+    expect_false!(Onoro16::check_win_fast(
+      &pawn_poses,
+      HexPos::new(6, 6),
+      false
+    ));
+  }
+
+  #[gtest]
+  fn test_check_win_spread_out() {
+    let mut pawn_poses: [PackedIdx; 16] = [PackedIdx::null(); 16];
+    pawn_poses[0] = PackedIdx::new(5, 5);
+    pawn_poses[4] = PackedIdx::new(6, 5);
+    pawn_poses[14] = PackedIdx::new(7, 5);
+    pawn_poses[8] = PackedIdx::new(8, 5);
+
+    expect_true!(Onoro16::check_win_fast(
+      &pawn_poses,
+      HexPos::new(6, 5),
+      false
+    ));
+  }
+
+  #[gtest]
+  fn test_check_win_wrong_color() {
+    let mut pawn_poses: [PackedIdx; 16] = [PackedIdx::null(); 16];
+    pawn_poses[0] = PackedIdx::new(5, 5);
+    pawn_poses[2] = PackedIdx::new(6, 5);
+    pawn_poses[4] = PackedIdx::new(7, 5);
+    pawn_poses[6] = PackedIdx::new(8, 5);
+
+    expect_false!(Onoro16::check_win_fast(
+      &pawn_poses,
+      HexPos::new(6, 5),
+      true
+    ));
+  }
+
+  #[gtest]
+  fn test_check_win_in_y() {
+    let mut pawn_poses: [PackedIdx; 16] = [PackedIdx::null(); 16];
+    pawn_poses[0] = PackedIdx::new(5, 2);
+    pawn_poses[2] = PackedIdx::new(5, 3);
+    pawn_poses[4] = PackedIdx::new(5, 4);
+    pawn_poses[6] = PackedIdx::new(5, 5);
+
+    expect_true!(Onoro16::check_win_fast(
+      &pawn_poses,
+      HexPos::new(5, 5),
+      false
+    ));
+  }
+
+  #[gtest]
+  fn test_check_win_in_xy() {
+    let mut pawn_poses: [PackedIdx; 16] = [PackedIdx::null(); 16];
+    pawn_poses[0] = PackedIdx::new(4, 2);
+    pawn_poses[2] = PackedIdx::new(5, 3);
+    pawn_poses[4] = PackedIdx::new(6, 4);
+    pawn_poses[6] = PackedIdx::new(7, 5);
+
+    expect_true!(Onoro16::check_win_fast(
+      &pawn_poses,
+      HexPos::new(5, 3),
+      false
+    ));
   }
 }
