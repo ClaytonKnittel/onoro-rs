@@ -180,7 +180,6 @@ dependencies = [
  "abstract_game",
  "algebra",
  "const-random",
- "googletest",
  "itertools",
  "onoro",
  "rand 0.8.5",
