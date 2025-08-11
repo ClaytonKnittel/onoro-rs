@@ -394,31 +394,66 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroImpl<N, N2
     #[cfg(target_endian = "big")]
     let black_turn = !black_turn;
 
+    // Given one half of the packed positions, returns the positions of the
+    // pawns for the last player to move in the even-indexed bytes of a u64.
     let align_to_mask = |array: &[PackedIdx]| -> u64 {
       let positions = unsafe { *(array.as_ptr() as *const u64) };
       let positions = positions >> (black_turn as u32 * 8);
       positions & SINGLE_COLOR_MASK
     };
 
+    // Extract the positions of the pawns of the last player to move, then
+    // combine them into a single u64.
     let low_positions = align_to_mask(&pawn_poses[0..8]);
     let hi_positions = align_to_mask(&pawn_poses[8..16]);
     let all_pawns = low_positions | (hi_positions << 8);
 
+    // Extract the x and y coordinates of the pawns.
     let pawns_x = all_pawns & SELECT_X_MASK;
     let pawns_y = (all_pawns >> 4) & SELECT_X_MASK;
+    // Extract the difference between the x and y coordinates of the pawns,
+    // `+ 0xff` to prevent underflow.
     let pawns_delta = pawns_x + SELECT_X_MASK - pawns_y;
 
+    // Create byte masks for the positions which equal `last_move` in either
+    // the x-coordinate, y-coordinate, or (x - y)-coordinate.
     let x_equal_mask = equal_mask_epi8(pawns_x, last_move.x() as u8);
     let y_equal_mask = equal_mask_epi8(pawns_y, last_move.y() as u8);
     let delta_equal_mask =
       equal_mask_epi8(pawns_delta, (last_move.x() + 0xf - last_move.y()) as u8);
 
-    let y_in_a_row = packed_positions_to_mask(x_equal_mask & pawns_y);
-    let x_in_a_row = packed_positions_to_mask(y_equal_mask & pawns_x);
-    let xy_in_a_row = packed_positions_to_mask(delta_equal_mask & pawns_x);
+    // Mask off any positions which were not equal to `last_move` in the other
+    // dimension. Note that for (x - y), we can use either x or y as indices
+    // for the positions, since both the x- and y-coordinates sequential along
+    // these diagonal lines.
+    let x_equal_y_coords = x_equal_mask & pawns_y;
+    let y_equal_x_coords = y_equal_mask & pawns_x;
+    let xy_equal_x_coords = delta_equal_mask & pawns_x;
+
+    // We want to determine if any of the above three masks have 4
+    // sequential-valued bytes (in any order). To do this, we can map each byte
+    // vector to a bitmask, where a bit will be set in the mask if the index of
+    // the bit appeared in the byte vector.
+    let y_in_a_row = packed_positions_to_mask(x_equal_y_coords);
+    let x_in_a_row = packed_positions_to_mask(y_equal_x_coords);
+    let xy_in_a_row = packed_positions_to_mask(xy_equal_x_coords);
+
+    // These masks will only set the first 15 bits of the result, since each
+    // coordinate is in the range 1..15.
+    debug_assert!(x_in_a_row < 0x8000);
+    debug_assert!(y_in_a_row < 0x8000);
+    debug_assert!(xy_in_a_row < 0x8000);
+
+    // Now that we have bitmasks, each of which are < 0x8000, and we would like
+    // to check if any 4 bits are in a row in any of them, we can merge all 3
+    // into a single u64 and check for 4 bits in a row in that.
+    //
+    // We have to be careful that there is at least one guaranteed zero bit
+    // between each of the 3 masks in the result, so they don't interfere with
+    // each other.
     let all_in_a_row = x_in_a_row | (y_in_a_row << 17) | (xy_in_a_row << 34);
 
-    // Check if any 4 bits in a row are set:
+    // Check if any 4 bits in a row are set.
     let all_in_a_row = all_in_a_row & (all_in_a_row >> 1);
     let all_in_a_row = all_in_a_row & (all_in_a_row >> 2);
     all_in_a_row != 0
