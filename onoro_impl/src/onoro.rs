@@ -21,7 +21,7 @@ use crate::{
   onoro_state::OnoroState,
   packed_hex_pos::PackedHexPos,
   packed_idx::{IdxOffset, PackedIdx},
-  util::{broadcast_u8_to_u64, packed_positions_to_mask},
+  util::{broadcast_u8_to_u64, equal_mask_epi8, packed_positions_to_mask},
 };
 
 /// For move generation, the number of bits to use per-tile (for counting
@@ -382,11 +382,6 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroImpl<N, N2
   fn check_win_fast(pawn_poses: &[PackedIdx; N], last_move: HexPos, black_turn: bool) -> bool {
     debug_assert_eq!(N, 16);
 
-    /// Least significant bit in each byte.
-    const LSB_ONES: u64 = 0x0101_0101_0101_0101;
-    /// Most significant bit in each byte.
-    const MSB_ONES: u64 = 0x8080_8080_8080_8080;
-
     /// Masks off the pawns in odd-indexed bytes.
     const SINGLE_COLOR_MASK: u64 = 0x00ff00ff_00ff00ff;
 
@@ -413,21 +408,10 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroImpl<N, N2
     let pawns_y = (all_pawns >> 4) & SELECT_X_MASK;
     let pawns_delta = pawns_x + SELECT_X_MASK - pawns_y;
 
-    // bitmask of 0xff in byte if that byte = needle in byte_vec, 0 otherwise
-    let equal_mask = |byte_vec: u64, needle: u8| -> u64 {
-      debug_assert_eq!(byte_vec & MSB_ONES, 0);
-
-      let search_mask = broadcast_u8_to_u64(needle);
-      debug_assert_eq!(search_mask & MSB_ONES, 0);
-
-      let diff = !(byte_vec ^ search_mask) & !MSB_ONES;
-      let diff = (diff + LSB_ONES) & MSB_ONES;
-      (diff >> 7) * 0xff
-    };
-
-    let x_equal_mask = equal_mask(pawns_x, last_move.x() as u8);
-    let y_equal_mask = equal_mask(pawns_y, last_move.y() as u8);
-    let delta_equal_mask = equal_mask(pawns_delta, (last_move.x() + 0xf - last_move.y()) as u8);
+    let x_equal_mask = equal_mask_epi8(pawns_x, last_move.x() as u8);
+    let y_equal_mask = equal_mask_epi8(pawns_y, last_move.y() as u8);
+    let delta_equal_mask =
+      equal_mask_epi8(pawns_delta, (last_move.x() + 0xf - last_move.y()) as u8);
 
     let y_in_a_row = packed_positions_to_mask(x_equal_mask & pawns_y);
     let x_in_a_row = packed_positions_to_mask(y_equal_mask & pawns_x);
