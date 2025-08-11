@@ -65,7 +65,7 @@ fn neighbor_colors_excluding<T: Onoro>(
 fn collect_phase1_moves<T: Onoro>(onoro: &T) -> OnoroResult<Vec<T::Index>> {
   onoro
     .each_move()
-    .map(|m| onoro.to_move_wrapper(m))
+    .map(|m| onoro.to_move_wrapper(&m))
     .map(|m| {
       if let OnoroMoveWrapper::Phase1 { to } = m {
         Ok(to)
@@ -88,7 +88,7 @@ fn phase1_move_adjacencies<T: Onoro>(onoro: &T) -> OnoroResult<Vec<NeighborColor
 fn collect_phase2_moves<T: Onoro>(onoro: &T) -> OnoroResult<Vec<Phase2Move<T::Index>>> {
   onoro
     .each_move()
-    .map(|m| onoro.to_move_wrapper(m))
+    .map(|m| onoro.to_move_wrapper(&m))
     .map(|m| {
       if let OnoroMoveWrapper::Phase2 { from, to } = m {
         Ok(Phase2Move { from, to })

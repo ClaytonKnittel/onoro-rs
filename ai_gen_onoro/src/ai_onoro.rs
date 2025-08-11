@@ -55,7 +55,9 @@ pub struct Pawn {
   pub pos: PackedIdx,
 }
 
-impl OnoroPawn<PackedIdx> for Pawn {
+impl OnoroPawn for Pawn {
+  type Index = PackedIdx;
+
   fn pos(&self) -> PackedIdx {
     self.pos
   }
@@ -317,8 +319,8 @@ impl Onoro for OnoroGame {
     }
   }
 
-  fn to_move_wrapper(&self, m: Move) -> OnoroMoveWrapper<PackedIdx> {
-    m
+  fn to_move_wrapper(&self, m: &Move) -> OnoroMoveWrapper<PackedIdx> {
+    *m
   }
 }
 

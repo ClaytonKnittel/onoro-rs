@@ -1,18 +1,12 @@
-use std::{collections::HashMap, fmt::Debug};
-
 use googletest::{expect_that, gtest, prelude::unordered_elements_are};
 use itertools::Itertools;
-use onoro::{error::OnoroResult, Onoro, OnoroIndex, OnoroPawn, PawnColor};
+use onoro::{
+  error::OnoroResult,
+  test_util::{OnoroCmp, OnoroFactory},
+  Onoro,
+};
 use rstest::rstest;
 use rstest_reuse::{apply, template};
-
-trait OnoroFactory {
-  type T: Onoro + Clone + Debug;
-
-  fn from_board_string(board_string: &str) -> OnoroResult<Self::T> {
-    Ok(Self::T::from_board_string(board_string)?)
-  }
-}
 
 struct Onoro16Factory;
 impl OnoroFactory for Onoro16Factory {
@@ -23,29 +17,6 @@ struct AiOnoroFactory;
 impl OnoroFactory for AiOnoroFactory {
   type T = ai_gen_onoro::OnoroGame;
 }
-
-fn pawn_map<T: Onoro>(onoro: &T) -> HashMap<(i32, i32), PawnColor> {
-  let min_x = onoro.pawns().map(|pawn| pawn.pos().x()).min().unwrap();
-  let min_y = onoro.pawns().map(|pawn| pawn.pos().y()).min().unwrap();
-  onoro
-    .pawns()
-    .map(|pawn| {
-      (
-        (pawn.pos().x() - min_x, pawn.pos().y() - min_y),
-        pawn.color(),
-      )
-    })
-    .collect()
-}
-
-#[derive(Debug, Clone, Copy)]
-struct OnoroCmp<'a, T: Onoro + Debug>(&'a T);
-impl<'a, T: Onoro + Debug> PartialEq for OnoroCmp<'a, T> {
-  fn eq(&self, other: &Self) -> bool {
-    pawn_map(self.0) == pawn_map(other.0)
-  }
-}
-impl<'a, T: Onoro + Debug> Eq for OnoroCmp<'a, T> {}
 
 #[template]
 #[rstest]

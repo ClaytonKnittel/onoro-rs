@@ -700,8 +700,8 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Onoro
     }
   }
 
-  fn to_move_wrapper(&self, m: Move) -> OnoroMoveWrapper<PackedIdx> {
-    match m {
+  fn to_move_wrapper(&self, m: &Move) -> OnoroMoveWrapper<PackedIdx> {
+    match *m {
       Move::Phase1Move { to } => OnoroMoveWrapper::Phase1 { to },
       Move::Phase2Move { to, from_idx } => OnoroMoveWrapper::Phase2 {
         from: *self.pawn_poses.get(from_idx as usize).unwrap(),
@@ -734,7 +734,9 @@ pub struct Pawn {
   board_idx: u8,
 }
 
-impl OnoroPawn<PackedIdx> for Pawn {
+impl OnoroPawn for Pawn {
+  type Index = PackedIdx;
+
   fn pos(&self) -> PackedIdx {
     self.pos
   }

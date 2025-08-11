@@ -70,25 +70,45 @@ pub trait OnoroIndex: Clone + Copy + Eq + Debug {
   }
 }
 
+impl OnoroIndex for (i32, i32) {
+  fn from_coords(x: u32, y: u32) -> Self {
+    (x as i32, y as i32)
+  }
+
+  fn x(&self) -> i32 {
+    self.0
+  }
+
+  fn y(&self) -> i32 {
+    self.1
+  }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum OnoroMoveWrapper<Index: OnoroIndex> {
   Phase1 { to: Index },
   Phase2 { from: Index, to: Index },
 }
 
-impl<Index: OnoroIndex> OnoroMove<Index> for OnoroMoveWrapper<Index> {
+impl<Index: OnoroIndex> OnoroMove for OnoroMoveWrapper<Index> {
+  type Index = Index;
+
   fn make_phase1(pos: Index) -> Self {
     Self::Phase1 { to: pos }
   }
 }
 
-pub trait OnoroMove<Index: OnoroIndex> {
-  fn make_phase1(pos: Index) -> Self;
+pub trait OnoroMove: Clone {
+  type Index: OnoroIndex;
+
+  fn make_phase1(pos: Self::Index) -> Self;
 }
 
-pub trait OnoroPawn<Index: OnoroIndex> {
+pub trait OnoroPawn {
+  type Index: OnoroIndex;
+
   /// The position of this pawn on the board.
-  fn pos(&self) -> Index;
+  fn pos(&self) -> Self::Index;
 
   /// The color of this pawn.
   fn color(&self) -> PawnColor;
@@ -96,8 +116,8 @@ pub trait OnoroPawn<Index: OnoroIndex> {
 
 pub trait Onoro: Sized {
   type Index: OnoroIndex;
-  type Move: OnoroMove<Self::Index>;
-  type Pawn: OnoroPawn<Self::Index>;
+  type Move: OnoroMove<Index = Self::Index>;
+  type Pawn: OnoroPawn<Index = Self::Index>;
 
   /// Initializes an empty game. This should not be called outside the `Onoro`
   /// trait.
@@ -160,7 +180,7 @@ pub trait Onoro: Sized {
   }
 
   /// Only used in tests.
-  fn to_move_wrapper(&self, m: Self::Move) -> OnoroMoveWrapper<Self::Index>;
+  fn to_move_wrapper(&self, m: &Self::Move) -> OnoroMoveWrapper<Self::Index>;
 
   /// Returns the width of the game board, e.g. the maximum distance between
   /// two pawns in any legal board configuration.
