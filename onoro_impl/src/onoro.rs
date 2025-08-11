@@ -385,7 +385,7 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroImpl<N, N2
     const LSB_ONES: u64 = 0x0101_0101_0101_0101;
     const MSB_ONES: u64 = 0x8080_8080_8080_8080;
 
-    const IDX_OFFSET: u32 = 2;
+    const IDX_OFFSET: u32 = 1;
     const IDX_TRANSLATE: u64 = LSB_ONES * IDX_OFFSET as u64;
 
     const SELECT_X_MASK: u64 = 0x0f0f_0f0f_0f0f_0f0f;
@@ -442,7 +442,7 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroImpl<N, N2
     let y_in_a_row = broadcast_to_bit_indices(x_equal_mask & pawns_y);
     let x_in_a_row = broadcast_to_bit_indices(y_equal_mask & pawns_x);
     let xy_in_a_row = broadcast_to_bit_indices(delta_equal_mask & pawns_x);
-    let all_in_a_row = x_in_a_row | (y_in_a_row << 19) | (xy_in_a_row << 38);
+    let all_in_a_row = x_in_a_row | (y_in_a_row << 18) | (xy_in_a_row << 36);
 
     // Check if any 4 bits in a row are set:
     let all_in_a_row = all_in_a_row & (all_in_a_row >> 1);
