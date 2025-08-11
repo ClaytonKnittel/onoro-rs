@@ -382,22 +382,27 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroImpl<N, N2
   fn check_win_fast(pawn_poses: &[PackedIdx; N], last_move: HexPos, black_turn: bool) -> bool {
     debug_assert_eq!(N, 16);
 
+    /// Least significant bit in each byte.
     const LSB_ONES: u64 = 0x0101_0101_0101_0101;
+    /// Most significant bit in each byte.
     const MSB_ONES: u64 = 0x8080_8080_8080_8080;
 
+    /// Masks off the pawns in odd-indexed bytes.
+    const SINGLE_COLOR_MASK: u64 = 0x00ff00ff_00ff00ff;
+
+    /// Selects the x-coordinates of every PackedIdx position.
     const SELECT_X_MASK: u64 = 0x0f0f_0f0f_0f0f_0f0f;
 
-    #[cfg(target_endian = "little")]
-    const MASK: u64 = 0x00ff00ff_00ff00ff;
+    // For big-endian architectures, we will read the pawn positions in the
+    // reverse order from little endian. We can compensate for this by
+    // "swapping the colors" of the pieces.
     #[cfg(target_endian = "big")]
-    panic!("Not supported!");
-    // const MASK: u64 = 0xff00ff00_ff00ff00;
-    let mask = -(black_turn as i64) as u64 ^ MASK;
+    let black_turn = !black_turn;
 
     let align_to_mask = |array: &[PackedIdx]| -> u64 {
       let positions = unsafe { *(array.as_ptr() as *const u64) };
-      let positions = positions & mask;
-      positions >> (black_turn as u32 * 8)
+      let positions = positions >> (black_turn as u32 * 8);
+      positions & SINGLE_COLOR_MASK
     };
 
     let low_positions = align_to_mask(&pawn_poses[0..8]);
