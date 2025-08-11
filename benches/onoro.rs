@@ -119,9 +119,7 @@ fn check_win(c: &mut Criterion) {
   const N_GAMES: usize = 10_000;
 
   let mut group = c.benchmark_group("check win");
-  group.throughput(Throughput::Elements(
-    (2 * Onoro16::pawns_per_player() * N_GAMES) as u64,
-  ));
+  group.throughput(Throughput::Elements(N_GAMES as u64));
   group.measurement_time(Duration::from_secs(20));
 
   let mut rng = StdRng::seed_from_u64(4324908);
