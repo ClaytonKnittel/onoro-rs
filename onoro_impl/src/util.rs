@@ -1,5 +1,5 @@
 use core::arch::x86_64::{_mm_set_epi8, _mm_shuffle_epi8};
-use std::arch::x86_64::{_mm_cvtsi128_si64x, _mm_set_epi64x};
+use std::arch::x86_64::{_mm_cvtsi128_si64x, _mm_hadd_epi16, _mm_set_epi64x, _mm_unpacklo_epi8};
 
 use itertools::Itertools;
 
@@ -81,12 +81,11 @@ unsafe fn packed_positions_to_mask_sse3(packed_positions: u64) -> u64 {
   let lo_masks = _mm_shuffle_epi8(lo_data, shuffle_mask);
   let hi_masks = _mm_shuffle_epi8(hi_data, shuffle_mask);
 
-  let lo_masks = _mm_cvtsi128_si64x(lo_masks) as u64;
-  let hi_masks = _mm_cvtsi128_si64x(hi_masks) as u64;
+  let zero = _mm_set_epi64x(0, 0);
 
-  let lo_masks = (lo_masks + (lo_masks >> 8)) & 0x00ff_00ff_00ff_00ff;
-  let hi_masks = (hi_masks + (hi_masks << 8)) & 0xff00_ff00_ff00_ff00;
-  let masks = lo_masks + hi_masks;
+  let masks = _mm_unpacklo_epi8(lo_masks, hi_masks);
+  let masks = _mm_hadd_epi16(masks, zero);
+  let masks = _mm_cvtsi128_si64x(masks) as u64;
 
   let masks = masks + (masks >> 16);
   let masks = masks + (masks >> 32);
