@@ -406,12 +406,8 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroImpl<N, N2
     };
 
     let low_positions = align_to_mask(&pawn_poses[0..8]);
-    let low_positions = (low_positions | (low_positions >> 24)) & 0x00000000_ffffffff;
-
     let hi_positions = align_to_mask(&pawn_poses[8..16]);
-    let hi_positions = (hi_positions | (hi_positions << 40)) & 0xffffffff_00000000;
-
-    let all_pawns = low_positions | hi_positions;
+    let all_pawns = low_positions | (hi_positions << 8);
 
     let pawns_x = all_pawns & SELECT_X_MASK;
     let pawns_y = (all_pawns >> 4) & SELECT_X_MASK;
