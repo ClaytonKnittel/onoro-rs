@@ -1,3 +1,4 @@
+pub mod benchmark_util;
 mod canonicalize;
 mod const_rand;
 mod hash;

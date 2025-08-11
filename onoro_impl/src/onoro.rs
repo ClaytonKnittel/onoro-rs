@@ -379,7 +379,7 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroImpl<N, N2
     offset
   }
 
-  fn check_win(&self, last_move: HexPos) -> bool {
+  pub(crate) fn check_win(&self, last_move: HexPos) -> bool {
     // Bitvector of positions occupied by pawns of this color along the 3 lines
     // extending out from last_move. Intentionally leave a zero bit between each
     // of the 3 sets so they can't form a continuous string of 1's across
