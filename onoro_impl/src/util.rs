@@ -41,31 +41,12 @@ define_cmp!(max_i16, min_i16, i16);
 define_cmp!(max_i32, min_i32, i32);
 define_cmp!(max_i64, min_i64, i64);
 
-#[inline]
-#[target_feature(enable = "ssse3")]
-unsafe fn broadcast_u8_to_u64_sse3(v: u8) -> u64 {
-  let v = v as i8;
-  let mask = _mm_set_epi8(0, 0, 0, 0, 0, 0, 0, 0, v, v, v, v, v, v, v, v);
-  _mm_cvtsi128_si64x(mask) as u64
-}
-
-#[cfg(any(test, not(target_feature = "ssse3")))]
-#[inline]
-pub const fn broadcast_u8_to_u64_slow(v: u8) -> u64 {
-  const BYTE_ANCHOR: u64 = 0x0101_0101_0101_0101;
-  (v as u64) * BYTE_ANCHOR
-}
-
 /// Given a `u8`, returns a `u64` with each byte of the `u64` equal to the
 /// passed `u8`.
 #[inline(always)]
-pub fn broadcast_u8_to_u64(v: u8) -> u64 {
-  #[cfg(target_feature = "ssse3")]
-  unsafe {
-    broadcast_u8_to_u64_sse3(v)
-  }
-  #[cfg(not(target_feature = "ssse3"))]
-  broadcast_u8_to_u64_slow(v)
+pub const fn broadcast_u8_to_u64(v: u8) -> u64 {
+  const BYTE_ANCHOR: u64 = 0x0101_0101_0101_0101;
+  (v as u64) * BYTE_ANCHOR
 }
 
 #[inline]
@@ -176,14 +157,13 @@ mod tests {
   use rstest_reuse::{apply, template};
 
   use crate::util::{
-    broadcast_u8_to_u64, broadcast_u8_to_u64_slow, equal_mask_epi8, equal_mask_epi8_slow,
-    packed_positions_to_mask, packed_positions_to_mask_slow,
+    broadcast_u8_to_u64, equal_mask_epi8, equal_mask_epi8_slow, packed_positions_to_mask,
+    packed_positions_to_mask_slow,
   };
 
   #[template]
   #[rstest]
   fn broadcast_u8_to_u64(
-    #[values(broadcast_u8_to_u64, broadcast_u8_to_u64_slow)] broadcast: impl FnOnce(u8) -> u64,
     #[values(
       (0x12, 0x12_12_12_12_12_12_12_12),
       (0x00, 0x00_00_00_00_00_00_00_00),
@@ -195,9 +175,9 @@ mod tests {
 
   #[apply(broadcast_u8_to_u64)]
   #[test]
-  fn test_broadcast_u8_to_u64(broadcast: impl FnOnce(u8) -> u64, args: (u8, u64)) {
+  fn test_broadcast_u8_to_u64(args: (u8, u64)) {
     let (input, expected) = args;
-    assert_eq!(broadcast(input), expected);
+    assert_eq!(broadcast_u8_to_u64(input), expected);
   }
 
   #[template]
