@@ -15,3 +15,7 @@ union_find = { path = "../union_find" }
 
 [build]
 rustflags = ["-C", "target-feature=+ssse3"]
+
+[dev-dependencies]
+rstest = "0.26.1"
+rstest_reuse = "0.7.0"

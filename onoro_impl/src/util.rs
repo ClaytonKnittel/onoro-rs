@@ -93,12 +93,12 @@ unsafe fn packed_positions_to_mask_sse3(packed_positions: u64) -> u64 {
   let lo_masks = _mm_cvtsi128_si64x(lo_masks) as u64;
   let hi_masks = _mm_cvtsi128_si64x(hi_masks) as u64;
 
-  let lo_masks = (lo_masks | (lo_masks >> 8)) & 0x00ff_00ff_00ff_00ff;
-  let hi_masks = (hi_masks | (hi_masks << 8)) & 0xff00_ff00_ff00_ff00;
-  let masks = lo_masks | hi_masks;
+  let lo_masks = (lo_masks + (lo_masks >> 8)) & 0x00ff_00ff_00ff_00ff;
+  let hi_masks = (hi_masks + (hi_masks << 8)) & 0xff00_ff00_ff00_ff00;
+  let masks = lo_masks + hi_masks;
 
-  let masks = masks | (masks >> 16);
-  let masks = masks | (masks >> 32);
+  let masks = masks + (masks >> 16);
+  let masks = masks + (masks >> 32);
   masks & 0x0000_0000_0000_ffff
 }
 
@@ -125,17 +125,29 @@ pub fn packed_positions_to_mask(packed_positions: u64) -> u64 {
 
 #[cfg(test)]
 mod tests {
+  use rstest::rstest;
+  use rstest_reuse::{apply, template};
+
   use crate::util::{packed_positions_to_mask, packed_positions_to_mask_slow};
 
-  #[test]
-  fn test_packed_positions_to_mask() {
-    assert_eq!(packed_positions_to_mask(0x0102030405060708), 0xff);
-    assert_eq!(packed_positions_to_mask(0x01040506070a0c0e), 0x2a79);
+  #[template]
+  #[rstest]
+  fn packed_positions(
+    #[values(packed_positions_to_mask, packed_positions_to_mask_slow)]
+    packed_positions: impl FnOnce(u64) -> u64,
+    #[values(
+      (0x01_02_03_04_05_06_07_08, 0xff),
+      (0x01_04_05_06_07_0a_0c_0e, 0x2a79),
+      (0x03_02_07_00_00_05_00_00, 0x56),
+    )]
+    args: (u64, u64),
+  ) {
   }
 
+  #[apply(packed_positions)]
   #[test]
-  fn test_packed_positions_to_mask_slow() {
-    assert_eq!(packed_positions_to_mask_slow(0x0102030405060708), 0xff);
-    assert_eq!(packed_positions_to_mask_slow(0x01040506070a0c0e), 0x2a79);
+  fn test_packed_positions_to_mask(packed_positions: impl FnOnce(u64) -> u64, args: (u64, u64)) {
+    let (input, expected) = args;
+    assert_eq!(packed_positions(input), expected);
   }
 }
