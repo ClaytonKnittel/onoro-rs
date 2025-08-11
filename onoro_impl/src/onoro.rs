@@ -385,7 +385,8 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroImpl<N, N2
     #[cfg(target_endian = "little")]
     const MASK: u64 = 0x00ff00ff_00ff00ff;
     #[cfg(target_endian = "big")]
-    const MASK: u64 = 0xff00ff00_ff00ff00;
+    panic!("Not supported!");
+    // const MASK: u64 = 0xff00ff00_ff00ff00;
     let mask = -(black_turn as i64) as u64 ^ MASK;
 
     let align_to_mask = |array: &[PackedIdx]| -> u64 {
@@ -402,8 +403,8 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroImpl<N, N2
 
     let all_pawns = low_positions | hi_positions;
 
-    let pawns_x = all_pawns & 0x0f0f_0f0f_0f0f_0f0f;
-    let pawns_y = (all_pawns >> 4) & 0x0f0f_0f0f_0f0f_0f0f;
+    let pawns_x = (all_pawns & 0x0f0f_0f0f_0f0f_0f0f) + 0x0202_0202_0202_0202;
+    let pawns_y = ((all_pawns >> 4) & 0x0f0f_0f0f_0f0f_0f0f) + 0x0202_0202_0202_0202;
     let pawns_delta = pawns_x + 0x0f0f_0f0f_0f0f_0f0f - pawns_y;
 
     // bitmask of 0xff in byte if that byte = needle in byte_vec, 0 otherwise
@@ -421,8 +422,8 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroImpl<N, N2
       (diff >> 7) * 0xff
     };
 
-    let x_equal_mask = equal_mask(pawns_x, last_move.x() as u8);
-    let y_equal_mask = equal_mask(pawns_y, last_move.y() as u8);
+    let x_equal_mask = equal_mask(pawns_x, (last_move.x() + 2) as u8);
+    let y_equal_mask = equal_mask(pawns_y, (last_move.y() + 2) as u8);
     let delta_equal_mask = equal_mask(pawns_delta, (last_move.x() + 0xf - last_move.y()) as u8);
 
     let broadcast_to_bit_indices = |byte_vec: u64| -> u64 {
@@ -1199,10 +1200,27 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> GameMoveGenerat
 
 #[cfg(test)]
 mod tests {
+  use std::ops::{Index, IndexMut};
+
   use googletest::{expect_false, expect_true, gtest};
   use onoro::{Onoro, hex_pos::HexPos};
 
   use crate::{Onoro16, onoro_defs::Onoro8, packed_idx::PackedIdx};
+
+  #[repr(align(8))]
+  struct PawnPoses([PackedIdx; 16]);
+  impl Index<usize> for PawnPoses {
+    type Output = PackedIdx;
+
+    fn index(&self, index: usize) -> &Self::Output {
+      &self.0[index]
+    }
+  }
+  impl IndexMut<usize> for PawnPoses {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+      &mut self.0[index]
+    }
+  }
 
   #[test]
   fn test_get_tile() {
@@ -1220,14 +1238,14 @@ mod tests {
 
   #[gtest]
   fn test_check_win_simple() {
-    let mut pawn_poses: [PackedIdx; 16] = [PackedIdx::null(); 16];
+    let mut pawn_poses = PawnPoses([PackedIdx::null(); 16]);
     pawn_poses[0] = PackedIdx::new(5, 5);
     pawn_poses[2] = PackedIdx::new(6, 5);
     pawn_poses[4] = PackedIdx::new(7, 5);
     pawn_poses[6] = PackedIdx::new(8, 5);
 
     expect_true!(Onoro16::check_win_fast(
-      &pawn_poses,
+      &pawn_poses.0,
       HexPos::new(6, 5),
       false
     ));
@@ -1235,14 +1253,14 @@ mod tests {
 
   #[gtest]
   fn test_check_win_hole() {
-    let mut pawn_poses: [PackedIdx; 16] = [PackedIdx::null(); 16];
+    let mut pawn_poses = PawnPoses([PackedIdx::null(); 16]);
     pawn_poses[0] = PackedIdx::new(5, 5);
     pawn_poses[2] = PackedIdx::new(6, 5);
     pawn_poses[4] = PackedIdx::new(8, 5);
     pawn_poses[6] = PackedIdx::new(9, 5);
 
     expect_false!(Onoro16::check_win_fast(
-      &pawn_poses,
+      &pawn_poses.0,
       HexPos::new(6, 5),
       false
     ));
@@ -1250,14 +1268,14 @@ mod tests {
 
   #[gtest]
   fn test_check_win_wrong_row() {
-    let mut pawn_poses: [PackedIdx; 16] = [PackedIdx::null(); 16];
+    let mut pawn_poses = PawnPoses([PackedIdx::null(); 16]);
     pawn_poses[0] = PackedIdx::new(5, 5);
     pawn_poses[2] = PackedIdx::new(6, 5);
     pawn_poses[4] = PackedIdx::new(7, 5);
     pawn_poses[6] = PackedIdx::new(8, 5);
 
     expect_false!(Onoro16::check_win_fast(
-      &pawn_poses,
+      &pawn_poses.0,
       HexPos::new(6, 6),
       false
     ));
@@ -1265,14 +1283,14 @@ mod tests {
 
   #[gtest]
   fn test_check_win_spread_out() {
-    let mut pawn_poses: [PackedIdx; 16] = [PackedIdx::null(); 16];
+    let mut pawn_poses = PawnPoses([PackedIdx::null(); 16]);
     pawn_poses[0] = PackedIdx::new(5, 5);
     pawn_poses[4] = PackedIdx::new(6, 5);
     pawn_poses[14] = PackedIdx::new(7, 5);
     pawn_poses[8] = PackedIdx::new(8, 5);
 
     expect_true!(Onoro16::check_win_fast(
-      &pawn_poses,
+      &pawn_poses.0,
       HexPos::new(6, 5),
       false
     ));
@@ -1280,14 +1298,14 @@ mod tests {
 
   #[gtest]
   fn test_check_win_wrong_color() {
-    let mut pawn_poses: [PackedIdx; 16] = [PackedIdx::null(); 16];
+    let mut pawn_poses = PawnPoses([PackedIdx::null(); 16]);
     pawn_poses[0] = PackedIdx::new(5, 5);
     pawn_poses[2] = PackedIdx::new(6, 5);
     pawn_poses[4] = PackedIdx::new(7, 5);
     pawn_poses[6] = PackedIdx::new(8, 5);
 
     expect_false!(Onoro16::check_win_fast(
-      &pawn_poses,
+      &pawn_poses.0,
       HexPos::new(6, 5),
       true
     ));
@@ -1295,14 +1313,14 @@ mod tests {
 
   #[gtest]
   fn test_check_win_in_y() {
-    let mut pawn_poses: [PackedIdx; 16] = [PackedIdx::null(); 16];
+    let mut pawn_poses = PawnPoses([PackedIdx::null(); 16]);
     pawn_poses[0] = PackedIdx::new(5, 2);
     pawn_poses[2] = PackedIdx::new(5, 3);
     pawn_poses[4] = PackedIdx::new(5, 4);
     pawn_poses[6] = PackedIdx::new(5, 5);
 
     expect_true!(Onoro16::check_win_fast(
-      &pawn_poses,
+      &pawn_poses.0,
       HexPos::new(5, 5),
       false
     ));
@@ -1310,16 +1328,30 @@ mod tests {
 
   #[gtest]
   fn test_check_win_in_xy() {
-    let mut pawn_poses: [PackedIdx; 16] = [PackedIdx::null(); 16];
+    let mut pawn_poses = PawnPoses([PackedIdx::null(); 16]);
     pawn_poses[0] = PackedIdx::new(4, 2);
     pawn_poses[2] = PackedIdx::new(5, 3);
     pawn_poses[4] = PackedIdx::new(6, 4);
     pawn_poses[6] = PackedIdx::new(7, 5);
 
     expect_true!(Onoro16::check_win_fast(
-      &pawn_poses,
+      &pawn_poses.0,
       HexPos::new(5, 3),
       false
+    ));
+  }
+
+  #[gtest]
+  fn test_check_win_near_zero() {
+    let mut pawn_poses = PawnPoses([PackedIdx::null(); 16]);
+    pawn_poses[1] = PackedIdx::new(1, 3);
+    pawn_poses[3] = PackedIdx::new(2, 3);
+    pawn_poses[5] = PackedIdx::new(3, 3);
+
+    expect_false!(Onoro16::check_win_fast(
+      &pawn_poses.0,
+      HexPos::new(1, 3),
+      true
     ));
   }
 }
