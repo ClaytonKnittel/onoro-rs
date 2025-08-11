@@ -141,10 +141,17 @@ pub fn packed_positions_to_mask(packed_positions: u64) -> u64 {
 #[target_feature(enable = "ssse3")]
 unsafe fn equal_mask_epi8_sse3(byte_vec: u64, needle: u8) -> u64 {
   let b = needle as i8;
+  // Broadcast needle to the first 8 bytes of a __m128i register.
   let needle_mask = _mm_set_epi8(0, 0, 0, 0, 0, 0, 0, 0, b, b, b, b, b, b, b, b);
-  let byte_vec = _mm_set_epi64x(byte_vec as i64, byte_vec as i64);
+  // Move `byte_vec` into the lower half of a __m128i register.
+  let byte_vec = _mm_set_epi64x(0, byte_vec as i64);
 
+  // cmpeq_epi8 sets each byte of the result to 0xff if the two corresponding
+  // bytes from `needle_mask` and `byte_vec` are equal, or 0x00 if they are
+  // not.
   let equal_mask = _mm_cmpeq_epi8(needle_mask, byte_vec);
+  // Since we were only operating in the lower half, we can simply extract the
+  // lower 64 bits of the result.
   _mm_cvtsi128_si64x(equal_mask) as u64
 }
 
@@ -159,7 +166,9 @@ fn equal_mask_epi8_slow(byte_vec: u64, needle: u8) -> u64 {
     .fold(0, |mask, (i, byte)| mask | (byte << (i * 8)))
 }
 
-/// bitmask of 0xff in byte if that byte = needle in byte_vec, 0 otherwise
+/// Compares packed 8-bit integers in `byte_vec` with `needle` for equality.
+/// Returns a u64 mask where each corresponding byte from `byte_vec` is set to
+/// `0xff` if it matches `needle`, or `0x00` if it does not.
 #[inline(always)]
 pub fn equal_mask_epi8(byte_vec: u64, needle: u8) -> u64 {
   #[cfg(target_feature = "ssse3")]
