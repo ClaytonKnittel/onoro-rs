@@ -21,7 +21,7 @@ use crate::{
   onoro_state::OnoroState,
   packed_hex_pos::PackedHexPos,
   packed_idx::{IdxOffset, PackedIdx},
-  util::broadcast_u8_to_u64,
+  util::{broadcast_u8_to_u64, packed_positions_to_mask},
 };
 
 /// For move generation, the number of bits to use per-tile (for counting
@@ -385,9 +385,6 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroImpl<N, N2
     const LSB_ONES: u64 = 0x0101_0101_0101_0101;
     const MSB_ONES: u64 = 0x8080_8080_8080_8080;
 
-    const IDX_OFFSET: u32 = 1;
-    const IDX_TRANSLATE: u64 = LSB_ONES * IDX_OFFSET as u64;
-
     const SELECT_X_MASK: u64 = 0x0f0f_0f0f_0f0f_0f0f;
 
     #[cfg(target_endian = "little")]
@@ -411,8 +408,8 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroImpl<N, N2
 
     let all_pawns = low_positions | hi_positions;
 
-    let pawns_x = (all_pawns & SELECT_X_MASK) + IDX_TRANSLATE;
-    let pawns_y = ((all_pawns >> 4) & SELECT_X_MASK) + IDX_TRANSLATE;
+    let pawns_x = all_pawns & SELECT_X_MASK;
+    let pawns_y = (all_pawns >> 4) & SELECT_X_MASK;
     let pawns_delta = pawns_x + SELECT_X_MASK - pawns_y;
 
     // bitmask of 0xff in byte if that byte = needle in byte_vec, 0 otherwise
@@ -427,22 +424,14 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroImpl<N, N2
       (diff >> 7) * 0xff
     };
 
-    let x_equal_mask = equal_mask(pawns_x, (last_move.x() + IDX_OFFSET) as u8);
-    let y_equal_mask = equal_mask(pawns_y, (last_move.y() + IDX_OFFSET) as u8);
+    let x_equal_mask = equal_mask(pawns_x, last_move.x() as u8);
+    let y_equal_mask = equal_mask(pawns_y, last_move.y() as u8);
     let delta_equal_mask = equal_mask(pawns_delta, (last_move.x() + 0xf - last_move.y()) as u8);
 
-    let broadcast_to_bit_indices = |byte_vec: u64| -> u64 {
-      let mut result = 0;
-      for byte in byte_vec.to_ne_bytes() {
-        result |= 1u64 << byte;
-      }
-      result
-    };
-
-    let y_in_a_row = broadcast_to_bit_indices(x_equal_mask & pawns_y);
-    let x_in_a_row = broadcast_to_bit_indices(y_equal_mask & pawns_x);
-    let xy_in_a_row = broadcast_to_bit_indices(delta_equal_mask & pawns_x);
-    let all_in_a_row = x_in_a_row | (y_in_a_row << 18) | (xy_in_a_row << 36);
+    let y_in_a_row = packed_positions_to_mask(x_equal_mask & pawns_y);
+    let x_in_a_row = packed_positions_to_mask(y_equal_mask & pawns_x);
+    let xy_in_a_row = packed_positions_to_mask(delta_equal_mask & pawns_x);
+    let all_in_a_row = x_in_a_row | (y_in_a_row << 17) | (xy_in_a_row << 34);
 
     // Check if any 4 bits in a row are set:
     let all_in_a_row = all_in_a_row & (all_in_a_row >> 1);

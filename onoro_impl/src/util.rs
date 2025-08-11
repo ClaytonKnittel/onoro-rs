@@ -1,4 +1,4 @@
-use core::arch::x86_64::{__m128i, _mm_set_epi8, _mm_shuffle_epi8};
+use core::arch::x86_64::{_mm_set_epi8, _mm_shuffle_epi8};
 use std::arch::x86_64::{_mm_cvtsi128_si64x, _mm_set_epi64x};
 
 use itertools::Itertools;
@@ -47,9 +47,6 @@ pub const fn broadcast_u8_to_u64(v: u8) -> u64 {
   (v as u64) * BYTE_ANCHOR
 }
 
-/// Given 8 byte values packed into a u64, returns a u64 with each
-/// corresponding bit index set for each byte (1-indexed). Zero byte values are
-/// ignored. All non-zero bytes must be unique.
 #[target_feature(enable = "ssse3")]
 unsafe fn packed_positions_to_mask_sse3(packed_positions: u64) -> u64 {
   debug_assert!(
@@ -63,7 +60,8 @@ unsafe fn packed_positions_to_mask_sse3(packed_positions: u64) -> u64 {
       .to_ne_bytes()
       .into_iter()
       .filter(|&byte| byte != 0)
-      .all_unique()
+      .all_unique(),
+    "Packed positions must be unique and non-zero: {packed_positions:#016x}"
   );
 
   let lo_data = _mm_set_epi8(
@@ -113,6 +111,9 @@ fn packed_positions_to_mask_slow(packed_positions: u64) -> u64 {
     .fold(0, |mask, byte| mask | (1u64 << (byte - 1)))
 }
 
+/// Given 8 byte values packed into a u64, returns a u64 with each
+/// corresponding bit index set for each byte (1-indexed). Zero byte values are
+/// ignored. All non-zero bytes must be unique.
 pub fn packed_positions_to_mask(packed_positions: u64) -> u64 {
   #[cfg(target_feature = "ssse3")]
   unsafe {
