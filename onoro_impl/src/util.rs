@@ -47,13 +47,15 @@ pub const fn broadcast_u8_to_u64(v: u8) -> u64 {
   (v as u64) * BYTE_ANCHOR
 }
 
+#[inline]
 #[target_feature(enable = "ssse3")]
 unsafe fn packed_positions_to_mask_sse3(packed_positions: u64) -> u64 {
   debug_assert!(
     packed_positions
       .to_ne_bytes()
       .into_iter()
-      .all(|byte| byte < 0x10)
+      .all(|byte| byte < 0x10),
+    "Packed positions must all be < 0x10: {packed_positions:#016x}"
   );
   debug_assert!(
     packed_positions
@@ -64,26 +66,15 @@ unsafe fn packed_positions_to_mask_sse3(packed_positions: u64) -> u64 {
     "Packed positions must be unique and non-zero: {packed_positions:#016x}"
   );
 
+  #[rustfmt::skip]
   let lo_data = _mm_set_epi8(
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0x80u8 as i8,
-    0x40,
-    0x20,
-    0x10,
-    0x08,
-    0x04,
-    0x02,
-    0x01,
-    0,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x80u8 as i8,
+    0x40, 0x20, 0x10, 0x08, 0x04, 0x02, 0x01, 0x00,
   );
+  #[rustfmt::skip]
   let hi_data = _mm_set_epi8(
-    0x40, 0x20, 0x10, 0x08, 0x04, 0x02, 0x01, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0x40, 0x20, 0x10, 0x08, 0x04, 0x02, 0x01, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
   );
 
   let shuffle_mask = _mm_set_epi64x(0, packed_positions as i64);
@@ -103,6 +94,7 @@ unsafe fn packed_positions_to_mask_sse3(packed_positions: u64) -> u64 {
 }
 
 #[cfg(any(test, not(target_feature = "ssse3")))]
+#[inline]
 fn packed_positions_to_mask_slow(packed_positions: u64) -> u64 {
   packed_positions
     .to_ne_bytes()
@@ -114,6 +106,7 @@ fn packed_positions_to_mask_slow(packed_positions: u64) -> u64 {
 /// Given 8 byte values packed into a u64, returns a u64 with each
 /// corresponding bit index set for each byte (1-indexed). Zero byte values are
 /// ignored. All non-zero bytes must be unique.
+#[inline(always)]
 pub fn packed_positions_to_mask(packed_positions: u64) -> u64 {
   #[cfg(target_feature = "ssse3")]
   unsafe {
