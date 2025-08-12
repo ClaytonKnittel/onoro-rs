@@ -74,12 +74,6 @@ fn test_random_exploration<T: OnoroFactory, U: OnoroFactory>(
   let mut rng = StdRng::seed_from_u64(seed);
 
   for _ in 0..MAX_ITERS {
-    println!("{:?}", onoro1);
-    for pawn in onoro1.pawns() {
-      use onoro::OnoroPawn;
-
-      println!("{:?}", pawn.pos());
-    }
     assert_eq!(
       onoro1.in_phase1(),
       onoro2.in_phase1(),
