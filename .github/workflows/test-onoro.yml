@@ -1,0 +1,33 @@
+name: Rust
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        run: cargo build --verbose
+      - name: Test abstract game
+        working-directory: abstract_game
+        run: cargo test
+      - name: Test algebra
+        working-directory: algebra
+        run: cargo test
+      - name: Test cooperate
+        working-directory: cooperate
+        run: cargo test
+      - name: Test onoro
+        working-directory: onoro
+        run: cargo test
+      - name: Test main
+        run: cargo test

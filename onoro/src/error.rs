@@ -6,7 +6,7 @@ pub struct OnoroError {
 }
 
 impl OnoroError {
-  pub(crate) fn new(message: String) -> Self {
+  pub fn new(message: String) -> Self {
     OnoroError { message }
   }
 }
@@ -22,8 +22,8 @@ impl Display for OnoroError {
 #[macro_export]
 macro_rules! make_onoro_error {
   ($($args:expr),+) => {
-    $crate::onoro::OnoroError::new(format!($($args),+)).into()
+    $crate::error::OnoroError::new(format!($($args),+)).into()
   };
 }
 
-pub type OnoroResult<T> = Result<T, Box<dyn Error + Send + Sync + 'static>>;
+pub type OnoroResult<T = ()> = Result<T, Box<dyn Error + Send + Sync + 'static>>;

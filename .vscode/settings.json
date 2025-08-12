@@ -2,11 +2,12 @@
   "rust-analyzer.linkedProjects": [
     "./Cargo.toml",
     "./algebra/Cargo.toml",
+    "./ai_gen_onoro/Cargo.toml",
     "./abstract_game/Cargo.toml",
     "./cardinality_estimate/Cargo.toml",
     "./cooperate/Cargo.toml",
-    "./server/Cargo.toml",
-    "./onoro/Cargo.toml"
+    "./onoro/Cargo.toml",
+    "./onoro_impl/Cargo.toml"
   ],
   "rust-analyzer.check.command": "clippy"
 }

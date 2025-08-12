@@ -23,20 +23,6 @@ pub enum SymmetryClassContainer<C, V, E, CV, CE, EV, T> {
   Trivial(T),
 }
 
-impl<C, V, E, CV, CE, EV, T> SymmetryClassContainer<C, V, E, CV, CE, EV, T> {
-  pub fn symmetry_class(&self) -> SymmetryClass {
-    match self {
-      Self::C(_) => SymmetryClass::C,
-      Self::V(_) => SymmetryClass::V,
-      Self::E(_) => SymmetryClass::E,
-      Self::CV(_) => SymmetryClass::CV,
-      Self::CE(_) => SymmetryClass::CE,
-      Self::EV(_) => SymmetryClass::EV,
-      Self::Trivial(_) => SymmetryClass::Trivial,
-    }
-  }
-}
-
 impl<I, C, V, E, CV, CE, EV, T> Iterator for SymmetryClassContainer<C, V, E, CV, CE, EV, T>
 where
   C: Iterator<Item = I>,

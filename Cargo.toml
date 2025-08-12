@@ -7,10 +7,12 @@ edition = "2021"
 
 [dependencies]
 abstract_game = { path = "./abstract_game" }
+ai_gen_onoro = { path = "./ai_gen_onoro" }
 dashmap = "5.5"
 multiqueue = "0.3"
 cooperate = { path = "./cooperate" }
 onoro = { path = "./onoro" }
+onoro_impl = { path = "./onoro_impl" }
 pprof = { version = "0.11", features = ["flamegraph"] }
 rand = "0.8"
 rayon = "1.7"
@@ -26,3 +28,8 @@ lto = "fat"
 [[bench]]
 name = "onoro"
 harness = false
+
+[dev-dependencies]
+googletest = "0.14.2"
+rstest = "0.26.1"
+rstest_reuse = "0.7.0"

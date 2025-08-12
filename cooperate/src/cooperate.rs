@@ -106,7 +106,7 @@ where
   if depth == 0 || game.finished() != GameResult::NotFinished {
     return;
   }
-  
+
   for mv in game.each_move() {
     let next_state = game.with_move(mv);
     if depth == 1 && next_state.finished() != GameResult::NotFinished {
