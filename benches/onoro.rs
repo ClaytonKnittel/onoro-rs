@@ -5,7 +5,7 @@ use criterion::{
 };
 use itertools::Itertools;
 use onoro::Onoro;
-use onoro_impl::Onoro16;
+use onoro_impl::{benchmark_util::CheckWinBenchmark, Onoro16};
 use rand::{rngs::StdRng, Rng, SeedableRng};
 
 fn random_playout<R: Rng>(mut onoro: Onoro16, num_moves: usize, rng: &mut R) -> Onoro16 {
@@ -115,5 +115,35 @@ fn find_moves_p2(c: &mut Criterion) {
   group.finish();
 }
 
-criterion_group!(onoro_benches, find_moves_p1, find_moves_p2);
+fn check_win(c: &mut Criterion) {
+  const N_GAMES: usize = 10_000;
+
+  let mut group = c.benchmark_group("check win");
+  group.throughput(Throughput::Elements(N_GAMES as u64));
+  group.measurement_time(Duration::from_secs(20));
+
+  let mut rng = StdRng::seed_from_u64(4324908);
+
+  let mut states = generate_random_states(N_GAMES, 18, &mut rng);
+  // Make an extra move for half the games. Otherwise, it would be the same
+  // color's turn in every game.
+  for state in &mut states {
+    if rng.gen_bool(0.5) {
+      *state = random_playout(state.clone(), 1, &mut rng);
+    }
+  }
+
+  group.bench_function("check win", |b| {
+    b.iter(|| {
+      for onoro in &states {
+        for pawn in onoro.pawns() {
+          black_box(onoro.bench_check_win(pawn.pos.into()));
+        }
+      }
+    })
+  });
+  group.finish();
+}
+
+criterion_group!(onoro_benches, find_moves_p1, find_moves_p2, check_win);
 criterion_main!(onoro_benches);

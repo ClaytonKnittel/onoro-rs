@@ -1,11 +1,14 @@
-use std::{fmt::Display, num::Wrapping};
+use std::{
+  fmt::{Debug, Display},
+  num::Wrapping,
+};
 
 use onoro::{
   OnoroIndex,
   hex_pos::{HexPos, HexPosOffset},
 };
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub struct PackedIdx {
   bytes: Wrapping<u8>,
 }
@@ -108,6 +111,12 @@ impl std::ops::AddAssign<IdxOffset> for PackedIdx {
 impl Display for PackedIdx {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     write!(f, "({}, {})", self.x(), self.y())
+  }
+}
+
+impl Debug for PackedIdx {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(f, "{self}")
   }
 }
 
