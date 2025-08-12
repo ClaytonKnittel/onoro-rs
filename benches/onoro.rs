@@ -4,7 +4,7 @@ use criterion::{
   criterion_group, criterion_main, measurement::Measurement, BenchmarkGroup, Criterion, Throughput,
 };
 use itertools::Itertools;
-use onoro::Onoro;
+use onoro::{Onoro, OnoroPawn};
 use onoro_impl::{benchmark_util::CheckWinBenchmark, Onoro16};
 use rand::{rngs::StdRng, Rng, SeedableRng};
 
@@ -119,7 +119,9 @@ fn check_win(c: &mut Criterion) {
   const N_GAMES: usize = 10_000;
 
   let mut group = c.benchmark_group("check win");
-  group.throughput(Throughput::Elements(N_GAMES as u64));
+  group.throughput(Throughput::Elements(
+    (2 * Onoro16::pawns_per_player() * N_GAMES) as u64,
+  ));
   group.measurement_time(Duration::from_secs(20));
 
   let mut rng = StdRng::seed_from_u64(4324908);
@@ -137,7 +139,7 @@ fn check_win(c: &mut Criterion) {
     b.iter(|| {
       for onoro in &states {
         for pawn in onoro.pawns() {
-          black_box(onoro.bench_check_win(pawn.pos.into()));
+          black_box(onoro.bench_check_win(pawn.pos().into()));
         }
       }
     })
@@ -145,5 +147,36 @@ fn check_win(c: &mut Criterion) {
   group.finish();
 }
 
-criterion_group!(onoro_benches, find_moves_p1, find_moves_p2, check_win);
+fn get_tile(c: &mut Criterion) {
+  const N_GAMES: usize = 10_000;
+
+  let mut group = c.benchmark_group("get tile");
+  group.throughput(Throughput::Elements(
+    (2 * Onoro16::pawns_per_player() * N_GAMES) as u64,
+  ));
+  group.measurement_time(Duration::from_secs(20));
+
+  let mut rng = StdRng::seed_from_u64(901482019);
+
+  let states = generate_random_states(N_GAMES, 18, &mut rng);
+
+  group.bench_function("get tile", |b| {
+    b.iter(|| {
+      for onoro in &states {
+        for pawn in onoro.pawns() {
+          black_box(onoro.get_tile(pawn.pos()));
+        }
+      }
+    })
+  });
+  group.finish();
+}
+
+criterion_group!(
+  onoro_benches,
+  find_moves_p1,
+  find_moves_p2,
+  check_win,
+  get_tile
+);
 criterion_main!(onoro_benches);

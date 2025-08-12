@@ -21,7 +21,7 @@ use crate::{
   onoro_state::OnoroState,
   packed_hex_pos::PackedHexPos,
   packed_idx::{IdxOffset, PackedIdx},
-  util::{broadcast_u8_to_u64, equal_mask_epi8, packed_positions_to_mask},
+  util::{broadcast_u8_to_u64, equal_mask_epi8, packed_positions_to_mask, unlikely},
 };
 
 /// For move generation, the number of bits to use per-tile (for counting
@@ -154,8 +154,8 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroImpl<N, N2
       res = format!("{res}{: <width$}", "", width = max_y - y);
       for x in min_x..=max_x {
         let pos = PackedIdx::new(x as u32, y as u32);
-        let former_pawn_idx = self.get_pawn_idx(pos);
-        let new_pawn_idx = g.get_pawn_idx(pos);
+        let former_pawn_idx = self.get_pawn_idx_slow(pos);
+        let new_pawn_idx = g.get_pawn_idx_slow(pos);
 
         res = format!(
           "{res}{}",
@@ -459,15 +459,7 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroImpl<N, N2
     all_in_a_row != 0
   }
 
-  pub(crate) fn check_win(&self, last_move: HexPos) -> bool {
-    if N != 16 {
-      return self.check_win_slow(last_move);
-    }
-
-    Self::check_win_fast(&self.pawn_poses, last_move, self.onoro_state().black_turn())
-  }
-
-  pub(crate) fn check_win_slow(&self, last_move: HexPos) -> bool {
+  fn check_win_slow(&self, last_move: HexPos) -> bool {
     // Bitvector of positions occupied by pawns of this color along the 3 lines
     // extending out from last_move. Intentionally leave a zero bit between each
     // of the 3 sets so they can't form a continuous string of 1's across
@@ -510,34 +502,50 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroImpl<N, N2
     s != 0
   }
 
-  /// Given a position on the board, returns the tile state of that position,
-  /// i.e. the color of the piece on that tile, or `Empty` if no piece is there.
-  #[cfg(test)]
-  fn get_tile_slow(&self, idx: PackedIdx) -> TileState {
-    if idx == PackedIdx::null() {
+  pub(crate) fn check_win(&self, last_move: HexPos) -> bool {
+    if N != 16 {
+      return self.check_win_slow(last_move);
+    }
+
+    Self::check_win_fast(&self.pawn_poses, last_move, self.onoro_state().black_turn())
+  }
+
+  #[target_feature(enable = "ssse3")]
+  unsafe fn get_tile_fast(pawn_poses: &[PackedIdx; N], idx: PackedIdx) -> TileState {
+    use std::arch::x86_64::*;
+
+    debug_assert_eq!(N, 16);
+    if unlikely(idx == PackedIdx::null()) {
       return TileState::Empty;
     }
 
-    match self
-      .pawn_poses
-      .iter()
-      .enumerate()
-      .find(|&(_, &pos)| pos == idx)
-    {
-      Some((idx, _)) => {
-        if idx % 2 == 0 {
-          TileState::Black
-        } else {
-          TileState::White
-        }
-      }
-      None => TileState::Empty,
+    let pawns = unsafe { _mm_loadu_si128(pawn_poses.as_ptr() as *const _) };
+
+    // Construct a mask to search for `idx` in the positions lists.
+    let i = unsafe { idx.bytes() } as i8;
+    let idx_search = _mm_set_epi8(i, i, i, i, i, i, i, i, i, i, i, i, i, i, i, i);
+
+    // Search for `idx` in the positions list. This will either return 0, or
+    // a mask with a single byte set to 0xff.
+    let masked_pawns = _mm_cmpeq_epi8(pawns, idx_search);
+
+    // Compress the mask to the first 16 bits of an i32.
+    let mask = _mm_movemask_epi8(masked_pawns);
+
+    // If an even-indexed bit it set, the tile is black. Otherwise, if any
+    // other bit is set, the tile is white, else the tile is empty.
+    if (mask & 0x55_55) != 0 {
+      TileState::Black
+    } else if mask != 0 {
+      TileState::White
+    } else {
+      TileState::Empty
     }
   }
 
   /// Given a position on the board, returns the index of the pawn with that
   /// position, or `None` if no such pawn exists.
-  fn get_pawn_idx(&self, idx: PackedIdx) -> Option<u32> {
+  fn get_pawn_idx_slow(&self, idx: PackedIdx) -> Option<u32> {
     if idx == PackedIdx::null() {
       return None;
     }
@@ -567,6 +575,19 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroImpl<N, N2
     }
 
     None
+  }
+
+  fn get_tile_slow(&self, idx: PackedIdx) -> TileState {
+    match self.get_pawn_idx_slow(idx) {
+      Some(i) => {
+        if i % 2 == 0 {
+          TileState::Black
+        } else {
+          TileState::White
+        }
+      }
+      None => TileState::Empty,
+    }
   }
 
   /// Bounds checks a hex pos before turning it into a PackedIdx for lookup.
@@ -736,16 +757,11 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Onoro
   }
 
   fn get_tile(&self, idx: PackedIdx) -> TileState {
-    match self.get_pawn_idx(idx) {
-      Some(i) => {
-        if i % 2 == 0 {
-          TileState::Black
-        } else {
-          TileState::White
-        }
-      }
-      None => TileState::Empty,
+    #[cfg(target_feature = "ssse3")]
+    if N == 16 {
+      return unsafe { Self::get_tile_fast(&self.pawn_poses, idx) };
     }
+    self.get_tile_slow(idx)
   }
 
   fn pawns(&self) -> impl Iterator<Item = Pawn> + '_ {
@@ -1217,9 +1233,9 @@ mod tests {
   use std::ops::{Index, IndexMut};
 
   use googletest::{expect_false, expect_true, gtest};
-  use onoro::{Onoro, hex_pos::HexPos};
+  use onoro::{Onoro, TileState, hex_pos::HexPos};
 
-  use crate::{Onoro16, onoro_defs::Onoro8, packed_idx::PackedIdx};
+  use crate::{Onoro16, OnoroImpl, onoro_defs::Onoro8, packed_idx::PackedIdx};
 
   #[repr(align(8))]
   struct PawnPoses([PackedIdx; 16]);
@@ -1236,16 +1252,53 @@ mod tests {
     }
   }
 
+  /// Given a position on the board, returns the tile state of that position,
+  /// i.e. the color of the piece on that tile, or `Empty` if no piece is there.
+  fn get_tile_test<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize>(
+    onoro: &OnoroImpl<N, N2, ADJ_CNT_SIZE>,
+    idx: PackedIdx,
+  ) -> TileState {
+    if idx == PackedIdx::null() {
+      return TileState::Empty;
+    }
+
+    match onoro
+      .pawn_poses
+      .iter()
+      .enumerate()
+      .find(|&(_, &pos)| pos == idx)
+    {
+      Some((idx, _)) => {
+        if idx % 2 == 0 {
+          TileState::Black
+        } else {
+          TileState::White
+        }
+      }
+      None => TileState::Empty,
+    }
+  }
+
   #[test]
-  fn test_get_tile() {
+  fn test_get_tile_simple() {
     let onoro = Onoro8::default_start();
 
     for y in 0..Onoro8::board_width() {
       for x in 0..Onoro8::board_width() {
-        assert_eq!(
-          onoro.get_tile(PackedIdx::new(x as u32, y as u32)),
-          onoro.get_tile_slow(PackedIdx::new(x as u32, y as u32))
-        );
+        let idx = PackedIdx::new(x as u32, y as u32);
+        assert_eq!(onoro.get_tile(idx), get_tile_test(&onoro, idx));
+      }
+    }
+  }
+
+  #[test]
+  fn test_get_tile_simple_16() {
+    let onoro = Onoro16::default_start();
+
+    for y in 0..Onoro16::board_width() {
+      for x in 0..Onoro16::board_width() {
+        let idx = PackedIdx::new(x as u32, y as u32);
+        assert_eq!(onoro.get_tile(idx), get_tile_test(&onoro, idx));
       }
     }
   }

@@ -15,6 +15,27 @@ pub const fn unreachable() -> ! {
   }
 }
 
+#[inline(always)]
+#[cold]
+fn cold() {}
+
+#[inline(always)]
+#[allow(dead_code)]
+pub fn likely(b: bool) -> bool {
+  if !b {
+    cold()
+  }
+  b
+}
+
+#[inline(always)]
+pub fn unlikely(b: bool) -> bool {
+  if b {
+    cold()
+  }
+  b
+}
+
 macro_rules! define_cmp {
   ($max_name:ident, $min_name:ident, $t:ty) => {
     #[allow(dead_code)]
