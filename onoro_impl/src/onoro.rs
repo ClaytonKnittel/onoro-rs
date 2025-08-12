@@ -777,6 +777,8 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Onoro
   }
 
   fn make_move(&mut self, m: Move) {
+    debug_assert!(self.finished().is_none());
+
     match m {
       Move::Phase1Move { to: _ } => {
         debug_assert!(self.in_phase1());
