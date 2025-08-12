@@ -18,18 +18,42 @@ fn make_random_move<R: Rng>(onoro: &mut Onoro16, rng: &mut R) -> Move {
   m
 }
 
-fn random_playout<R: Rng>(mut onoro: Onoro16, num_moves: usize, rng: &mut R) -> Onoro16 {
-  for _ in 0..num_moves {
-    make_random_move(&mut onoro, rng);
+fn random_playout<R: Rng>(onoro: &mut Onoro16, num_moves: usize, rng: &mut R) -> usize {
+  for i in 1..=num_moves {
+    make_random_move(onoro, rng);
+    if onoro.finished().is_some() {
+      return i;
+    }
   }
-  onoro
+
+  num_moves
 }
 
 #[inline(never)]
-fn generate_random_states<R: Rng>(count: usize, num_moves: usize, rng: &mut R) -> Vec<Onoro16> {
-  (0..count)
-    .map(|_| random_playout(Onoro16::default_start(), num_moves, rng))
-    .collect()
+fn generate_random_states<R: Rng>(
+  count: usize,
+  num_moves: usize,
+  rng: &mut R,
+) -> OnoroResult<Vec<Onoro16>> {
+  let mut states = Vec::with_capacity(count);
+
+  let attempts = 100 * count;
+  for _ in 0..attempts {
+    let mut onoro = Onoro16::default_start();
+    if random_playout(&mut onoro, num_moves, rng) == num_moves {
+      states.push(onoro);
+    }
+    if states.len() == count {
+      return Ok(states);
+    }
+  }
+
+  Err(
+    OnoroError::new(format!(
+      "Failed to generate {count} random states with {num_moves} moves after {attempts} attempts"
+    ))
+    .into(),
+  )
 }
 
 #[inline(never)]
@@ -68,8 +92,8 @@ fn benchmark_each_move<M: Measurement, R: Rng>(
   num_games: usize,
   num_moves: usize,
   rng: &mut R,
-) {
-  let states = generate_random_states(num_games, num_moves, rng);
+) -> OnoroResult {
+  let states = generate_random_states(num_games, num_moves, rng)?;
   group.bench_function(id, |b| {
     b.iter(|| {
       for onoro in &states {
@@ -79,6 +103,8 @@ fn benchmark_each_move<M: Measurement, R: Rng>(
       }
     })
   });
+
+  Ok(())
 }
 
 fn find_moves_p1(c: &mut Criterion) {
@@ -96,7 +122,8 @@ fn find_moves_p1(c: &mut Criterion) {
     N_GAMES,
     4,
     &mut rng,
-  );
+  )
+  .unwrap();
 
   benchmark_each_move(
     &mut group,
@@ -104,7 +131,8 @@ fn find_moves_p1(c: &mut Criterion) {
     N_GAMES,
     8,
     &mut rng,
-  );
+  )
+  .unwrap();
 
   benchmark_each_move(
     &mut group,
@@ -112,7 +140,8 @@ fn find_moves_p1(c: &mut Criterion) {
     N_GAMES,
     12,
     &mut rng,
-  );
+  )
+  .unwrap();
 
   group.finish();
 }
@@ -132,7 +161,8 @@ fn find_moves_p2(c: &mut Criterion) {
     N_GAMES,
     13,
     &mut rng,
-  );
+  )
+  .unwrap();
 
   benchmark_each_move(
     &mut group,
@@ -140,7 +170,8 @@ fn find_moves_p2(c: &mut Criterion) {
     N_GAMES,
     15,
     &mut rng,
-  );
+  )
+  .unwrap();
 
   benchmark_each_move(
     &mut group,
@@ -148,7 +179,8 @@ fn find_moves_p2(c: &mut Criterion) {
     N_GAMES,
     17,
     &mut rng,
-  );
+  )
+  .unwrap();
 
   group.finish();
 }
@@ -158,8 +190,7 @@ fn make_move(c: &mut Criterion) {
 
   let mut rng = StdRng::seed_from_u64(4328975198);
 
-  let states = generate_random_walks(&OnoroImpl::default_start(), N_GAMES, &mut rng)
-    .expect("Failed to generate random walks");
+  let states = generate_random_walks(&OnoroImpl::default_start(), N_GAMES, &mut rng).unwrap();
 
   let num_elements = states.iter().map(|(_, moves)| moves.len()).sum::<usize>();
 
@@ -192,12 +223,12 @@ fn check_win(c: &mut Criterion) {
 
   let mut rng = StdRng::seed_from_u64(4324908);
 
-  let mut states = generate_random_states(N_GAMES, 18, &mut rng);
+  let mut states = generate_random_states(N_GAMES, 18, &mut rng).unwrap();
   // Make an extra move for half the games. Otherwise, it would be the same
   // color's turn in every game.
   for state in &mut states {
-    if rng.gen_bool(0.5) {
-      *state = random_playout(state.clone(), 1, &mut rng);
+    if state.finished().is_none() && rng.gen_bool(0.5) {
+      random_playout(state, 1, &mut rng);
     }
   }
 
@@ -224,7 +255,7 @@ fn get_tile(c: &mut Criterion) {
 
   let mut rng = StdRng::seed_from_u64(901482019);
 
-  let states = generate_random_states(N_GAMES, 18, &mut rng);
+  let states = generate_random_states(N_GAMES, 18, &mut rng).unwrap();
 
   group.bench_function("get tile", |b| {
     b.iter(|| {
