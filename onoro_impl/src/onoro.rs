@@ -382,7 +382,7 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroImpl<N, N2
   fn check_win_fast(pawn_poses: &[PackedIdx; N], last_move: HexPos, black_turn: bool) -> bool {
     debug_assert_eq!(N, 16);
 
-    /// Masks off the pawns in odd-indexed bytes.
+    /// Masks off the pawns in even-indexed bytes.
     const SINGLE_COLOR_MASK: u64 = 0x00ff00ff_00ff00ff;
 
     /// Selects the x-coordinates of every PackedIdx position.
@@ -396,7 +396,7 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroImpl<N, N2
 
     // Given one half of the packed positions, returns the positions of the
     // pawns for the last player to move in the even-indexed bytes of a u64.
-    let align_to_mask = |array: &[PackedIdx]| -> u64 {
+    let extract_last_player_pawns = |array: &[PackedIdx]| -> u64 {
       let positions = unsafe { *(array.as_ptr() as *const u64) };
       let positions = positions >> (black_turn as u32 * 8);
       positions & SINGLE_COLOR_MASK
@@ -404,8 +404,8 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroImpl<N, N2
 
     // Extract the positions of the pawns of the last player to move, then
     // combine them into a single u64.
-    let low_positions = align_to_mask(&pawn_poses[0..8]);
-    let hi_positions = align_to_mask(&pawn_poses[8..16]);
+    let low_positions = extract_last_player_pawns(&pawn_poses[0..8]);
+    let hi_positions = extract_last_player_pawns(&pawn_poses[8..16]);
     let all_pawns = low_positions | (hi_positions << 8);
 
     // Extract the x and y coordinates of the pawns.
@@ -424,8 +424,8 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroImpl<N, N2
 
     // Mask off any positions which were not equal to `last_move` in the other
     // dimension. Note that for (x - y), we can use either x or y as indices
-    // for the positions, since both the x- and y-coordinates sequential along
-    // these diagonal lines.
+    // for the positions, since both the x- and y-coordinates are sequential
+    // along these diagonal lines.
     let x_equal_y_coords = x_equal_mask & pawns_y;
     let y_equal_x_coords = y_equal_mask & pawns_x;
     let xy_equal_x_coords = delta_equal_mask & pawns_x;

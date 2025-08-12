@@ -74,7 +74,7 @@ unsafe fn packed_positions_to_mask_sse3(packed_positions: u64) -> u64 {
   //
   // Since the range of bytes we support is 0 - 15, we need 2 bytes to
   // represent (1 << (index - 1)) for all possible indices. The size of entries
-  // in the lookup table is 8 bytes, so we have two lookup tables, one holding
+  // in the lookup table is 1 byte, so we have two lookup tables, one holding
   // the lower half of the masks and one holding the upper half.
   #[rustfmt::skip]
   let lo_data = _mm_set_epi8(
@@ -124,9 +124,9 @@ fn packed_positions_to_mask_slow(packed_positions: u64) -> u64 {
     .fold(0, |mask, byte| mask | (1u64 << (byte - 1)))
 }
 
-/// Given 8 byte values packed into a u64, returns a u64 with each
-/// corresponding bit index set for each byte (1-indexed). Zero byte values are
-/// ignored. All non-zero bytes must be unique.
+/// Returns a u64 with bits set in the positions indicated by the byte values
+/// in `packed_positions`, minus 1. Zero byte values are ignored. All non-zero
+/// bytes must be unique.
 #[inline(always)]
 pub fn packed_positions_to_mask(packed_positions: u64) -> u64 {
   #[cfg(target_feature = "ssse3")]
