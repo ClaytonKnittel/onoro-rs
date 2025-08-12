@@ -12,7 +12,28 @@ use onoro_impl::{benchmark_util::CheckWinBenchmark, Move, Onoro16};
 use rand::{rngs::StdRng, Rng, SeedableRng};
 
 fn make_random_move<R: Rng>(onoro: &mut Onoro16, rng: &mut R) -> Move {
-  let moves = onoro.each_move().collect_vec();
+  let mut moves = onoro.each_move().collect_vec();
+  moves.sort_by(|&m1, &m2| match (m1, m2) {
+    (Move::Phase1Move { to: to1 }, Move::Phase1Move { to: to2 }) => {
+      (to1.x(), to1.y()).cmp(&(to2.x(), to2.y()))
+    }
+
+    (
+      Move::Phase2Move {
+        to: to1,
+        from_idx: from1,
+      },
+      Move::Phase2Move {
+        to: to2,
+        from_idx: from2,
+      },
+    ) => (to1.x(), to1.y())
+      .cmp(&(to2.x(), to2.y()))
+      .then(from1.cmp(&from2)),
+
+    // All moves should be in the same phase.
+    _ => unreachable!(),
+  });
   let m = moves[rng.gen_range(0..moves.len())];
   onoro.make_move(m);
   m
