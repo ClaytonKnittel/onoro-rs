@@ -3,9 +3,9 @@ use std::fmt::Debug;
 use itertools::interleave;
 
 use crate::{
-  error::OnoroError,
+  error::{OnoroError, OnoroResult},
   hex_pos::HexPosOffset,
-  onoro_util::{pawns_from_board_string, BoardLayoutPawns},
+  onoro_util::{BoardLayoutPawns, pawns_from_board_string},
 };
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -259,10 +259,12 @@ pub trait Onoro: Sized {
     for i in 0..(n_pawns - 1) / 2 {
       pawns.swap(2 * i + 1, n_pawns.div_ceil(2) + i);
     }
-    debug_assert!(pawns
-      .iter()
-      .enumerate()
-      .all(|(idx, (_, color))| { (idx % 2 == 0) == matches!(color, PawnColor::Black) }));
+    debug_assert!(
+      pawns
+        .iter()
+        .enumerate()
+        .all(|(idx, (_, color))| { (idx % 2 == 0) == matches!(color, PawnColor::Black) })
+    );
 
     Ok(Self::from_indexes(pawns.into_iter().map(|(pos, _)| {
       Self::Index::from_coords((pos.x() - min_x + 1) as u32, (pos.y() - min_y + 1) as u32)
@@ -286,6 +288,12 @@ pub trait Onoro: Sized {
          B W .",
     )
     .unwrap()
+  }
+
+  /// Validates the game state, returning an error if the state is invalid.
+  /// This is used in tests to ensure that the game state is consistent.
+  fn validate(&self) -> OnoroResult {
+    Ok(())
   }
 
   fn display(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

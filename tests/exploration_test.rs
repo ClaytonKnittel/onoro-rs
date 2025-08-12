@@ -1,10 +1,13 @@
-use googletest::{assert_that, gtest, prelude::container_eq};
-use onoro::{
-  error::{OnoroError, OnoroResult},
-  test_util::{normalized_ordered_moves, OnoroCmp, OnoroFactory, BOARD_POSITIONS},
-  Onoro,
+use googletest::{
+  assert_that, gtest,
+  prelude::{container_eq, ok},
 };
-use rand::{rngs::StdRng, Rng, SeedableRng};
+use onoro::{
+  Onoro,
+  error::{OnoroError, OnoroResult},
+  test_util::{BOARD_POSITIONS, OnoroCmp, OnoroFactory, normalized_ordered_moves},
+};
+use rand::{Rng, SeedableRng, rngs::StdRng};
 use rstest::rstest;
 use rstest_reuse::{apply, template};
 
@@ -74,6 +77,8 @@ fn test_random_exploration<T: OnoroFactory, U: OnoroFactory>(
   let mut rng = StdRng::seed_from_u64(seed);
 
   for _ in 0..MAX_ITERS {
+    assert_that!(onoro1.validate(), ok(()));
+    assert_that!(onoro2.validate(), ok(()));
     assert_eq!(
       onoro1.in_phase1(),
       onoro2.in_phase1(),
