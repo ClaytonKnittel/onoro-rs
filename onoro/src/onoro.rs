@@ -3,7 +3,7 @@ use std::fmt::Debug;
 use itertools::interleave;
 
 use crate::{
-  error::OnoroError,
+  error::{OnoroError, OnoroResult},
   hex_pos::HexPosOffset,
   onoro_util::{BoardLayoutPawns, pawns_from_board_string},
 };
@@ -288,6 +288,12 @@ pub trait Onoro: Sized {
          B W .",
     )
     .unwrap()
+  }
+
+  /// Validates the game state, returning an error if the state is invalid.
+  /// This is used in tests to ensure that the game state is consistent.
+  fn validate(&self) -> OnoroResult {
+    Ok(())
   }
 
   fn display(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

@@ -594,8 +594,110 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroImpl<N, N2
       self.get_tile(idx.into())
     }
   }
+}
 
-  pub fn validate(&self) -> OnoroResult {
+impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Onoro
+  for OnoroImpl<N, N2, ADJ_CNT_SIZE>
+{
+  type Index = PackedIdx;
+  type Move = Move;
+  type Pawn = Pawn;
+
+  unsafe fn new() -> Self {
+    Self {
+      pawn_poses: [PackedIdx::null(); N],
+      state: OnoroState::new(),
+      sum_of_mass: HexPos::zero().into(),
+    }
+  }
+
+  fn pawns_per_player() -> usize {
+    N / 2
+  }
+
+  fn turn(&self) -> PawnColor {
+    if self.onoro_state().black_turn() {
+      PawnColor::Black
+    } else {
+      PawnColor::White
+    }
+  }
+
+  fn pawns_in_play(&self) -> u32 {
+    self.onoro_state().turn() + 1
+  }
+
+  fn finished(&self) -> Option<PawnColor> {
+    self.onoro_state().finished().then(|| {
+      if self.onoro_state().black_turn() {
+        PawnColor::White
+      } else {
+        PawnColor::Black
+      }
+    })
+  }
+
+  fn get_tile(&self, idx: PackedIdx) -> TileState {
+    #[cfg(target_feature = "ssse3")]
+    if N == 16 {
+      return unsafe { Self::get_tile_fast(&self.pawn_poses, idx) };
+    }
+    self.get_tile_slow(idx)
+  }
+
+  fn pawns(&self) -> impl Iterator<Item = Pawn> + '_ {
+    self.pawns_typed()
+  }
+
+  fn in_phase1(&self) -> bool {
+    self.onoro_state().turn() < 0xf
+  }
+
+  fn each_move(&self) -> impl Iterator<Item = Move> {
+    self.each_move_gen().to_iter(self)
+  }
+
+  fn make_move(&mut self, m: Move) {
+    debug_assert!(self.finished().is_none());
+
+    match m {
+      Move::Phase1Move { to: _ } => {
+        debug_assert!(self.in_phase1());
+      }
+      Move::Phase2Move { to: _, from_idx: _ } => {
+        debug_assert!(!self.in_phase1());
+      }
+    }
+    unsafe { self.make_move_unchecked(m) }
+  }
+
+  unsafe fn make_move_unchecked(&mut self, m: Move) {
+    match m {
+      Move::Phase1Move { to } => {
+        // Increment the turn first, so self.onoro_state().turn() is 0 for turn
+        // 1.
+        self.mut_onoro_state().inc_turn();
+        let pawn_idx = self.onoro_state().turn() as usize;
+        self.place_pawn(pawn_idx, to);
+      }
+      Move::Phase2Move { to, from_idx } => {
+        self.mut_onoro_state().swap_player_turn();
+        self.move_pawn(from_idx as usize, to);
+      }
+    }
+  }
+
+  fn to_move_wrapper(&self, m: &Move) -> OnoroMoveWrapper<PackedIdx> {
+    match *m {
+      Move::Phase1Move { to } => OnoroMoveWrapper::Phase1 { to },
+      Move::Phase2Move { to, from_idx } => OnoroMoveWrapper::Phase2 {
+        from: *self.pawn_poses.get(from_idx as usize).unwrap(),
+        to,
+      },
+    }
+  }
+
+  fn validate(&self) -> OnoroResult {
     let mut n_b_pawns = 0u32;
     let mut n_w_pawns = 0u32;
     let mut sum_of_mass = HexPos::zero();
@@ -708,108 +810,6 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroImpl<N, N2
     }
 
     Ok(())
-  }
-}
-
-impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Onoro
-  for OnoroImpl<N, N2, ADJ_CNT_SIZE>
-{
-  type Index = PackedIdx;
-  type Move = Move;
-  type Pawn = Pawn;
-
-  unsafe fn new() -> Self {
-    Self {
-      pawn_poses: [PackedIdx::null(); N],
-      state: OnoroState::new(),
-      sum_of_mass: HexPos::zero().into(),
-    }
-  }
-
-  fn pawns_per_player() -> usize {
-    N / 2
-  }
-
-  fn turn(&self) -> PawnColor {
-    if self.onoro_state().black_turn() {
-      PawnColor::Black
-    } else {
-      PawnColor::White
-    }
-  }
-
-  fn pawns_in_play(&self) -> u32 {
-    self.onoro_state().turn() + 1
-  }
-
-  fn finished(&self) -> Option<PawnColor> {
-    self.onoro_state().finished().then(|| {
-      if self.onoro_state().black_turn() {
-        PawnColor::White
-      } else {
-        PawnColor::Black
-      }
-    })
-  }
-
-  fn get_tile(&self, idx: PackedIdx) -> TileState {
-    #[cfg(target_feature = "ssse3")]
-    if N == 16 {
-      return unsafe { Self::get_tile_fast(&self.pawn_poses, idx) };
-    }
-    self.get_tile_slow(idx)
-  }
-
-  fn pawns(&self) -> impl Iterator<Item = Pawn> + '_ {
-    self.pawns_typed()
-  }
-
-  fn in_phase1(&self) -> bool {
-    self.onoro_state().turn() < 0xf
-  }
-
-  fn each_move(&self) -> impl Iterator<Item = Move> {
-    self.each_move_gen().to_iter(self)
-  }
-
-  fn make_move(&mut self, m: Move) {
-    debug_assert!(self.finished().is_none());
-
-    match m {
-      Move::Phase1Move { to: _ } => {
-        debug_assert!(self.in_phase1());
-      }
-      Move::Phase2Move { to: _, from_idx: _ } => {
-        debug_assert!(!self.in_phase1());
-      }
-    }
-    unsafe { self.make_move_unchecked(m) }
-  }
-
-  unsafe fn make_move_unchecked(&mut self, m: Move) {
-    match m {
-      Move::Phase1Move { to } => {
-        // Increment the turn first, so self.onoro_state().turn() is 0 for turn
-        // 1.
-        self.mut_onoro_state().inc_turn();
-        let pawn_idx = self.onoro_state().turn() as usize;
-        self.place_pawn(pawn_idx, to);
-      }
-      Move::Phase2Move { to, from_idx } => {
-        self.mut_onoro_state().swap_player_turn();
-        self.move_pawn(from_idx as usize, to);
-      }
-    }
-  }
-
-  fn to_move_wrapper(&self, m: &Move) -> OnoroMoveWrapper<PackedIdx> {
-    match *m {
-      Move::Phase1Move { to } => OnoroMoveWrapper::Phase1 { to },
-      Move::Phase2Move { to, from_idx } => OnoroMoveWrapper::Phase2 {
-        from: *self.pawn_poses.get(from_idx as usize).unwrap(),
-        to,
-      },
-    }
   }
 }
 
