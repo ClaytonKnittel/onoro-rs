@@ -520,21 +520,23 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroImpl<N, N2
     }
 
     let pawns = unsafe { _mm_loadu_si128(pawn_poses.as_ptr() as *const _) };
-    let extract_black_pawns =
-      _mm_set_epi8(-1, -1, -1, -1, -1, -1, -1, -1, 14, 12, 10, 8, 6, 4, 2, 0);
-    let extract_white_pawns =
-      _mm_set_epi8(-1, -1, -1, -1, -1, -1, -1, -1, 15, 13, 11, 9, 7, 5, 3, 1);
 
+    // Construct a mask to search for `idx` in the positions lists.
     let i = unsafe { idx.bytes() } as i8;
     let idx_search = _mm_set_epi8(i, i, i, i, i, i, i, i, i, i, i, i, i, i, i, i);
-    let pawns = _mm_cmpeq_epi8(pawns, idx_search);
 
-    let black_pawns = _mm_cvtsi128_si64(_mm_shuffle_epi8(pawns, extract_black_pawns)) as u64;
-    let white_pawns = _mm_cvtsi128_si64(_mm_shuffle_epi8(pawns, extract_white_pawns)) as u64;
+    // Search for `idx` in the positions list. This will either return 0, or
+    // a mask with a single byte set to 0xff.
+    let masked_pawns = _mm_cmpeq_epi8(pawns, idx_search);
 
-    if black_pawns != 0 {
+    // Compress the mask to the first 16 bits of an i32.
+    let mask = _mm_movemask_epi8(masked_pawns);
+
+    // If an even-indexed bit it set, the tile is black. Otherwise, if any
+    // other bit is set, the tile is white, else the tile is empty.
+    if (mask & 0x55_55) != 0 {
       TileState::Black
-    } else if white_pawns != 0 {
+    } else if mask != 0 {
       TileState::White
     } else {
       TileState::Empty
