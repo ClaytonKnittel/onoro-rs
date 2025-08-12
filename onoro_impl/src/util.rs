@@ -130,9 +130,7 @@ unsafe fn packed_positions_to_mask_sse3(packed_positions: u64) -> u64 {
   // guaranteed to be unique, so we can add them instead of bitwise-or'ing
   // them.
   let masks = lo_masks + hi_masks;
-  let masks = masks + (masks >> 16);
-  let masks = masks + (masks >> 32);
-  masks & 0x0000_0000_0000_ffff
+  masks.overflowing_mul(0x0001_0001_0001_0001).0 >> 48
 }
 
 #[cfg(any(test, not(target_feature = "ssse3")))]
