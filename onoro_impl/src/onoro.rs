@@ -869,6 +869,7 @@ pub struct PawnGeneratorImpl<
   const N2: usize,
   const ADJ_CNT_SIZE: usize,
 > {
+  // TODO: Should this be a u8?
   pawn_idx: usize,
 }
 
