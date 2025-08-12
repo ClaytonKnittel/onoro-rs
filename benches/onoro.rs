@@ -193,7 +193,8 @@ fn make_move(c: &mut Criterion) {
 
   let mut rng = StdRng::seed_from_u64(4328975198);
 
-  let states = generate_random_walks(&Onoro16::default_start(), N_GAMES, &mut rng).unwrap();
+  let initial_state = Onoro16::default_start();
+  let states = generate_random_walks(&initial_state, N_GAMES, &mut rng).unwrap();
 
   let num_elements = states.iter().map(|moves| moves.len()).sum::<usize>();
 
@@ -204,7 +205,7 @@ fn make_move(c: &mut Criterion) {
   group.bench_function("make move", |b| {
     b.iter(|| {
       for moves in &states {
-        let mut onoro = Onoro16::default_start();
+        let mut onoro = initial_state.clone();
         for &m in moves {
           onoro.make_move(m);
         }
