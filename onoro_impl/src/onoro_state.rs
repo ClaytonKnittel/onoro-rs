@@ -19,13 +19,14 @@ impl OnoroState {
   const BLACK_TURN: u8 = 0x01;
   const FINISHED: u8 = 0x04;
   const TURN_MASK: u8 = 0xf0;
+  const TURN_INC: u8 = 0x10;
   const DATA_MASK: u8 = Self::BLACK_TURN | Self::FINISHED | Self::TURN_MASK;
 
   pub const fn new() -> Self {
     // Initialize turn to 0xf, so that after the first pawn is placed, it will
     // become 0.
     Self {
-      data: Self::TURN_MASK,
+      data: Self::TURN_MASK | Self::BLACK_TURN,
     }
   }
 
@@ -36,7 +37,7 @@ impl OnoroState {
   /// Increment the turn and swap which player's turn it is. This should be used
   /// only in phase 1, where the turn count increments.
   pub fn inc_turn(&mut self) {
-    self.data = (self.data + (Self::TURN_MASK | Self::BLACK_TURN)) & Self::DATA_MASK;
+    self.data = self.data.wrapping_add(Self::TURN_INC | Self::BLACK_TURN) & Self::DATA_MASK;
   }
 
   pub const fn black_turn(&self) -> bool {
