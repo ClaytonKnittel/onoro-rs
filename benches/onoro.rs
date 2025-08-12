@@ -4,15 +4,23 @@ use criterion::{
   criterion_group, criterion_main, measurement::Measurement, BenchmarkGroup, Criterion, Throughput,
 };
 use itertools::Itertools;
-use onoro::{Onoro, OnoroPawn};
-use onoro_impl::{benchmark_util::CheckWinBenchmark, Onoro16};
+use onoro::{
+  error::{OnoroError, OnoroResult},
+  Onoro, OnoroPawn,
+};
+use onoro_impl::{benchmark_util::CheckWinBenchmark, Move, Onoro16, OnoroImpl};
 use rand::{rngs::StdRng, Rng, SeedableRng};
+
+fn make_random_move<R: Rng>(onoro: &mut Onoro16, rng: &mut R) -> Move {
+  let moves = onoro.each_move().collect_vec();
+  let m = moves[rng.gen_range(0..moves.len())];
+  onoro.make_move(m);
+  m
+}
 
 fn random_playout<R: Rng>(mut onoro: Onoro16, num_moves: usize, rng: &mut R) -> Onoro16 {
   for _ in 0..num_moves {
-    let moves = onoro.each_move().collect_vec();
-    let m = moves[rng.gen_range(0..moves.len())];
-    onoro.make_move(m);
+    make_random_move(&mut onoro, rng);
   }
   onoro
 }
@@ -21,6 +29,36 @@ fn random_playout<R: Rng>(mut onoro: Onoro16, num_moves: usize, rng: &mut R) -> 
 fn generate_random_states<R: Rng>(count: usize, num_moves: usize, rng: &mut R) -> Vec<Onoro16> {
   (0..count)
     .map(|_| random_playout(Onoro16::default_start(), num_moves, rng))
+    .collect()
+}
+
+#[inline(never)]
+fn generate_random_walks<R: Rng>(
+  initial_state: &Onoro16,
+  count: usize,
+  rng: &mut R,
+) -> OnoroResult<Vec<(Onoro16, Vec<Move>)>> {
+  const MAX_MOVES: usize = 1000;
+  debug_assert!(initial_state.finished().is_none());
+
+  (0..count)
+    .map(|_| {
+      let mut onoro = initial_state.clone();
+      let mut moves = Vec::new();
+      for _ in 0..MAX_MOVES {
+        if onoro.finished().is_some() {
+          return Ok((onoro, moves));
+        }
+        moves.push(make_random_move(&mut onoro, rng));
+      }
+
+      Err(
+        OnoroError::new(format!(
+          "Exceeded maximum number of moves {MAX_MOVES} without finishing the game."
+        ))
+        .into(),
+      )
+    })
     .collect()
 }
 
@@ -115,6 +153,34 @@ fn find_moves_p2(c: &mut Criterion) {
   group.finish();
 }
 
+fn make_move(c: &mut Criterion) {
+  const N_GAMES: usize = 10_000;
+
+  let mut rng = StdRng::seed_from_u64(4328975198);
+
+  let states = generate_random_walks(&OnoroImpl::default_start(), N_GAMES, &mut rng)
+    .expect("Failed to generate random walks");
+
+  let num_elements = states.iter().map(|(_, moves)| moves.len()).sum::<usize>();
+
+  let mut group = c.benchmark_group("make move");
+  group.throughput(Throughput::Elements(num_elements as u64));
+  group.measurement_time(Duration::from_secs(20));
+
+  group.bench_function("make move", |b| {
+    b.iter(|| {
+      for (onoro, moves) in &states {
+        let mut onoro = onoro.clone();
+        for &m in moves {
+          onoro.make_move(m);
+        }
+        black_box(onoro);
+      }
+    })
+  });
+  group.finish();
+}
+
 fn check_win(c: &mut Criterion) {
   const N_GAMES: usize = 10_000;
 
@@ -176,6 +242,7 @@ criterion_group!(
   onoro_benches,
   find_moves_p1,
   find_moves_p2,
+  make_move,
   check_win,
   get_tile
 );
