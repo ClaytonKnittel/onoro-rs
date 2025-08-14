@@ -1,4 +1,6 @@
 .DS_Store
 target
+*.s
+*.svg
 *.swp
 output.txt
