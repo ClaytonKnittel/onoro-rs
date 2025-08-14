@@ -19,6 +19,7 @@ use crate::{
   canonicalize::{BoardSymmetryState, board_symm_state},
   r#move::Move,
   onoro_state::OnoroState,
+  p1_move_gen::P1MoveGenerator,
   packed_hex_pos::PackedHexPos,
   packed_idx::{IdxOffset, PackedIdx},
   util::{broadcast_u8_to_u64, equal_mask_epi8, packed_positions_to_mask, unlikely},
@@ -250,6 +251,11 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroImpl<N, N2
     }
   }
 
+  #[cfg(test)]
+  pub(crate) fn pawn_poses(&self) -> &[PackedIdx; N] {
+    &self.pawn_poses
+  }
+
   pub fn sum_of_mass(&self) -> PackedHexPos {
     self.sum_of_mass
   }
@@ -283,11 +289,7 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroImpl<N, N2
 
   fn p1_move_gen(&self) -> P1MoveGenerator<N, N2, ADJ_CNT_SIZE> {
     debug_assert!(self.in_phase1());
-    P1MoveGenerator {
-      pawn_iter: self.pawns_gen(),
-      neighbor_iter: None,
-      adjacency_counts: [0; ADJ_CNT_SIZE],
-    }
+    P1MoveGenerator::new(&self.pawn_poses)
   }
 
   fn p2_move_gen(&self) -> P2MoveGenerator<N, N2, ADJ_CNT_SIZE> {
@@ -919,59 +921,6 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroIterator
     match self {
       Self::P1Moves(p1_iter) => p1_iter.next(onoro),
       Self::P2Moves(p2_iter) => p2_iter.next(onoro),
-    }
-  }
-}
-
-pub struct P1MoveGenerator<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> {
-  pawn_iter: PawnGenerator<N, N2, ADJ_CNT_SIZE>,
-  neighbor_iter: Option<std::array::IntoIter<HexPos, 6>>,
-
-  /// Bitvector of 2-bit numbers per tile in the whole game board. Each number
-  /// is the number of neighbors a pawn has, capping out at 2.
-  adjacency_counts: [u64; ADJ_CNT_SIZE],
-}
-
-impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroIterator
-  for P1MoveGenerator<N, N2, ADJ_CNT_SIZE>
-{
-  type Item = Move;
-  type Game = OnoroImpl<N, N2, ADJ_CNT_SIZE>;
-
-  fn next(&mut self, onoro: &Self::Game) -> Option<Self::Item> {
-    loop {
-      if let Some(neighbor) = self.neighbor_iter.as_mut().and_then(|iter| iter.next()) {
-        // Bypass the bounds check in get_tile_hex_pos, since we know all pawns
-        // are within a margin of 1 from the border.
-        if onoro.get_tile(neighbor.into()) != TileState::Empty {
-          continue;
-        }
-
-        let ord = OnoroImpl::<N, N2, ADJ_CNT_SIZE>::hex_pos_ord(&neighbor);
-        let tb_shift = TILE_BITS * (ord % (64 / TILE_BITS));
-        let tbb = unsafe { *self.adjacency_counts.get_unchecked(ord / (64 / TILE_BITS)) };
-        let mask = TILE_MASK << tb_shift;
-        let full_mask = MIN_NEIGHBORS_PER_PAWN << tb_shift;
-
-        if (tbb & mask) != full_mask {
-          let tbb = tbb + (1u64 << tb_shift);
-          unsafe {
-            *self
-              .adjacency_counts
-              .get_unchecked_mut(ord / (64 / TILE_BITS)) = tbb;
-          }
-
-          if (tbb & mask) == full_mask {
-            return Some(Move::Phase1Move {
-              to: neighbor.into(),
-            });
-          }
-        }
-      } else if let Some(pawn) = self.pawn_iter.next(onoro) {
-        self.neighbor_iter = Some(HexPos::from(pawn.pos).each_neighbor());
-      } else {
-        return None;
-      }
     }
   }
 }

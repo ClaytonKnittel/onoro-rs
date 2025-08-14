@@ -5,6 +5,8 @@ use std::arch::x86_64::{
 
 use itertools::Itertools;
 
+use crate::PackedIdx;
+
 #[inline]
 pub const fn unreachable() -> ! {
   #[cfg(debug_assertions)]
@@ -196,6 +198,45 @@ pub fn equal_mask_epi8(byte_vec: u64, needle: u8) -> u64 {
   }
   #[cfg(not(target_feature = "ssse3"))]
   equal_mask_epi8_slow(byte_vec, needle)
+}
+
+// #[cfg(any(test, not(target_feature = "ssse3")))]
+#[inline]
+fn packed_positions_bounding_box_slow(pawn_poses: &[PackedIdx]) -> (PackedIdx, PackedIdx) {
+  debug_assert!(!pawn_poses.is_empty(), "Pawn positions cannot be empty");
+
+  let (min_pos, max_pos) = pawn_poses
+    .iter()
+    .filter(|&&pos| pos != PackedIdx::null())
+    .fold(
+      ((u32::MAX, u32::MAX), (0, 0)),
+      |(min_pos, max_pos), &pos| {
+        (
+          (min_pos.0.min(pos.x()), min_pos.1.min(pos.y())),
+          (max_pos.0.max(pos.x()), max_pos.1.max(pos.y())),
+        )
+      },
+    );
+
+  (
+    PackedIdx::new(min_pos.0, min_pos.1),
+    PackedIdx::new(max_pos.0, max_pos.1),
+  )
+}
+
+#[inline(always)]
+pub fn packed_positions_bounding_box<const N: usize>(
+  pawn_poses: &[PackedIdx; N],
+) -> (PackedIdx, PackedIdx) {
+  #[cfg(target_feature = "ssse3")]
+  // TODO: Implement fast version.
+  // if N == 16 {
+  //   return unsafe {
+  //     packed_positions_boinding_box_sse3(pawn_poses)
+  //   };
+  // }
+  // #[cfg(not(target_feature = "ssse3"))]
+  packed_positions_bounding_box_slow(pawn_poses)
 }
 
 #[cfg(test)]
