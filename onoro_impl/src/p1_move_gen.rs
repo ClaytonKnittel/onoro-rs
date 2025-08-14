@@ -1,4 +1,5 @@
 use abstract_game::OnoroIterator;
+use num_traits::{PrimInt, Unsigned};
 
 use crate::{IdxOffset, Move, OnoroImpl, PackedIdx, util::packed_positions_bounding_box};
 
@@ -12,9 +13,9 @@ impl BoardVecIndexer {
     Self { lower_left, width }
   }
 
-  fn index(&self, pos: PackedIdx) -> u32 {
+  fn index(&self, pos: PackedIdx) -> usize {
     let d = unsafe { PackedIdx::from_idx_offset(pos - self.lower_left) };
-    d.y() * self.width as u32 + d.x()
+    d.y() as usize * self.width as usize + d.x() as usize
   }
 
   fn pos_from_index(&self, index: u32) -> PackedIdx {
@@ -23,40 +24,111 @@ impl BoardVecIndexer {
     self.lower_left + IdxOffset::new(x as i32, y as i32)
   }
 
-  fn build_bitvecs(&self, pawn_poses: &[PackedIdx]) -> (u64, u64) {
-    let width = self.width as u32;
-    let neighbors_mask = 0x3 | (0x5 << width) | (0x6 << (2 * width));
+  fn build_bitvecs<I: PrimInt>(&self, pawn_poses: &[PackedIdx]) -> (I, I) {
+    let width = self.width as usize;
+    let neighbors_mask =
+      unsafe { I::from(0x3 | (0x5 << width) | (0x6 << (2 * width))).unwrap_unchecked() };
 
     let (board, neighbor_candidates) = pawn_poses
       .iter()
       .filter(|&&pos| pos != PackedIdx::null())
-      .fold((0, 0), |(board_vec, neighbors_vec), &pos| {
-        let index = self.index(pos);
-        debug_assert!(index > width);
-        (
-          board_vec | (1u64 << index),
-          neighbors_vec | (neighbors_mask << (index - width - 1)),
-        )
-      });
+      .fold(
+        (I::zero(), I::zero()),
+        |(board_vec, neighbors_vec), &pos| {
+          let index = self.index(pos);
+          debug_assert!(index > width);
+          (
+            board_vec | (I::one() << index),
+            neighbors_vec | (neighbors_mask << (index - width - 1)),
+          )
+        },
+      );
 
     (board, neighbor_candidates & !board)
   }
 
-  fn neighbors_mask(&self, index: u32) -> u64 {
-    let lesser_neighbors_mask = 0x3 | (0x1 << self.width);
-    let greater_neighbors_mask = 0x2 | (0x3 << self.width);
+  fn neighbors_mask<I: PrimInt>(&self, index: usize) -> I {
+    let lesser_neighbors_mask = I::from(0x3 | (0x1 << self.width)).unwrap();
+    let greater_neighbors_mask = I::from(0x2 | (0x3 << self.width)).unwrap();
 
-    let lesser_neighbors = (lesser_neighbors_mask << index) >> (self.width + 1);
+    let lesser_neighbors = (lesser_neighbors_mask << index) >> (self.width as usize + 1);
     let greater_neighbors = greater_neighbors_mask << index;
 
     lesser_neighbors | greater_neighbors
   }
 }
 
-pub struct P1MoveGenerator<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> {
-  board_vec: u64,
-  neighbor_candidates: u64,
+struct Impl<I> {
+  board_vec: I,
+  neighbor_candidates: I,
   indexer: BoardVecIndexer,
+}
+
+impl<I: Unsigned + PrimInt> Impl<I> {
+  fn new<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize>(
+    lower_left: PackedIdx,
+    width: u8,
+    onoro: &OnoroImpl<N, N2, ADJ_CNT_SIZE>,
+  ) -> Self {
+    debug_assert!(lower_left.x() > 0);
+    debug_assert!(lower_left.y() > 0);
+    let indexer = BoardVecIndexer::new(lower_left + IdxOffset::new(-1, -1), width);
+    let (board_vec, neighbor_candidates) = indexer.build_bitvecs(onoro.pawn_poses());
+    Self {
+      board_vec,
+      neighbor_candidates,
+      indexer,
+    }
+  }
+
+  fn next<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize>(
+    &mut self,
+    _onoro: &OnoroImpl<N, N2, ADJ_CNT_SIZE>,
+  ) -> Option<Move> {
+    let mut neighbor_candidates = self.neighbor_candidates;
+    while neighbor_candidates != I::zero() {
+      let index = neighbor_candidates.trailing_zeros() as usize;
+      neighbor_candidates = neighbor_candidates & (neighbor_candidates - I::one());
+
+      let neighbors_mask: I = self.indexer.neighbors_mask(index);
+      if (neighbors_mask & self.board_vec).count_ones() >= 2 {
+        self.neighbor_candidates = neighbor_candidates;
+        return Some(Move::Phase1Move {
+          to: self.indexer.pos_from_index(index as u32),
+        });
+      }
+    }
+
+    // No need to store neighbor_candidates again, since we typically don't
+    // call next() again after None is returned.
+    None
+  }
+}
+
+enum ImplContainer {
+  /// We use this repr when the board is small enough to fit in a u64,
+  /// including a 1-tile padding around the perimeter. This is much faster to
+  /// operate on than a u128.
+  Small(Impl<u64>),
+  /// For correctness, we need to support any board size. The largest possible
+  /// board is 8 x 9, which, with a 1-tile padding, requires 110 bits.
+  Large(Impl<u128>),
+}
+
+pub struct P1MoveGenerator<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> {
+  impl_container: ImplContainer,
+}
+
+impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize>
+  P1MoveGenerator<N, N2, ADJ_CNT_SIZE>
+{
+  #[cfg(test)]
+  fn indexer(&self) -> &BoardVecIndexer {
+    match &self.impl_container {
+      ImplContainer::Small(impl_) => &impl_.indexer,
+      ImplContainer::Large(impl_) => &impl_.indexer,
+    }
+  }
 }
 
 impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize>
@@ -69,18 +141,14 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize>
     let width = delta.x() + 3;
     let height = delta.y() + 3;
 
-    let indexer = BoardVecIndexer::new(lower_left + IdxOffset::new(-1, -1), width as u8);
-
-    if width * height > u64::BITS {
-      todo!("Fallback to slow move generator if we can't fit the board in a u64");
-    }
-
-    let (board_vec, neighbor_candidates) = indexer.build_bitvecs(onoro.pawn_poses());
-
-    Self {
-      board_vec,
-      neighbor_candidates,
-      indexer,
+    if width * height <= u64::BITS {
+      P1MoveGenerator {
+        impl_container: ImplContainer::Small(Impl::new(lower_left, width as u8, onoro)),
+      }
+    } else {
+      P1MoveGenerator {
+        impl_container: ImplContainer::Large(Impl::new(lower_left, width as u8, onoro)),
+      }
     }
   }
 }
@@ -92,23 +160,10 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroIterator
   type Game = OnoroImpl<N, N2, ADJ_CNT_SIZE>;
 
   fn next(&mut self, _onoro: &Self::Game) -> Option<Self::Item> {
-    let mut neighbor_candidates = self.neighbor_candidates;
-    while neighbor_candidates != 0 {
-      let index = neighbor_candidates.trailing_zeros();
-      neighbor_candidates &= neighbor_candidates - 1;
-
-      let neighbors_mask = self.indexer.neighbors_mask(index);
-      if (neighbors_mask & self.board_vec).count_ones() >= 2 {
-        self.neighbor_candidates = neighbor_candidates;
-        return Some(Move::Phase1Move {
-          to: self.indexer.pos_from_index(index),
-        });
-      }
+    match &mut self.impl_container {
+      ImplContainer::Small(impl_) => impl_.next(_onoro),
+      ImplContainer::Large(impl_) => impl_.next(_onoro),
     }
-
-    // No need to store neighbor_candidates again, since we typically don't
-    // call next() again after None is returned.
-    None
   }
 }
 
@@ -121,18 +176,36 @@ mod tests {
 
   use crate::{
     Onoro16, PackedIdx,
-    p1_move_gen::{BoardVecIndexer, P1MoveGenerator},
+    p1_move_gen::{BoardVecIndexer, ImplContainer, P1MoveGenerator},
   };
 
-  fn build_board_vec(pawn_poses: &[PackedIdx], indexer: &BoardVecIndexer) -> u64 {
+  fn get_board_vec<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize>(
+    move_gen: &P1MoveGenerator<N, N2, ADJ_CNT_SIZE>,
+  ) -> u128 {
+    match &move_gen.impl_container {
+      ImplContainer::Small(impl_) => impl_.board_vec as u128,
+      ImplContainer::Large(impl_) => impl_.board_vec,
+    }
+  }
+
+  fn get_neighbor_candidates<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize>(
+    move_gen: &P1MoveGenerator<N, N2, ADJ_CNT_SIZE>,
+  ) -> u128 {
+    match &move_gen.impl_container {
+      ImplContainer::Small(impl_) => impl_.neighbor_candidates as u128,
+      ImplContainer::Large(impl_) => impl_.neighbor_candidates,
+    }
+  }
+
+  fn build_board_vec(pawn_poses: &[PackedIdx], indexer: &BoardVecIndexer) -> u128 {
     pawn_poses
       .iter()
       .filter(|&&pos| pos != PackedIdx::null())
-      .map(|&pos| 1u64 << indexer.index(pos))
+      .map(|&pos| 1 << indexer.index(pos))
       .sum()
   }
 
-  fn neighbors_mask(pos: PackedIdx, indexer: &BoardVecIndexer) -> u64 {
+  fn neighbors_mask(pos: PackedIdx, indexer: &BoardVecIndexer) -> u128 {
     let mut neighbors = 0;
     let rel_pos = HexPos::from(pos) - HexPos::from(indexer.lower_left);
     for offset in HexPos::neighbor_offsets() {
@@ -140,8 +213,6 @@ mod tests {
         || (rel_pos.y() + offset.y()) < 0
         || rel_pos.x() + offset.x() >= indexer.width as i32
         || pos.y() as i32 + offset.y() >= 0x10
-        || rel_pos.x() + offset.x() + (rel_pos.y() + offset.y()) * indexer.width as i32
-          >= u64::BITS as i32
       {
         continue;
       }
@@ -151,14 +222,14 @@ mod tests {
       debug_assert!(neighbor.y() >= indexer.lower_left.y());
 
       let neighbor_idx = indexer.index(PackedIdx::new(neighbor.x(), neighbor.y()));
-      neighbors |= 1u64 << neighbor_idx;
+      neighbors |= 1 << neighbor_idx;
     }
     neighbors
   }
 
   /// Returns a mask of all tiles that are empty and adjacent to a pawn on the
   /// board.
-  fn all_possible_neighbors(board_vec: u64, indexer: &BoardVecIndexer) -> u64 {
+  fn all_possible_neighbors(board_vec: u128, indexer: &BoardVecIndexer) -> u128 {
     let mut neighbors = 0;
     let mut temp_board = board_vec;
     while temp_board != 0 {
@@ -188,25 +259,27 @@ mod tests {
   #[rstest]
   fn test_build_board_vec(onoro: Onoro16) {
     let move_gen = P1MoveGenerator::new(&onoro);
-    let indexer = &move_gen.indexer;
+    let indexer = &move_gen.indexer();
     let board_vec = build_board_vec(onoro.pawn_poses(), indexer);
 
-    assert_eq!(move_gen.board_vec, board_vec);
+    assert_eq!(get_board_vec(&move_gen), board_vec);
   }
 
   #[apply(test_build)]
   #[rstest]
   fn test_build_possible_neighbors_vec(onoro: Onoro16) {
     let move_gen = P1MoveGenerator::new(&onoro);
-    let indexer = &move_gen.indexer;
+    let indexer = &move_gen.indexer();
 
     let board_vec = build_board_vec(onoro.pawn_poses(), indexer);
     let neighbor_candidates = all_possible_neighbors(board_vec, indexer);
 
     assert_eq!(
-      move_gen.neighbor_candidates, neighbor_candidates,
+      get_neighbor_candidates(&move_gen),
+      neighbor_candidates,
       "{:#016x} vs. {:#016x}",
-      move_gen.neighbor_candidates, neighbor_candidates
+      get_neighbor_candidates(&move_gen),
+      neighbor_candidates
     );
   }
 
