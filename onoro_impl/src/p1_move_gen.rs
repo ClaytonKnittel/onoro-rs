@@ -62,8 +62,8 @@ pub struct P1MoveGenerator<const N: usize, const N2: usize, const ADJ_CNT_SIZE: 
 impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize>
   P1MoveGenerator<N, N2, ADJ_CNT_SIZE>
 {
-  pub fn new(pawn_poses: &[PackedIdx; N]) -> Self {
-    let (lower_left, upper_right) = packed_positions_bounding_box(pawn_poses);
+  pub fn new(onoro: &OnoroImpl<N, N2, ADJ_CNT_SIZE>) -> Self {
+    let (lower_left, upper_right) = packed_positions_bounding_box(onoro.pawn_poses());
     let delta = unsafe { PackedIdx::from_idx_offset(upper_right - lower_left) };
 
     let width = delta.x() + 3;
@@ -75,7 +75,7 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize>
       todo!("Fallback to slow move generator if we can't fit the board in a u64");
     }
 
-    let (board_vec, neighbor_candidates) = indexer.build_bitvecs(pawn_poses);
+    let (board_vec, neighbor_candidates) = indexer.build_bitvecs(onoro.pawn_poses());
 
     Self {
       board_vec,
@@ -187,7 +187,7 @@ mod tests {
   #[apply(test_build)]
   #[rstest]
   fn test_build_board_vec(onoro: Onoro16) {
-    let move_gen = P1MoveGenerator::<_, 1, 1>::new(onoro.pawn_poses());
+    let move_gen = P1MoveGenerator::new(&onoro);
     let indexer = &move_gen.indexer;
     let board_vec = build_board_vec(onoro.pawn_poses(), indexer);
 
@@ -197,7 +197,7 @@ mod tests {
   #[apply(test_build)]
   #[rstest]
   fn test_build_possible_neighbors_vec(onoro: Onoro16) {
-    let move_gen = P1MoveGenerator::<_, 1, 1>::new(onoro.pawn_poses());
+    let move_gen = P1MoveGenerator::new(&onoro);
     let indexer = &move_gen.indexer;
 
     let board_vec = build_board_vec(onoro.pawn_poses(), indexer);
@@ -225,7 +225,7 @@ mod tests {
                . . . . . . W .",
     )?;
 
-    let mut move_gen = P1MoveGenerator::new(worst_case.pawn_poses());
+    let mut move_gen = P1MoveGenerator::new(&worst_case);
     move_gen.next(&worst_case);
 
     Ok(())

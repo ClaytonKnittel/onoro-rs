@@ -251,7 +251,6 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroImpl<N, N2
     }
   }
 
-  #[cfg(test)]
   pub(crate) fn pawn_poses(&self) -> &[PackedIdx; N] {
     &self.pawn_poses
   }
@@ -289,7 +288,7 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroImpl<N, N2
 
   fn p1_move_gen(&self) -> P1MoveGenerator<N, N2, ADJ_CNT_SIZE> {
     debug_assert!(self.in_phase1());
-    P1MoveGenerator::new(&self.pawn_poses)
+    P1MoveGenerator::new(self)
   }
 
   fn p2_move_gen(&self) -> P2MoveGenerator<N, N2, ADJ_CNT_SIZE> {
