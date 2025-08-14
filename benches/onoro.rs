@@ -159,11 +159,6 @@ fn find_moves_p1(c: &mut Criterion) {
   )
   .unwrap();
 
-  // if let Ok(report) = guard.report().build() {
-  //   let file = std::fs::File::create("onoro.svg").unwrap();
-  //   report.flamegraph(file).unwrap();
-  // };
-
   benchmark_each_move(
     &mut group,
     "find moves phase 1 after 8 moves",
@@ -181,6 +176,11 @@ fn find_moves_p1(c: &mut Criterion) {
     &mut rng,
   )
   .unwrap();
+
+  // if let Ok(report) = guard.report().build() {
+  //   let file = std::fs::File::create("onoro.svg").unwrap();
+  //   report.flamegraph(file).unwrap();
+  // };
 
   group.finish();
 }

@@ -1,7 +1,10 @@
 use abstract_game::OnoroIterator;
 use num_traits::{PrimInt, Unsigned};
 
-use crate::{IdxOffset, Move, OnoroImpl, PackedIdx, util::packed_positions_bounding_box};
+use crate::{
+  IdxOffset, Move, OnoroImpl, PackedIdx,
+  util::{likely, packed_positions_bounding_box},
+};
 
 struct BoardVecIndexer {
   lower_left: PackedIdx,
@@ -136,18 +139,18 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize>
 {
   pub fn new(onoro: &OnoroImpl<N, N2, ADJ_CNT_SIZE>) -> Self {
     let (lower_left, upper_right) = packed_positions_bounding_box(onoro.pawn_poses());
-    let delta = unsafe { PackedIdx::from_idx_offset(upper_right - lower_left) };
+    let delta = upper_right - lower_left;
 
-    let width = delta.x() + 3;
-    let height = delta.y() + 3;
+    let width = delta.x() as u32 + 3;
+    let height = delta.y() as u32 + 3;
 
-    if width * height <= u64::BITS {
+    if likely(width * height <= u64::BITS) {
       P1MoveGenerator {
-        impl_container: ImplContainer::Small(Impl::new(lower_left, width as u8, onoro)),
+        impl_container: ImplContainer::Small(Impl::new(lower_left.into(), width as u8, onoro)),
       }
     } else {
       P1MoveGenerator {
-        impl_container: ImplContainer::Large(Impl::new(lower_left, width as u8, onoro)),
+        impl_container: ImplContainer::Large(Impl::new(lower_left.into(), width as u8, onoro)),
       }
     }
   }
