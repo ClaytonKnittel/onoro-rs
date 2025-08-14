@@ -68,7 +68,7 @@ struct Impl<I> {
 }
 
 impl<I: Unsigned + PrimInt> Impl<I> {
-  fn new<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize>(
+  fn new_impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize>(
     lower_left: PackedIdx,
     width: u8,
     onoro: &OnoroImpl<N, N2, ADJ_CNT_SIZE>,
@@ -84,10 +84,7 @@ impl<I: Unsigned + PrimInt> Impl<I> {
     }
   }
 
-  fn next<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize>(
-    &mut self,
-    _onoro: &OnoroImpl<N, N2, ADJ_CNT_SIZE>,
-  ) -> Option<Move> {
+  fn next_impl(&mut self) -> Option<Move> {
     let mut neighbor_candidates = self.neighbor_candidates;
     while neighbor_candidates != I::zero() {
       let index = neighbor_candidates.trailing_zeros() as usize;
@@ -105,6 +102,42 @@ impl<I: Unsigned + PrimInt> Impl<I> {
     // No need to store neighbor_candidates again, since we typically don't
     // call next() again after None is returned.
     None
+  }
+}
+
+impl Impl<u64> {
+  fn new<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize>(
+    lower_left: PackedIdx,
+    width: u8,
+    onoro: &OnoroImpl<N, N2, ADJ_CNT_SIZE>,
+  ) -> Self {
+    Self::new_impl(lower_left, width, onoro)
+  }
+
+  fn next<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize>(
+    &mut self,
+    _onoro: &OnoroImpl<N, N2, ADJ_CNT_SIZE>,
+  ) -> Option<Move> {
+    self.next_impl()
+  }
+}
+
+impl Impl<u128> {
+  #[cold]
+  fn new<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize>(
+    lower_left: PackedIdx,
+    width: u8,
+    onoro: &OnoroImpl<N, N2, ADJ_CNT_SIZE>,
+  ) -> Self {
+    Self::new_impl(lower_left, width, onoro)
+  }
+
+  #[cold]
+  fn next<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize>(
+    &mut self,
+    _onoro: &OnoroImpl<N, N2, ADJ_CNT_SIZE>,
+  ) -> Option<Move> {
+    self.next_impl()
   }
 }
 
@@ -146,11 +179,19 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize>
 
     if likely(width * height <= u64::BITS) {
       P1MoveGenerator {
-        impl_container: ImplContainer::Small(Impl::new(lower_left.into(), width as u8, onoro)),
+        impl_container: ImplContainer::Small(Impl::<u64>::new(
+          lower_left.into(),
+          width as u8,
+          onoro,
+        )),
       }
     } else {
       P1MoveGenerator {
-        impl_container: ImplContainer::Large(Impl::new(lower_left.into(), width as u8, onoro)),
+        impl_container: ImplContainer::Large(Impl::<u128>::new(
+          lower_left.into(),
+          width as u8,
+          onoro,
+        )),
       }
     }
   }
