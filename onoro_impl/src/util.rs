@@ -251,18 +251,6 @@ pub fn mm_min_max_ignore_zero_epu8(vec: __m128i) -> (u8, u8) {
 fn packed_positions_boinding_box_sse3(pawn_poses: &[PackedIdx]) -> (HexPos, HexPos) {
   debug_assert_eq!(pawn_poses.len(), 16);
 
-  // TODO: Is this actually faster?
-  // let lo_pawns = unsafe { *(pawn_poses.as_ptr() as *const u64) };
-  // let hi_pawns = unsafe { *(pawn_poses[8..].as_ptr() as *const u64) };
-
-  // let lo_x = lo_pawns & SELECT_X_MASK;
-  // let hi_x = hi_pawns & SELECT_X_MASK;
-  // let lo_y = (lo_pawns >> 4) & SELECT_X_MASK;
-  // let hi_y = (hi_pawns >> 4) & SELECT_X_MASK;
-
-  // let x_coords = _mm_set_epi64x(hi_x as i64, lo_x as i64);
-  // let y_coords = _mm_set_epi64x(hi_y as i64, lo_y as i64);
-
   /// Selects the x-coordinates of every PackedIdx position.
   const SELECT_X_MASK: i64 = 0x0f0f_0f0f_0f0f_0f0f;
 
@@ -392,7 +380,10 @@ mod tests {
     assert_eq!(equal_mask(byte_vec, needle), expected);
   }
 
-  const POSES_BB_EXAMPLE: [PackedIdx; 16] = [
+  #[repr(align(8))]
+  struct PawnPoses([PackedIdx; 16]);
+
+  const POSES_BB_EXAMPLE: PawnPoses = PawnPoses([
     PackedIdx::new(2, 1),
     PackedIdx::new(3, 2),
     PackedIdx::new(1, 5),
@@ -409,7 +400,7 @@ mod tests {
     PackedIdx::null(),
     PackedIdx::null(),
     PackedIdx::null(),
-  ];
+  ]);
 
   #[template]
   #[rstest]
@@ -418,7 +409,7 @@ mod tests {
     packed_positions: impl FnOnce(&[PackedIdx; N]) -> (HexPos, HexPos),
     #[values(
       (&[PackedIdx::new(1, 1)], (HexPos::new(1, 1), HexPos::new(1, 1))),
-      (&POSES_BB_EXAMPLE, (HexPos::new(1, 1), HexPos::new(3, 5))),
+      (&POSES_BB_EXAMPLE.0, (HexPos::new(1, 1), HexPos::new(3, 5))),
     )]
     args: (&[PackedIdx; N], (HexPos, HexPos)),
   ) {
@@ -432,13 +423,5 @@ mod tests {
   ) {
     let (input, expected) = args;
     assert_eq!(packed_positions(input), expected);
-  }
-
-  #[test]
-  fn test_packed_positions_bounding_box2() {
-    assert_eq!(
-      packed_positions_bounding_box(&POSES_BB_EXAMPLE),
-      (HexPos::new(1, 1), HexPos::new(3, 5))
-    );
   }
 }
