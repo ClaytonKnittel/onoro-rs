@@ -214,19 +214,17 @@ fn mm_min_max_epu8_ignore_zero_avx512(vec: __m128i) -> (u8, u8) {
 }
 
 #[target_feature(enable = "ssse3")]
-unsafe fn horizontal_compress<F, G>(v: __m128i, mut compressor: F, scalar_compressor: G) -> u8
+unsafe fn horizontal_compress<F>(v: __m128i, mut compressor: F) -> u8
 where
   F: FnMut(__m128i, __m128i) -> __m128i,
-  G: FnOnce(u8, u8) -> u8,
 {
   let v = compressor(v, _mm_unpackhi_epi64(v, v));
   let v = compressor(v, _mm_bsrli_si128(v, 4));
   let v = compressor(v, _mm_bsrli_si128(v, 2));
+  let v = compressor(v, _mm_bsrli_si128(v, 1));
 
   let result = _mm_cvtsi128_si32(v) as u32;
-  let a = result & 0xff;
-  let b = (result >> 8) & 0xff;
-  scalar_compressor(a as u8, b as u8)
+  result as u8
 }
 
 #[target_feature(enable = "ssse3")]
@@ -240,8 +238,8 @@ pub fn mm_min_max_ignore_zero_epu8(vec: __m128i) -> (u8, u8) {
 
   unsafe {
     (
-      horizontal_compress(min_vec, |v1, v2| _mm_min_epu8(v1, v2), u8::min),
-      horizontal_compress(max_vec, |v1, v2| _mm_max_epu8(v1, v2), u8::max),
+      horizontal_compress(min_vec, |v1, v2| _mm_min_epu8(v1, v2)),
+      horizontal_compress(max_vec, |v1, v2| _mm_max_epu8(v1, v2)),
     )
   }
 }
