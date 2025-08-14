@@ -148,7 +148,7 @@ enum ImplContainer {
   Small(Impl<u64>),
   /// For correctness, we need to support any board size. The largest possible
   /// board is 8 x 9, which, with a 1-tile padding, requires 110 bits.
-  Large(Impl<u128>),
+  Large(Box<Impl<u128>>),
 }
 
 pub struct P1MoveGenerator<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> {
@@ -187,11 +187,9 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize>
       }
     } else {
       P1MoveGenerator {
-        impl_container: ImplContainer::Large(Impl::<u128>::new(
-          lower_left.into(),
-          width as u8,
-          onoro,
-        )),
+        impl_container: ImplContainer::Large(
+          Impl::<u128>::new(lower_left.into(), width as u8, onoro).into(),
+        ),
       }
     }
   }
