@@ -30,7 +30,7 @@ impl BoardVecIndexer {
     for offset in HexPos::neighbor_offsets() {
       if (rel_pos.x() + offset.x()) < 0
         || (rel_pos.y() + offset.y()) < 0
-        || pos.x() as i32 + offset.x() >= self.width as i32
+        || rel_pos.x() + offset.x() >= self.width as i32
         || pos.y() as i32 + offset.y() >= 0x10
         || rel_pos.x() + offset.x() + (rel_pos.y() + offset.y()) * self.width as i32
           >= u64::BITS as i32
@@ -67,9 +67,6 @@ fn all_possible_neighbors(board_vec: u64, indexer: &BoardVecIndexer) -> u64 {
     temp_board &= temp_board - 1;
 
     let pos = indexer.pos_from_index(index);
-    debug_assert_ne!(pos.x(), 0);
-    debug_assert_ne!(pos.y(), 0);
-    debug_assert!(pos.x() < indexer.width as u32);
 
     neighbors |= indexer.neighbors_mask(pos);
   }

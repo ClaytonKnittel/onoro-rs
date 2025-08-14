@@ -34,6 +34,10 @@ fn make_random_move<R: Rng>(onoro: &mut Onoro16, rng: &mut R) -> Move {
     // All moves should be in the same phase.
     _ => unreachable!(),
   });
+  assert!(
+    !moves.is_empty(),
+    "No moves available in position:\n{onoro:?}"
+  );
   let m = moves[rng.gen_range(0..moves.len())];
   onoro.make_move(m);
   m
