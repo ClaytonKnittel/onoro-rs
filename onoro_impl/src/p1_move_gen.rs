@@ -30,23 +30,22 @@ impl BoardVecIndexer {
 
   fn build_bitvecs<I: PrimInt>(&self, pawn_poses: &[PackedIdx]) -> (I, I) {
     let width = self.width as usize;
-    let neighbors_mask =
-      unsafe { I::from(0x3 | (0x5 << width) | (0x6 << (2 * width))).unwrap_unchecked() };
 
-    let (board, neighbor_candidates) = pawn_poses
+    let board = pawn_poses
       .iter()
       .filter(|&&pos| pos != PackedIdx::null())
-      .fold(
-        (I::zero(), I::zero()),
-        |(board_vec, neighbors_vec), &pos| {
-          let index = self.index(pos);
-          debug_assert!(index > width);
-          (
-            board_vec | (I::one() << index),
-            neighbors_vec | (neighbors_mask << (index - width - 1)),
-          )
-        },
-      );
+      .fold(I::zero(), |board_vec, &pos| {
+        let index = self.index(pos);
+        debug_assert!(index > width);
+        board_vec | (I::one() << index)
+      });
+
+    let neighbor_candidates = (board >> (width + 1))
+      | (board >> width)
+      | (board >> 1)
+      | (board << 1)
+      | (board << width)
+      | (board << (width + 1));
 
     (board, neighbor_candidates & !board)
   }
