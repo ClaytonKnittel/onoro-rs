@@ -22,6 +22,7 @@ impl BoardVecIndexer {
   }
 
   fn pos_from_index(&self, index: u32) -> PackedIdx {
+    debug_assert!((3..=16).contains(&self.width));
     let x = index % self.width as u32;
     let y = index / self.width as u32;
     self.lower_left + IdxOffset::new(x as i32, y as i32)
