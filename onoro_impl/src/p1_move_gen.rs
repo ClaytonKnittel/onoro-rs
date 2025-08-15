@@ -51,8 +51,8 @@ impl BoardVecIndexer {
   }
 
   fn neighbors_mask<I: PrimInt>(&self, index: usize) -> I {
-    let lesser_neighbors_mask = I::from(0x3 | (0x1 << self.width)).unwrap();
-    let greater_neighbors_mask = I::from(0x2 | (0x3 << self.width)).unwrap();
+    let lesser_neighbors_mask = unsafe { I::from(0x3 | (0x1 << self.width)).unwrap_unchecked() };
+    let greater_neighbors_mask = unsafe { I::from(0x2 | (0x3 << self.width)).unwrap_unchecked() };
 
     let lesser_neighbors = (lesser_neighbors_mask << index) >> (self.width as usize + 1);
     let greater_neighbors = greater_neighbors_mask << index;
