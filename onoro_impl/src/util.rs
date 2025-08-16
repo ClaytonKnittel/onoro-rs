@@ -1,7 +1,8 @@
 use core::arch::x86_64::{_mm_set_epi8, _mm_shuffle_epi8};
 use std::arch::x86_64::{
-  __m128i, _mm_and_si128, _mm_bsrli_si128, _mm_cmpeq_epi8, _mm_cvtsi128_si32, _mm_cvtsi128_si64x,
-  _mm_loadu_si128, _mm_max_epu8, _mm_min_epu8, _mm_or_si128, _mm_set_epi64x, _mm_setzero_si128,
+  __m128i, _mm_add_epi16, _mm_and_si128, _mm_bsrli_si128, _mm_cmpeq_epi8, _mm_cvtsi128_si32,
+  _mm_cvtsi128_si64x, _mm_loadu_si128, _mm_max_epu8, _mm_min_epu8, _mm_mullo_epi16, _mm_or_si128,
+  _mm_set_epi16, _mm_set_epi64x, _mm_setzero_si128, _mm_srli_epi16, _mm_sub_epi8,
   _mm_unpackhi_epi64, _mm_unpacklo_epi8,
 };
 #[cfg(all(target_feature = "avx512bw", target_feature = "avx512vl"))]
@@ -149,9 +150,9 @@ fn packed_positions_to_mask_slow(packed_positions: u64) -> u64 {
     .fold(0, |mask, byte| mask | (1u64 << (byte - 1)))
 }
 
-/// Returns a u64 with bits set in the positions indicated by the byte values
-/// in `packed_positions`, minus 1. Zero byte values are ignored. All non-zero
-/// bytes must be unique.
+/// Returns a u64 with bits set in the positions indicated by the lowest 4 bits
+/// of the byte values in `packed_positions`, minus 1. Zero byte values are
+/// ignored. All non-zero bytes must be unique.
 #[inline(always)]
 pub fn packed_positions_to_mask(packed_positions: u64) -> u64 {
   #[cfg(target_feature = "ssse3")]
@@ -160,6 +161,125 @@ pub fn packed_positions_to_mask(packed_positions: u64) -> u64 {
   }
   #[cfg(not(target_feature = "ssse3"))]
   packed_positions_to_mask_slow(packed_positions)
+}
+
+#[inline]
+#[target_feature(enable = "ssse3")]
+unsafe fn packed_positions_to_board_bitvec_sse3(
+  pawn_poses: &[PackedIdx],
+  lower_left: PackedIdx,
+  width: u32,
+) -> u64 {
+  const SELECT_X_MASK: i64 = 0x0f0f_0f0f_0f0f_0f0f;
+
+  let select_x = _mm_set_epi64x(SELECT_X_MASK, SELECT_X_MASK);
+  let select_y = _mm_set_epi64x(!SELECT_X_MASK, !SELECT_X_MASK);
+
+  let pawns = unsafe { _mm_loadu_si128(pawn_poses.as_ptr() as *const _) };
+
+  let ll = unsafe { lower_left.bytes() } as i8;
+  let lower_left_offsets = _mm_set_epi8(
+    ll, ll, ll, ll, ll, ll, ll, ll, ll, ll, ll, ll, ll, ll, ll, ll,
+  );
+
+  let pawns = _mm_sub_epi8(pawns, lower_left_offsets);
+
+  let x_coords = _mm_and_si128(pawns, select_x);
+  let pawns = _mm_srli_epi16::<4>(pawns);
+  let y_coords = _mm_and_si128(pawns, select_y);
+
+  let width = width as i16;
+  let width_mult = _mm_set_epi16(width, width, width, width, width, width, width, width);
+
+  let scaled_y = _mm_mullo_epi16(y_coords, width_mult);
+
+  let indices = _mm_add_epi16(x_coords, scaled_y);
+
+  //
+  let lo_indices = _mm_cvtsi128_si64x(indices) as u64;
+  let indices = _mm_unpackhi_epi64(indices, indices);
+  let hi_indices = _mm_cvtsi128_si64x(indices) as u64;
+
+  const fn build_table() -> [u64; 64] {
+    let mut arr: [u64; 64] = [0u64; 64];
+    let mut i = 1;
+    while i < 64 {
+      arr[i] = 1u64 << i;
+      i += 1;
+    }
+    arr
+  }
+  const TABLE: [u64; 64] = build_table();
+
+  lo_indices
+    .to_ne_bytes()
+    .iter()
+    .chain(hi_indices.to_ne_bytes().iter())
+    .map(|&b| TABLE[b as usize])
+    .sum()
+
+  // #[rustfmt::skip]
+  // let lo_data = _mm_set_epi8(
+  //   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  //   0x80u8 as i8, 0x40, 0x20, 0x10, 0x08, 0x04, 0x02, 0x01,
+  // );
+  // #[rustfmt::skip]
+  // let hi_data = _mm_set_epi8(
+  //   0x80u8 as i8, 0x40, 0x20, 0x10, 0x08, 0x04, 0x02, 0x01,
+  //   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  // );
+
+  // let lo_masks = _mm_shuffle_epi8(lo_data, indices);
+  // let hi_masks = _mm_shuffle_epi8(hi_data, indices);
+
+  // // 16-byte complete masks, which now need to be shifted to the correct 16-bit
+  // // quadrant of the final u64.
+  // let masks1 = _mm_unpacklo_epi8(lo_masks, hi_masks);
+  // let masks2 = _mm_unpackhi_epi8(lo_masks, hi_masks);
+}
+
+#[inline(always)]
+fn packed_positions_to_board_bitvec_slow<const N: usize>(
+  pawn_poses: &[PackedIdx; N],
+  lower_left: PackedIdx,
+  width: u32,
+) -> u64 {
+  let width = width as usize;
+  pawn_poses
+    .iter()
+    .filter(|&&pos| pos != PackedIdx::null())
+    .fold(0, |board_vec, &pos| {
+      let d = unsafe { PackedIdx::from_idx_offset(pos - lower_left) };
+      let index = d.y() as usize * width + d.x() as usize;
+      debug_assert!(index > width);
+      board_vec | (1 << index)
+    })
+}
+
+/// Given the pawn positions, the lower-left packed index, and the width of the
+/// region of pawns (with a 1-tile border on all 4 sides), returns a board
+/// bitvec, which has a bit set in index x + y * width relative to the lower
+/// left packed index provided.
+#[inline(always)]
+fn packed_positions_to_board_bitvec<const N: usize>(
+  pawn_poses: &[PackedIdx; N],
+  lower_left: PackedIdx,
+  width: u32,
+) -> u64 {
+  debug_assert!(pawn_poses.iter().all(|idx| { idx.x() > 0 }));
+  debug_assert!(pawn_poses.iter().all(|idx| { idx.x() <= width }));
+  debug_assert!(pawn_poses.iter().all(|idx| { idx.y() > 0 }));
+  debug_assert!(
+    pawn_poses
+      .iter()
+      .all(|idx| { idx.x() + 1 + (idx.y() + 1) * width < u64::BITS })
+  );
+
+  #[cfg(target_feature = "ssse3")]
+  if N == 16 {
+    return unsafe { packed_positions_to_board_bitvec_sse3(pawn_poses, lower_left, width) };
+  }
+  packed_positions_to_board_bitvec_slow(pawn_poses, lower_left, width)
 }
 
 #[inline]
@@ -315,9 +435,14 @@ mod tests {
     PackedIdx,
     util::{
       broadcast_u8_to_u64, equal_mask_epi8, equal_mask_epi8_slow, packed_positions_bounding_box,
-      packed_positions_bounding_box_slow, packed_positions_to_mask, packed_positions_to_mask_slow,
+      packed_positions_bounding_box_slow, packed_positions_to_board_bitvec,
+      packed_positions_to_board_bitvec_slow, packed_positions_to_mask,
+      packed_positions_to_mask_slow,
     },
   };
+
+  #[repr(align(8))]
+  struct PawnPoses([PackedIdx; 16]);
 
   #[template]
   #[rstest]
@@ -359,6 +484,53 @@ mod tests {
     assert_eq!(packed_positions(input), expected);
   }
 
+  const POSES_BOARD_BITVEC_EXAMPLE: PawnPoses = PawnPoses([
+    PackedIdx::new(4, 5),
+    PackedIdx::new(6, 4),
+    PackedIdx::new(5, 3),
+    PackedIdx::null(),
+    PackedIdx::null(),
+    PackedIdx::null(),
+    PackedIdx::null(),
+    PackedIdx::null(),
+    PackedIdx::null(),
+    PackedIdx::null(),
+    PackedIdx::null(),
+    PackedIdx::null(),
+    PackedIdx::null(),
+    PackedIdx::null(),
+    PackedIdx::null(),
+    PackedIdx::null(),
+  ]);
+
+  #[template]
+  #[rstest]
+  fn packed_positions_to_board_bitvec<const N: usize>(
+    #[values(
+      packed_positions_to_board_bitvec,
+      packed_positions_to_board_bitvec_slow
+    )]
+    packed_positions_to_board_bitvec: impl FnOnce(&[PackedIdx; N], PackedIdx, u32) -> u64,
+    #[values(
+      (&POSES_BOARD_BITVEC_EXAMPLE.0, PackedIdx::new(3, 2), 5, 0x01_20_80),
+    )]
+    args: (&[PackedIdx; N], PackedIdx, u32, u64),
+  ) {
+  }
+
+  #[apply(packed_positions_to_board_bitvec)]
+  #[test]
+  fn test_packed_positions_to_board_bitvec<const N: usize>(
+    packed_positions_to_board_bitvec: impl FnOnce(&[PackedIdx; N], PackedIdx, u32) -> u64,
+    args: (&[PackedIdx; N], PackedIdx, u32, u64),
+  ) {
+    let (pawn_poses, lower_left, width, expected) = args;
+    assert_eq!(
+      packed_positions_to_board_bitvec(pawn_poses, lower_left, width),
+      expected
+    );
+  }
+
   #[template]
   #[rstest]
   fn equal_mask_epi8(
@@ -377,9 +549,6 @@ mod tests {
     let (byte_vec, needle, expected) = args;
     assert_eq!(equal_mask(byte_vec, needle), expected);
   }
-
-  #[repr(align(8))]
-  struct PawnPoses([PackedIdx; 16]);
 
   const POSES_BB_EXAMPLE: PawnPoses = PawnPoses([
     PackedIdx::new(2, 1),
