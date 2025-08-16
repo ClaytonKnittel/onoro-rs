@@ -1,6 +1,6 @@
 use std::{fmt::Display, hash::Hash};
 
-use abstract_game::{Game, GameMoveGenerator, GameResult, Score};
+use abstract_game::{Game, GameMoveIterator, GameResult, Score};
 
 use crate::serial_search::find_best_move_serial;
 
@@ -34,7 +34,7 @@ impl TttMoveIter {
   }
 }
 
-impl GameMoveGenerator for TttMoveIter {
+impl GameMoveIterator for TttMoveIter {
   type Item = TttMove;
   type Game = Ttt;
 

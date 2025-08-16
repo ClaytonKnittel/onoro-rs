@@ -29,6 +29,10 @@ lto = "fat"
 name = "onoro"
 harness = false
 
+# [profile.bench]
+# debug = 2
+# strip = "none"
+
 [dev-dependencies]
 googletest = "0.14.2"
 rstest = "0.26.1"

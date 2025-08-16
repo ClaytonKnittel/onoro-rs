@@ -1,9 +1,14 @@
 use core::arch::x86_64::{_mm_set_epi8, _mm_shuffle_epi8};
 use std::arch::x86_64::{
-  _mm_cmpeq_epi8, _mm_cvtsi128_si64x, _mm_set_epi64x, _mm_unpackhi_epi64, _mm_unpacklo_epi8,
+  __m128i, _mm_and_si128, _mm_bsrli_si128, _mm_cmpeq_epi8, _mm_cvtsi128_si32, _mm_cvtsi128_si64x,
+  _mm_loadu_si128, _mm_max_epu8, _mm_min_epu8, _mm_or_si128, _mm_set_epi64x, _mm_setzero_si128,
+  _mm_unpackhi_epi64, _mm_unpacklo_epi8,
 };
 
 use itertools::Itertools;
+use onoro::hex_pos::HexPos;
+
+use crate::{FilterNullPackedIdx, PackedIdx};
 
 #[inline]
 pub const fn unreachable() -> ! {
@@ -20,7 +25,6 @@ pub const fn unreachable() -> ! {
 fn cold() {}
 
 #[inline(always)]
-#[allow(dead_code)]
 pub fn likely(b: bool) -> bool {
   if !b {
     cold()
@@ -143,9 +147,9 @@ fn packed_positions_to_mask_slow(packed_positions: u64) -> u64 {
     .fold(0, |mask, byte| mask | (1u64 << (byte - 1)))
 }
 
-/// Returns a u64 with bits set in the positions indicated by the byte values
-/// in `packed_positions`, minus 1. Zero byte values are ignored. All non-zero
-/// bytes must be unique.
+/// Returns a u64 with bits set in the positions indicated by the lowest 4 bits
+/// of the byte values in `packed_positions`, minus 1. Zero byte values are
+/// ignored. All non-zero bytes must be unique.
 #[inline(always)]
 pub fn packed_positions_to_mask(packed_positions: u64) -> u64 {
   #[cfg(target_feature = "ssse3")]
@@ -198,15 +202,113 @@ pub fn equal_mask_epi8(byte_vec: u64, needle: u8) -> u64 {
   equal_mask_epi8_slow(byte_vec, needle)
 }
 
+#[target_feature(enable = "ssse3")]
+unsafe fn horizontal_compress<F>(v: __m128i, mut compressor: F) -> u8
+where
+  F: FnMut(__m128i, __m128i) -> __m128i,
+{
+  let v = compressor(v, _mm_unpackhi_epi64(v, v));
+  let v = compressor(v, _mm_bsrli_si128(v, 4));
+  let v = compressor(v, _mm_bsrli_si128(v, 2));
+  let v = compressor(v, _mm_bsrli_si128(v, 1));
+
+  let result = _mm_cvtsi128_si32(v) as u32;
+  result as u8
+}
+
+/// Returns the minimum and maximum 1-byte values found in the 16 bytes of
+/// `vec`, ignoring any 0 bytes.
+#[target_feature(enable = "ssse3")]
+fn mm_min_max_ignore_zero_epu8(vec: __m128i) -> (u8, u8) {
+  let zeros = _mm_cmpeq_epi8(vec, _mm_setzero_si128());
+  let min_vec = _mm_or_si128(vec, zeros);
+  let max_vec = vec;
+
+  unsafe {
+    (
+      horizontal_compress(min_vec, |v1, v2| _mm_min_epu8(v1, v2)),
+      horizontal_compress(max_vec, |v1, v2| _mm_max_epu8(v1, v2)),
+    )
+  }
+}
+
+#[inline]
+#[target_feature(enable = "ssse3")]
+fn packed_positions_boinding_box_sse3(pawn_poses: &[PackedIdx]) -> (HexPos, HexPos) {
+  debug_assert_eq!(pawn_poses.len(), 16);
+
+  /// Selects the x-coordinates of every PackedIdx position.
+  const SELECT_X_MASK: i64 = 0x0f0f_0f0f_0f0f_0f0f;
+
+  let select_x = _mm_set_epi64x(SELECT_X_MASK, SELECT_X_MASK);
+
+  let pawns = unsafe { _mm_loadu_si128(pawn_poses.as_ptr() as *const _) };
+
+  let x_coords = _mm_and_si128(pawns, select_x);
+  // We don't need to mask off the x coordinates since the y coordinates are in
+  // the higher 4 bits, and y = 0 iff x = 0.
+  let y_coords = pawns;
+
+  let (min_x, max_x) = mm_min_max_ignore_zero_epu8(x_coords);
+  let (min_y, max_y) = mm_min_max_ignore_zero_epu8(y_coords);
+
+  (
+    HexPos::new(min_x as u32, (min_y >> 4) as u32),
+    HexPos::new(max_x as u32, (max_y >> 4) as u32),
+  )
+}
+
+#[inline]
+fn packed_positions_bounding_box_slow<const N: usize>(
+  pawn_poses: &[PackedIdx; N],
+) -> (HexPos, HexPos) {
+  debug_assert!(!pawn_poses.is_empty(), "Pawn positions cannot be empty");
+
+  let (min_pos, max_pos) = pawn_poses.iter().filter_null().fold(
+    ((u32::MAX, u32::MAX), (0, 0)),
+    |(min_pos, max_pos), &pos| {
+      (
+        (min_pos.0.min(pos.x()), min_pos.1.min(pos.y())),
+        (max_pos.0.max(pos.x()), max_pos.1.max(pos.y())),
+      )
+    },
+  );
+
+  (
+    HexPos::new(min_pos.0, min_pos.1),
+    HexPos::new(max_pos.0, max_pos.1),
+  )
+}
+
+/// Returns the lower-left and upper-right corner of the bounding
+/// parallellogram of all the pawns in `pawn_poses`, ignoring null indices.
+#[inline(always)]
+pub fn packed_positions_bounding_box<const N: usize>(
+  pawn_poses: &[PackedIdx; N],
+) -> (HexPos, HexPos) {
+  #[cfg(target_feature = "ssse3")]
+  if N == 16 {
+    return unsafe { packed_positions_boinding_box_sse3(pawn_poses) };
+  }
+  packed_positions_bounding_box_slow(pawn_poses)
+}
+
 #[cfg(test)]
 mod tests {
+  use onoro::hex_pos::HexPos;
   use rstest::rstest;
   use rstest_reuse::{apply, template};
 
-  use crate::util::{
-    broadcast_u8_to_u64, equal_mask_epi8, equal_mask_epi8_slow, packed_positions_to_mask,
-    packed_positions_to_mask_slow,
+  use crate::{
+    PackedIdx,
+    util::{
+      broadcast_u8_to_u64, equal_mask_epi8, equal_mask_epi8_slow, packed_positions_bounding_box,
+      packed_positions_bounding_box_slow, packed_positions_to_mask, packed_positions_to_mask_slow,
+    },
   };
+
+  #[repr(align(8))]
+  struct PawnPoses([PackedIdx; 16]);
 
   #[template]
   #[rstest]
@@ -265,5 +367,47 @@ mod tests {
   fn test_equal_mask_epi8(equal_mask: impl FnOnce(u64, u8) -> u64, args: (u64, u8, u64)) {
     let (byte_vec, needle, expected) = args;
     assert_eq!(equal_mask(byte_vec, needle), expected);
+  }
+
+  const POSES_BB_EXAMPLE: PawnPoses = PawnPoses([
+    PackedIdx::new(2, 1),
+    PackedIdx::new(3, 2),
+    PackedIdx::new(1, 5),
+    PackedIdx::null(),
+    PackedIdx::null(),
+    PackedIdx::null(),
+    PackedIdx::null(),
+    PackedIdx::null(),
+    PackedIdx::null(),
+    PackedIdx::null(),
+    PackedIdx::null(),
+    PackedIdx::null(),
+    PackedIdx::null(),
+    PackedIdx::null(),
+    PackedIdx::null(),
+    PackedIdx::null(),
+  ]);
+
+  #[template]
+  #[rstest]
+  fn packed_positions_bounding_box<const N: usize>(
+    #[values(packed_positions_bounding_box, packed_positions_bounding_box_slow)]
+    packed_positions: impl FnOnce(&[PackedIdx; N]) -> (HexPos, HexPos),
+    #[values(
+      (&[PackedIdx::new(1, 1)], (HexPos::new(1, 1), HexPos::new(1, 1))),
+      (&POSES_BB_EXAMPLE.0, (HexPos::new(1, 1), HexPos::new(3, 5))),
+    )]
+    args: (&[PackedIdx; N], (HexPos, HexPos)),
+  ) {
+  }
+
+  #[apply(packed_positions_bounding_box)]
+  #[test]
+  fn test_packed_positions_bounding_box<const N: usize>(
+    packed_positions: impl FnOnce(&[PackedIdx; N]) -> (HexPos, HexPos),
+    args: (&[PackedIdx; N], (HexPos, HexPos)),
+  ) {
+    let (input, expected) = args;
+    assert_eq!(packed_positions(input), expected);
   }
 }

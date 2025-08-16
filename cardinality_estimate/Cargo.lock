@@ -181,6 +181,7 @@ dependencies = [
  "algebra",
  "const-random",
  "itertools",
+ "num-traits",
  "onoro",
  "rand 0.8.5",
  "union_find",
