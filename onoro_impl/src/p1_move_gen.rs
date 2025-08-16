@@ -2,7 +2,7 @@ use abstract_game::OnoroIterator;
 use num_traits::{PrimInt, Unsigned};
 
 use crate::{
-  IdxOffset, Move, OnoroImpl, PackedIdx,
+  FilterNullPackedIdx, IdxOffset, Move, OnoroImpl, PackedIdx,
   util::{likely, packed_positions_bounding_box},
 };
 
@@ -33,7 +33,7 @@ impl BoardVecIndexer {
 
     let board = pawn_poses
       .iter()
-      .filter(|&&pos| pos != PackedIdx::null())
+      .filter_null()
       .fold(I::zero(), |board_vec, &pos| {
         let index = self.index(pos);
         debug_assert!(index > width);
@@ -217,7 +217,7 @@ mod tests {
   use rstest_reuse::{apply, template};
 
   use crate::{
-    Onoro16, PackedIdx,
+    FilterNullPackedIdx, Onoro16, PackedIdx,
     p1_move_gen::{BoardVecIndexer, ImplContainer, P1MoveGenerator},
   };
 
@@ -242,7 +242,7 @@ mod tests {
   fn build_board_vec(pawn_poses: &[PackedIdx], indexer: &BoardVecIndexer) -> u128 {
     pawn_poses
       .iter()
-      .filter(|&&pos| pos != PackedIdx::null())
+      .filter_null()
       .map(|&pos| 1 << indexer.index(pos))
       .sum()
   }

@@ -11,7 +11,7 @@ use std::arch::x86_64::{_mm_reduce_max_epu8, _mm_reduce_min_epu8};
 use itertools::Itertools;
 use onoro::hex_pos::HexPos;
 
-use crate::PackedIdx;
+use crate::{FilterNullPackedIdx, PackedIdx};
 
 #[inline]
 pub const fn unreachable() -> ! {
@@ -245,15 +245,12 @@ fn packed_positions_to_board_bitvec_slow<const N: usize>(
   width: u32,
 ) -> u64 {
   let width = width as usize;
-  pawn_poses
-    .iter()
-    .filter(|&&pos| pos != PackedIdx::null())
-    .fold(0, |board_vec, &pos| {
-      let d = unsafe { PackedIdx::from_idx_offset(pos - lower_left) };
-      let index = d.y() as usize * width + d.x() as usize;
-      debug_assert!(index > width);
-      board_vec | (1 << index)
-    })
+  pawn_poses.iter().filter_null().fold(0, |board_vec, &pos| {
+    let d = unsafe { PackedIdx::from_idx_offset(pos - lower_left) };
+    let index = d.y() as usize * width + d.x() as usize;
+    debug_assert!(index > width);
+    board_vec | (1 << index)
+  })
 }
 
 /// Given the pawn positions, the lower-left packed index, and the width of the
@@ -269,25 +266,25 @@ fn packed_positions_to_board_bitvec<const N: usize>(
   debug_assert!(
     pawn_poses
       .iter()
-      .filter(|&&idx| idx != PackedIdx::null())
+      .filter_null()
       .all(|idx| { idx.x() > lower_left.x() })
   );
   debug_assert!(
     pawn_poses
       .iter()
-      .filter(|&&idx| idx != PackedIdx::null())
+      .filter_null()
       .all(|idx| { idx.x() <= lower_left.x() + width })
   );
   debug_assert!(
     pawn_poses
       .iter()
-      .filter(|&&idx| idx != PackedIdx::null())
+      .filter_null()
       .all(|idx| { idx.y() > lower_left.y() })
   );
   // debug_assert!(
   //   pawn_poses
   //     .iter()
-  //     .filter(|&&idx| idx != PackedIdx::null())
+  //     .filter_null()
   //     .all(|idx| { idx.x() + 1 + (idx.y() + 1) * width < u64::BITS })
   // );
 
@@ -411,18 +408,15 @@ fn packed_positions_bounding_box_slow<const N: usize>(
 ) -> (HexPos, HexPos) {
   debug_assert!(!pawn_poses.is_empty(), "Pawn positions cannot be empty");
 
-  let (min_pos, max_pos) = pawn_poses
-    .iter()
-    .filter(|&&pos| pos != PackedIdx::null())
-    .fold(
-      ((u32::MAX, u32::MAX), (0, 0)),
-      |(min_pos, max_pos), &pos| {
-        (
-          (min_pos.0.min(pos.x()), min_pos.1.min(pos.y())),
-          (max_pos.0.max(pos.x()), max_pos.1.max(pos.y())),
-        )
-      },
-    );
+  let (min_pos, max_pos) = pawn_poses.iter().filter_null().fold(
+    ((u32::MAX, u32::MAX), (0, 0)),
+    |(min_pos, max_pos), &pos| {
+      (
+        (min_pos.0.min(pos.x()), min_pos.1.min(pos.y())),
+        (max_pos.0.max(pos.x()), max_pos.1.max(pos.y())),
+      )
+    },
+  );
 
   (
     HexPos::new(min_pos.0, min_pos.1),
