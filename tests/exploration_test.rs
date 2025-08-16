@@ -3,11 +3,11 @@ use googletest::{
   prelude::{container_eq, ok},
 };
 use onoro::{
-  Onoro,
   error::{OnoroError, OnoroResult},
-  test_util::{BOARD_POSITIONS, OnoroCmp, OnoroFactory, normalized_ordered_moves},
+  test_util::{normalized_ordered_moves, OnoroCmp, OnoroFactory, BOARD_POSITIONS},
+  Onoro,
 };
-use rand::{Rng, SeedableRng, rngs::StdRng};
+use rand::{rngs::StdRng, Rng, SeedableRng};
 use rstest::rstest;
 use rstest_reuse::{apply, template};
 

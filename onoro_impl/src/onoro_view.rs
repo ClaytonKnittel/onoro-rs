@@ -12,7 +12,7 @@ use algebra::{
   semigroup::Semigroup,
 };
 
-use abstract_game::{Game, GameMoveGenerator, GameResult};
+use abstract_game::{Game, GameMoveIterator, GameResult};
 use onoro::{
   Compress, Onoro, PawnColor, TileState,
   error::{OnoroError, OnoroResult},
@@ -422,7 +422,7 @@ pub struct ViewMoveGenerator<const N: usize, const N2: usize, const ADJ_CNT_SIZE
   move_gen: MoveGenerator<N, N2, ADJ_CNT_SIZE>,
 }
 
-impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> GameMoveGenerator
+impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> GameMoveIterator
   for ViewMoveGenerator<N, N2, ADJ_CNT_SIZE>
 {
   type Item = Move;

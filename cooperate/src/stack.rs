@@ -1,4 +1,4 @@
-use abstract_game::GameMoveGenerator;
+use abstract_game::GameMoveIterator;
 use std::{
   fmt::Display,
   ptr::null_mut,

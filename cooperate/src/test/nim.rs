@@ -1,6 +1,6 @@
 use std::{fmt::Display, hash::Hash};
 
-use abstract_game::{Game, GameMoveGenerator, GameResult, Score};
+use abstract_game::{Game, GameResult, GameMoveIterator, Score};
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum NimPlayer {
@@ -24,7 +24,7 @@ pub struct NimMoveIter {
   max_sticks: u32,
 }
 
-impl GameMoveGenerator for NimMoveIter {
+impl GameMoveIterator for NimMoveIter {
   type Item = NimMove;
   type Game = Nim;
 

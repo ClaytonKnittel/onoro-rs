@@ -226,6 +226,7 @@ dependencies = [
  "const-random",
  "googletest",
  "itertools",
+ "num-traits",
  "onoro",
  "rand",
  "rstest",

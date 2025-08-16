@@ -59,6 +59,15 @@ impl PackedIdx {
       bytes: Wrapping(self.bytes.0.wrapping_add(other.bytes.0)),
     }
   }
+
+  /// # Safety
+  ///
+  /// This breaks the type safety of relative/absolute coordinates.
+  pub const unsafe fn from_idx_offset(offset: IdxOffset) -> Self {
+    PackedIdx {
+      bytes: Wrapping(offset.bytes.0),
+    }
+  }
 }
 
 impl OnoroIndex for PackedIdx {
@@ -109,6 +118,18 @@ impl std::ops::AddAssign<IdxOffset> for PackedIdx {
   }
 }
 
+impl std::ops::Sub for PackedIdx {
+  type Output = IdxOffset;
+
+  fn sub(self, rhs: Self) -> Self::Output {
+    debug_assert!(
+      self.x() >= rhs.x() && self.y() >= rhs.y(),
+      "Cannot subtract larger PackedIdx from smaller one: {self} - {rhs}"
+    );
+    IdxOffset::from_bytes(Wrapping(self.bytes.0.wrapping_sub(rhs.bytes.0)))
+  }
+}
+
 impl Display for PackedIdx {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     write!(f, "({}, {})", self.x(), self.y())
@@ -131,6 +152,10 @@ impl IdxOffset {
     Self {
       bytes: Wrapping(Self::by_x(x).bytes.0.wrapping_add(Self::by_y(y).bytes.0)),
     }
+  }
+
+  const fn from_bytes(bytes: Wrapping<u8>) -> Self {
+    Self { bytes }
   }
 
   /// Constructs an `IdxOffset` that shifts a `PackedIdx` by `dx` along the

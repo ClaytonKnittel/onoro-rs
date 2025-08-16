@@ -27,6 +27,18 @@ impl HexPos {
     self.y
   }
 
+  pub fn neighbor_offsets() -> std::array::IntoIter<HexPosOffset, 6> {
+    [
+      HexPosOffset::new(-1, -1),
+      HexPosOffset::new(0, -1),
+      HexPosOffset::new(-1, 0),
+      HexPosOffset::new(1, 0),
+      HexPosOffset::new(0, 1),
+      HexPosOffset::new(1, 1),
+    ]
+    .into_iter()
+  }
+
   /// Returns an iterator over all neighbors of this `HexPos`.
   pub fn each_neighbor(&self) -> std::array::IntoIter<Self, 6> {
     [
