@@ -91,11 +91,7 @@ struct Impl<I> {
 impl<I: Unsigned + PrimInt> Impl<I> {
   /// Initializes the move generator, which builds the board vec and neighbor
   /// candidates masks.
-  fn new_impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize>(
-    lower_left: PackedIdx,
-    width: u8,
-    onoro: &OnoroImpl<N, N2, ADJ_CNT_SIZE>,
-  ) -> Self {
+  fn new_impl<const N: usize>(lower_left: PackedIdx, width: u8, onoro: &OnoroImpl<N>) -> Self {
     debug_assert!(lower_left.x() > 0);
     debug_assert!(lower_left.y() > 0);
     let indexer = BoardVecIndexer::new(lower_left + IdxOffset::new(-1, -1), width);
@@ -130,37 +126,23 @@ impl<I: Unsigned + PrimInt> Impl<I> {
 }
 
 impl Impl<u64> {
-  fn new<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize>(
-    lower_left: PackedIdx,
-    width: u8,
-    onoro: &OnoroImpl<N, N2, ADJ_CNT_SIZE>,
-  ) -> Self {
+  fn new<const N: usize>(lower_left: PackedIdx, width: u8, onoro: &OnoroImpl<N>) -> Self {
     Self::new_impl(lower_left, width, onoro)
   }
 
-  fn next<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize>(
-    &mut self,
-    _onoro: &OnoroImpl<N, N2, ADJ_CNT_SIZE>,
-  ) -> Option<Move> {
+  fn next<const N: usize>(&mut self, _onoro: &OnoroImpl<N>) -> Option<Move> {
     self.next_impl()
   }
 }
 
 impl Impl<u128> {
   #[cold]
-  fn new<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize>(
-    lower_left: PackedIdx,
-    width: u8,
-    onoro: &OnoroImpl<N, N2, ADJ_CNT_SIZE>,
-  ) -> Self {
+  fn new<const N: usize>(lower_left: PackedIdx, width: u8, onoro: &OnoroImpl<N>) -> Self {
     Self::new_impl(lower_left, width, onoro)
   }
 
   #[cold]
-  fn next<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize>(
-    &mut self,
-    _onoro: &OnoroImpl<N, N2, ADJ_CNT_SIZE>,
-  ) -> Option<Move> {
+  fn next<const N: usize>(&mut self, _onoro: &OnoroImpl<N>) -> Option<Move> {
     self.next_impl()
   }
 }
@@ -179,13 +161,11 @@ enum ImplContainer {
 /// The phase 1 move generator, where not all pawns have been placed and a move
 /// consists of adding a new pawn to the board adjacent to at least 2 other
 /// pawns.
-pub struct P1MoveGenerator<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> {
+pub struct P1MoveGenerator<const N: usize> {
   impl_container: ImplContainer,
 }
 
-impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize>
-  P1MoveGenerator<N, N2, ADJ_CNT_SIZE>
-{
+impl<const N: usize> P1MoveGenerator<N> {
   #[cfg(test)]
   fn indexer(&self) -> &BoardVecIndexer {
     match &self.impl_container {
@@ -195,10 +175,8 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize>
   }
 }
 
-impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize>
-  P1MoveGenerator<N, N2, ADJ_CNT_SIZE>
-{
-  pub fn new(onoro: &OnoroImpl<N, N2, ADJ_CNT_SIZE>) -> Self {
+impl<const N: usize> P1MoveGenerator<N> {
+  pub fn new(onoro: &OnoroImpl<N>) -> Self {
     debug_assert!(onoro.in_phase1());
 
     // Compute the bounding parallelogram of the pawns that have been placed,
@@ -234,11 +212,9 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize>
   }
 }
 
-impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> GameMoveIterator
-  for P1MoveGenerator<N, N2, ADJ_CNT_SIZE>
-{
+impl<const N: usize> GameMoveIterator for P1MoveGenerator<N> {
   type Item = Move;
-  type Game = OnoroImpl<N, N2, ADJ_CNT_SIZE>;
+  type Game = OnoroImpl<N>;
 
   fn next(&mut self, _onoro: &Self::Game) -> Option<Self::Item> {
     match &mut self.impl_container {
@@ -260,18 +236,14 @@ mod tests {
     p1_move_gen::{BoardVecIndexer, ImplContainer, P1MoveGenerator},
   };
 
-  fn get_board_vec<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize>(
-    move_gen: &P1MoveGenerator<N, N2, ADJ_CNT_SIZE>,
-  ) -> u128 {
+  fn get_board_vec<const N: usize>(move_gen: &P1MoveGenerator<N>) -> u128 {
     match &move_gen.impl_container {
       ImplContainer::Small(impl_) => impl_.board_vec as u128,
       ImplContainer::Large(impl_) => impl_.board_vec,
     }
   }
 
-  fn get_neighbor_candidates<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize>(
-    move_gen: &P1MoveGenerator<N, N2, ADJ_CNT_SIZE>,
-  ) -> u128 {
+  fn get_neighbor_candidates<const N: usize>(move_gen: &P1MoveGenerator<N>) -> u128 {
     match &move_gen.impl_container {
       ImplContainer::Small(impl_) => impl_.neighbor_candidates as u128,
       ImplContainer::Large(impl_) => impl_.neighbor_candidates,

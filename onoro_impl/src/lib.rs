@@ -8,6 +8,7 @@ mod onoro_defs;
 mod onoro_state;
 mod onoro_view;
 mod p1_move_gen;
+mod p2_move_gen;
 mod packed_hex_pos;
 mod packed_idx;
 mod tile_hash;
