@@ -16,6 +16,7 @@ use onoro::{
 use union_find::ConstUnionFind;
 
 use crate::{
+  FilterNullPackedIdx,
   canonicalize::{BoardSymmetryState, board_symm_state},
   r#move::Move,
   onoro_state::OnoroState,
@@ -343,10 +344,8 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroImpl<N, N2
     // reading/writing.
     if shift != HexPosOffset::origin() {
       let idx_offset = IdxOffset::from(shift);
-      self.pawn_poses.iter_mut().for_each(|pos| {
-        if *pos != PackedIdx::null() {
-          *pos += idx_offset;
-        }
+      self.pawn_poses.iter_mut().filter_null().for_each(|pos| {
+        *pos += idx_offset;
       });
       self.sum_of_mass =
         (HexPos::from(self.sum_of_mass) + shift * (self.pawns_in_play() as i32)).into();
