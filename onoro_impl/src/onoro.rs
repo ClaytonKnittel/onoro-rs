@@ -8,12 +8,13 @@ use algebra::group::Group;
 use itertools::interleave;
 use onoro::{
   Color, Colored, Onoro, OnoroMoveWrapper, OnoroPawn, PawnColor, TileState,
-  error::OnoroResult,
   groups::{C2, D3, D6, K4},
   hex_pos::{HexPos, HexPosOffset},
-  make_onoro_error,
 };
-use union_find::ConstUnionFind;
+#[cfg(test)]
+use onoro::{error::OnoroResult, make_onoro_error};
+#[cfg(test)]
+use union_find::UnionFind;
 
 use crate::{
   FilterNullPackedIdx,
@@ -575,6 +576,7 @@ impl<const N: usize> OnoroImpl<N> {
   }
 
   /// Bounds checks a hex pos before turning it into a PackedIdx for lookup.
+  #[cfg(test)]
   fn get_tile_hex_pos(&self, idx: HexPos) -> TileState {
     if idx.x() >= N as u32 || idx.y() >= N as u32 {
       TileState::Empty
@@ -683,13 +685,13 @@ impl<const N: usize> Onoro for OnoroImpl<N> {
     }
   }
 
+  #[cfg(test)]
   fn validate(&self) -> OnoroResult {
     let mut n_b_pawns = 0u32;
     let mut n_w_pawns = 0u32;
     let mut sum_of_mass = HexPos::zero();
 
-    // TODO: Fix this
-    let mut uf = ConstUnionFind::<256>::new();
+    let mut uf = UnionFind::new(N * N);
 
     for pawn in self.pawns() {
       sum_of_mass += pawn.pos.into();
