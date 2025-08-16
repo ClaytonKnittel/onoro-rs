@@ -1,13 +1,18 @@
 use abstract_game::GameMoveIterator;
 use num_traits::{PrimInt, Unsigned};
+use onoro::Onoro;
 
 use crate::{
   FilterNullPackedIdx, IdxOffset, Move, OnoroImpl, PackedIdx,
   util::{likely, packed_positions_bounding_box},
 };
 
+/// An indexing schema for mapping HexPos <-> bitvector index.
 struct BoardVecIndexer {
+  /// The lower left index of the minimal bounding box containing all placed
+  /// pawns, with a 1-tile perimeter of empty tiles.
   lower_left: PackedIdx,
+  /// The width of this minimal bounding box.
   width: u8,
 }
 
@@ -16,11 +21,13 @@ impl BoardVecIndexer {
     Self { lower_left, width }
   }
 
+  /// Maps a `PackedIdx` from the Onoro state to an index in the board bitvec.
   fn index(&self, pos: PackedIdx) -> usize {
     let d = unsafe { PackedIdx::from_idx_offset(pos - self.lower_left) };
     d.y() as usize * self.width as usize + d.x() as usize
   }
 
+  /// Maps an index from the board bitvec to a `PackedIdx` in the Onoro state.
   fn pos_from_index(&self, index: u32) -> PackedIdx {
     debug_assert!((3..=16).contains(&self.width));
     let x = index % self.width as u32;
@@ -28,6 +35,10 @@ impl BoardVecIndexer {
     self.lower_left + IdxOffset::new(x as i32, y as i32)
   }
 
+  /// Builds both the board bitvec and neighbor candidates. The board bitvec
+  /// has a 1 in each index corresponding to an occupied tile, and the neighbor
+  /// candidates have a 1 in each index corresponding to an empty neighbor of
+  /// any pawn.
   fn build_bitvecs<I: PrimInt>(&self, pawn_poses: &[PackedIdx]) -> (I, I) {
     let width = self.width as usize;
 
@@ -40,6 +51,8 @@ impl BoardVecIndexer {
         board_vec | (I::one() << index)
       });
 
+    // All neighbors are -(width+1), -width, -1, +1, +width, +(width+1) in
+    // index space.
     let neighbor_candidates = (board >> (width + 1))
       | (board >> width)
       | (board >> 1)
@@ -50,6 +63,8 @@ impl BoardVecIndexer {
     (board, neighbor_candidates & !board)
   }
 
+  /// Constructs a mask of the 6 neighbors of a tile at the given bitvector
+  /// index.
   fn neighbors_mask<I: PrimInt>(&self, index: usize) -> I {
     let lesser_neighbors_mask = unsafe { I::from(0x3 | (0x1 << self.width)).unwrap_unchecked() };
     let greater_neighbors_mask = unsafe { I::from(0x2 | (0x3 << self.width)).unwrap_unchecked() };
@@ -62,12 +77,20 @@ impl BoardVecIndexer {
 }
 
 struct Impl<I> {
+  /// A bitvector representation of the board, with bits set if there is a pawn
+  /// present in the corresponding tile. This includes a 1-tile perimeter of
+  /// empty tiles so that `board_vec` and `neighbor_candidates` can use the
+  /// same indexer.
   board_vec: I,
+  /// A bitvector of all tiles with at least one pawn neighbor which are not
+  /// occupied by a pawn already.
   neighbor_candidates: I,
   indexer: BoardVecIndexer,
 }
 
 impl<I: Unsigned + PrimInt> Impl<I> {
+  /// Initializes the move generator, which builds the board vec and neighbor
+  /// candidates masks.
   fn new_impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize>(
     lower_left: PackedIdx,
     width: u8,
@@ -84,6 +107,7 @@ impl<I: Unsigned + PrimInt> Impl<I> {
     }
   }
 
+  /// Finds the next move we can make, or `None` if all moves have been found.
   fn next_impl(&mut self) -> Option<Move> {
     let mut neighbor_candidates = self.neighbor_candidates;
     while neighbor_candidates != I::zero() {
@@ -142,15 +166,19 @@ impl Impl<u128> {
 }
 
 enum ImplContainer {
-  /// We use this repr when the board is small enough to fit in a u64,
+  /// We use this repr when the board bitvec is small enough to fit in a u64,
   /// including a 1-tile padding around the perimeter. This is much faster to
   /// operate on than a u128.
   Small(Impl<u64>),
-  /// For correctness, we need to support any board size. The largest possible
-  /// board is 8 x 9, which, with a 1-tile padding, requires 110 bits.
+  /// We need to support any board size. The largest possible board is 8 x 8
+  /// (see test_worst_case below), which, with a 1-tile padding, requires 81
+  /// bits for the board bitvec.
   Large(Box<Impl<u128>>),
 }
 
+/// The phase 1 move generator, where not all pawns have been placed and a move
+/// consists of adding a new pawn to the board adjacent to at least 2 other
+/// pawns.
 pub struct P1MoveGenerator<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> {
   impl_container: ImplContainer,
 }
@@ -171,12 +199,23 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize>
   P1MoveGenerator<N, N2, ADJ_CNT_SIZE>
 {
   pub fn new(onoro: &OnoroImpl<N, N2, ADJ_CNT_SIZE>) -> Self {
+    debug_assert!(onoro.in_phase1());
+
+    // Compute the bounding parallelogram of the pawns that have been placed,
+    // which is min/max x/y in coordinate space.
     let (lower_left, upper_right) = packed_positions_bounding_box(onoro.pawn_poses());
     let delta = upper_right - lower_left;
 
+    // We will represent the board with a bitvector, where each bit corresponds
+    // to a tile and is set if there is a pawn there. We want a 1-tile padding
+    // around the perimeter so we can also represent the neighbor candidates
+    // with a bitvec.
     let width = delta.x() as u32 + 3;
     let height = delta.y() as u32 + 3;
 
+    // Specialize for the case where the board bitvec fits in a u64, which is
+    // by far the most common. Only in pathological cases will we need more
+    // than 64 bits.
     if likely(width * height <= u64::BITS) {
       P1MoveGenerator {
         impl_container: ImplContainer::Small(Impl::<u64>::new(
