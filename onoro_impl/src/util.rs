@@ -227,6 +227,8 @@ where
   result as u8
 }
 
+/// Returns the minimum and maximum 1-byte values found in the 16 bytes of
+/// `vec`, ignoring any 0 bytes.
 #[target_feature(enable = "ssse3")]
 pub fn mm_min_max_ignore_zero_epu8(vec: __m128i) -> (u8, u8) {
   #[cfg(all(target_feature = "avx512bw", target_feature = "avx512vl"))]
@@ -291,6 +293,8 @@ fn packed_positions_bounding_box_slow<const N: usize>(
   )
 }
 
+/// Returns the lower-left and upper-right corner of the bounding
+/// parallellogram of all the pawns in `pawn_poses`, ignoring null indices.
 #[inline(always)]
 pub fn packed_positions_bounding_box<const N: usize>(
   pawn_poses: &[PackedIdx; N],
