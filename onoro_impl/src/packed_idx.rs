@@ -1,4 +1,5 @@
 use std::{
+  borrow::Borrow,
   fmt::{Debug, Display},
   num::Wrapping,
 };
@@ -186,6 +187,21 @@ impl std::ops::Add for IdxOffset {
 impl std::ops::AddAssign for IdxOffset {
   fn add_assign(&mut self, rhs: IdxOffset) {
     self.bytes += rhs.bytes
+  }
+}
+
+pub trait FilterNullPackedIdx<B: Borrow<PackedIdx>>: Iterator<Item = B> {
+  /// Filters null `PackedIdx`'s from the iterator.
+  fn filter_null(self) -> impl Iterator<Item = B>;
+}
+
+impl<B, I> FilterNullPackedIdx<B> for I
+where
+  B: Borrow<PackedIdx>,
+  I: Iterator<Item = B>,
+{
+  fn filter_null(self) -> impl Iterator<Item = B> {
+    self.filter(|packed_idx| *packed_idx.borrow() != PackedIdx::null())
   }
 }
 
