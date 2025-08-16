@@ -326,22 +326,20 @@ mod tests {
   }
 
   #[test]
-  #[ignore]
   fn test_worst_case() -> OnoroResult {
     let worst_case = Onoro16::from_board_string(
-      ". W . . . . . .
-        B B . . . . . .
-         . W . . . . . .
-          . B . . . . . .
-           . W . . . . . .
-            . B . . . . . .
-             . W . . . . . .
-              . B W B W B W B
-               . . . . . . W .",
+      ". B . . . . . .
+        B W . . . . . .
+         . B . . . . . .
+          . W . . . . . .
+           . B . . . . . .
+            . W . . . . . .
+             . B W B W B W B
+              . . . . . . W .",
     )?;
 
-    let mut move_gen = P1MoveGenerator::new(&worst_case);
-    move_gen.next(&worst_case);
+    let move_gen = P1MoveGenerator::new(&worst_case);
+    assert_eq!(move_gen.to_iter(&worst_case).count(), 23);
 
     Ok(())
   }
