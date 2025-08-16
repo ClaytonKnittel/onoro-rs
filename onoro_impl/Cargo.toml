@@ -14,7 +14,7 @@ rand = "0.8"
 union_find = { path = "../union_find" }
 
 [build]
-rustflags = ["-C", "target-feature=+ssse3,+avx512bw,+avx512vl"]
+rustflags = ["-C", "target-feature=+ssse3"]
 
 [dev-dependencies]
 googletest = "0.14.2"

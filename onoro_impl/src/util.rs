@@ -4,8 +4,6 @@ use std::arch::x86_64::{
   _mm_loadu_si128, _mm_max_epu8, _mm_min_epu8, _mm_or_si128, _mm_set_epi64x, _mm_setzero_si128,
   _mm_unpackhi_epi64, _mm_unpacklo_epi8,
 };
-#[cfg(all(target_feature = "avx512bw", target_feature = "avx512vl"))]
-use std::arch::x86_64::{_mm_reduce_max_epu8, _mm_reduce_min_epu8};
 
 use itertools::Itertools;
 use onoro::hex_pos::HexPos;
@@ -204,15 +202,6 @@ pub fn equal_mask_epi8(byte_vec: u64, needle: u8) -> u64 {
   equal_mask_epi8_slow(byte_vec, needle)
 }
 
-#[cfg(all(target_feature = "avx512bw", target_feature = "avx512vl"))]
-#[target_feature(enable = "avx512bw,avx512vl")]
-fn mm_min_max_epu8_ignore_zero_avx512(vec: __m128i) -> (u8, u8) {
-  let zeros = _mm_cmpeq_epi8(vec, _mm_setzero_si128());
-  let min_vec = _mm_or_si128(vec, zeros);
-  let max_vec = vec;
-  (_mm_reduce_min_epu8(min_vec), _mm_reduce_max_epu8(max_vec))
-}
-
 #[target_feature(enable = "ssse3")]
 unsafe fn horizontal_compress<F>(v: __m128i, mut compressor: F) -> u8
 where
@@ -230,10 +219,7 @@ where
 /// Returns the minimum and maximum 1-byte values found in the 16 bytes of
 /// `vec`, ignoring any 0 bytes.
 #[target_feature(enable = "ssse3")]
-pub fn mm_min_max_ignore_zero_epu8(vec: __m128i) -> (u8, u8) {
-  #[cfg(all(target_feature = "avx512bw", target_feature = "avx512vl"))]
-  return unsafe { mm_min_max_epu8_ignore_zero_avx512(vec) };
-
+fn mm_min_max_ignore_zero_epu8(vec: __m128i) -> (u8, u8) {
   let zeros = _mm_cmpeq_epi8(vec, _mm_setzero_si128());
   let min_vec = _mm_or_si128(vec, zeros);
   let max_vec = vec;
@@ -255,12 +241,13 @@ fn packed_positions_boinding_box_sse3(pawn_poses: &[PackedIdx]) -> (HexPos, HexP
   const SELECT_X_MASK: i64 = 0x0f0f_0f0f_0f0f_0f0f;
 
   let select_x = _mm_set_epi64x(SELECT_X_MASK, SELECT_X_MASK);
-  let select_y = _mm_set_epi64x(!SELECT_X_MASK, !SELECT_X_MASK);
 
   let pawns = unsafe { _mm_loadu_si128(pawn_poses.as_ptr() as *const _) };
 
   let x_coords = _mm_and_si128(pawns, select_x);
-  let y_coords = _mm_and_si128(pawns, select_y);
+  // We don't need to mask off the x coordinates since the y coordinates are in
+  // the higher 4 bits, and y = 0 iff x = 0.
+  let y_coords = pawns;
 
   let (min_x, max_x) = mm_min_max_ignore_zero_epu8(x_coords);
   let (min_y, max_y) = mm_min_max_ignore_zero_epu8(y_coords);
