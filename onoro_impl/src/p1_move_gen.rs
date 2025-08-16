@@ -1,4 +1,4 @@
-use abstract_game::OnoroIterator;
+use abstract_game::GameMoveIterator;
 use num_traits::{PrimInt, Unsigned};
 
 use crate::{
@@ -195,7 +195,7 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize>
   }
 }
 
-impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroIterator
+impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> GameMoveIterator
   for P1MoveGenerator<N, N2, ADJ_CNT_SIZE>
 {
   type Item = Move;
@@ -211,7 +211,7 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroIterator
 
 #[cfg(test)]
 mod tests {
-  use abstract_game::OnoroIterator;
+  use abstract_game::GameMoveIterator;
   use onoro::{Onoro, error::OnoroResult, hex_pos::HexPos, test_util::BOARD_POSITIONS};
   use rstest::rstest;
   use rstest_reuse::{apply, template};

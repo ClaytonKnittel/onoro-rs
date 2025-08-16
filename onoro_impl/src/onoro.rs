@@ -3,7 +3,7 @@ use std::{
   fmt::{Debug, Display},
 };
 
-use abstract_game::{GameIterator, OnoroIterator};
+use abstract_game::{GameIterator, GameMoveIterator};
 use algebra::group::Group;
 use itertools::interleave;
 use onoro::{
@@ -874,7 +874,7 @@ pub struct PawnGeneratorImpl<
 }
 
 impl<const ONE_COLOR: bool, const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize>
-  OnoroIterator for PawnGeneratorImpl<ONE_COLOR, N, N2, ADJ_CNT_SIZE>
+  GameMoveIterator for PawnGeneratorImpl<ONE_COLOR, N, N2, ADJ_CNT_SIZE>
 {
   type Item = Pawn;
   type Game = OnoroImpl<N, N2, ADJ_CNT_SIZE>;
@@ -909,7 +909,7 @@ pub enum MoveGenerator<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usiz
   P2Moves(P2MoveGenerator<N, N2, ADJ_CNT_SIZE>),
 }
 
-impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroIterator
+impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> GameMoveIterator
   for MoveGenerator<N, N2, ADJ_CNT_SIZE>
 {
   type Item = Move;
@@ -1073,7 +1073,7 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize>
   }
 }
 
-impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroIterator
+impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> GameMoveIterator
   for P2MoveGenerator<N, N2, ADJ_CNT_SIZE>
 {
   type Item = Move;

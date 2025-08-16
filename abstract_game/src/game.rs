@@ -1,4 +1,4 @@
-pub trait OnoroIterator: Sized {
+pub trait GameMoveIterator: Sized {
   type Item;
   type Game;
 
@@ -19,7 +19,7 @@ pub struct GameIterator<'a, GI, G> {
 
 impl<GI, I, G> Iterator for GameIterator<'_, GI, G>
 where
-  GI: OnoroIterator<Item = I, Game = G>,
+  GI: GameMoveIterator<Item = I, Game = G>,
 {
   type Item = I;
 
@@ -37,7 +37,7 @@ pub enum GameResult<PlayerIdentifier> {
 
 pub trait Game: Clone + Sized {
   type Move: Copy;
-  type MoveGenerator: OnoroIterator<Item = Self::Move, Game = Self>;
+  type MoveGenerator: GameMoveIterator<Item = Self::Move, Game = Self>;
   type PlayerIdentifier: Eq;
 
   fn move_generator(&self) -> Self::MoveGenerator;

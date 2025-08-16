@@ -1,6 +1,6 @@
 use std::{fmt::Display, hash::Hash};
 
-use abstract_game::{Game, GameResult, OnoroIterator};
+use abstract_game::{Game, GameResult, GameMoveIterator};
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum GomokuPlayer {
@@ -42,7 +42,7 @@ impl GomokuMoveIter {
   }
 }
 
-impl OnoroIterator for GomokuMoveIter {
+impl GameMoveIterator for GomokuMoveIter {
   type Item = GomokuMove;
   type Game = Gomoku;
 
