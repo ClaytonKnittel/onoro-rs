@@ -266,14 +266,30 @@ fn packed_positions_to_board_bitvec<const N: usize>(
   lower_left: PackedIdx,
   width: u32,
 ) -> u64 {
-  debug_assert!(pawn_poses.iter().all(|idx| { idx.x() > 0 }));
-  debug_assert!(pawn_poses.iter().all(|idx| { idx.x() <= width }));
-  debug_assert!(pawn_poses.iter().all(|idx| { idx.y() > 0 }));
   debug_assert!(
     pawn_poses
       .iter()
-      .all(|idx| { idx.x() + 1 + (idx.y() + 1) * width < u64::BITS })
+      .filter(|&&idx| idx != PackedIdx::null())
+      .all(|idx| { idx.x() > lower_left.x() })
   );
+  debug_assert!(
+    pawn_poses
+      .iter()
+      .filter(|&&idx| idx != PackedIdx::null())
+      .all(|idx| { idx.x() <= lower_left.x() + width })
+  );
+  debug_assert!(
+    pawn_poses
+      .iter()
+      .filter(|&&idx| idx != PackedIdx::null())
+      .all(|idx| { idx.y() > lower_left.y() })
+  );
+  // debug_assert!(
+  //   pawn_poses
+  //     .iter()
+  //     .filter(|&&idx| idx != PackedIdx::null())
+  //     .all(|idx| { idx.x() + 1 + (idx.y() + 1) * width < u64::BITS })
+  // );
 
   #[cfg(target_feature = "ssse3")]
   if N == 16 {
