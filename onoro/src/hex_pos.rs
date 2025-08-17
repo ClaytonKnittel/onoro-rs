@@ -4,7 +4,7 @@ use algebra::group::{Cyclic, Trivial};
 
 use crate::groups::{C2, D3, D6, K4};
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct HexPos {
   x: u32,
   y: u32,
