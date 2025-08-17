@@ -49,21 +49,106 @@ impl<const N: usize> P2MoveGenerator<N> {
     }
   }
 
+  fn neighbors(
+    pawn_index: usize,
+    onoro: &OnoroImpl<N>,
+    p1_move_gen: &P1MoveGenerator<N>,
+  ) -> impl Iterator<Item = usize> {
+    let indexer = p1_move_gen.indexer();
+
+    p1_move_gen.neighbors(pawn_index).map(|neighbor_index| {
+      let neighbor_pos = indexer.pos_from_index(neighbor_index);
+      onoro
+        .pawn_poses()
+        .iter()
+        .enumerate()
+        .find(|&(_, &pos)| pos == neighbor_pos)
+        .unwrap()
+        .0
+    })
+  }
+
   fn recursor(
+    pawn_index: usize,
+    parent_index: usize,
     pawn_meta: &mut [PawnMeta; N],
     ecas: &mut [u32; N],
+    time: &mut u32,
+    onoro: &OnoroImpl<N>,
     p1_move_gen: &P1MoveGenerator<N>,
   ) {
+    let indexer = p1_move_gen.indexer();
+
+    let meta = &mut pawn_meta[pawn_index];
+    meta.discovery_time = *time;
+    ecas[pawn_index] = *time;
+    *time += 1;
+
+    for neighbor_index in Self::neighbors(pawn_index, onoro, p1_move_gen)
+      .filter(|&neighbor_index| neighbor_index != parent_index)
+    {
+      let neighbor_meta = &mut pawn_meta[neighbor_index];
+      let neighbor_t = neighbor_meta.discovery_time;
+
+      if neighbor_t != 0 {
+        ecas[pawn_index] = ecas[pawn_index].min(neighbor_t);
+        continue;
+      }
+
+      Self::recursor(
+        neighbor_index,
+        pawn_index,
+        pawn_meta,
+        ecas,
+        time,
+        onoro,
+        p1_move_gen,
+      );
+
+      let neighbor_meta = poses.get_mut(&neighbor).unwrap();
+      let neighbor_eca = neighbor_meta.earliest_connected_ancestor;
+
+      let meta = poses.get_mut(&pos).unwrap();
+      meta.earliest_connected_ancestor = meta.earliest_connected_ancestor.min(neighbor_eca);
+
+      if neighbor_eca >= meta.discovery_time {
+        meta.is_cut = true;
+      }
+    }
   }
 
   fn build_pawn_meta(onoro: &OnoroImpl<N>, p1_move_gen: &P1MoveGenerator<N>) -> [PawnMeta; N] {
     let indexer = p1_move_gen.indexer();
     let mut pawn_meta = [PawnMeta::default(); N];
     let mut ecas = [0u32; N];
-    pawn_meta[0].discovery_time = 1;
-    ecas[0] = 1;
+    let mut time = 1;
+    pawn_meta[0].discovery_time = time;
+    ecas[0] = time;
 
-    for neighbor_index in p1_move_gen.neighbors(indexer.index(onoro.pawn_poses()[0])) {}
+    let root_pawn = onoro.pawn_poses()[0];
+    let root_pawn_idx = indexer.index(root_pawn);
+
+    let mut neighbor_count = 0;
+    for neighbor_index in Self::neighbors(root_pawn_idx, onoro, p1_move_gen) {
+      if pawn_meta[neighbor_index].discovery_time != 0 {
+        continue;
+      }
+
+      Self::recursor(
+        neighbor_index,
+        root_pawn_idx,
+        &mut pawn_meta,
+        &mut ecas,
+        &mut time,
+        onoro,
+        p1_move_gen,
+      );
+      neighbor_count += 1;
+    }
+
+    if neighbor_count > 1 {
+      pawn_meta[0].is_cut = true;
+    }
 
     pawn_meta
   }
