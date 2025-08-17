@@ -3,15 +3,27 @@ use onoro::Onoro;
 
 use crate::{Move, OnoroImpl};
 
-fn find_articulation_points() {}
+struct PawnMeta {
+  discovery_time: u32,
+  has_two_neighbors: bool,
 
-pub struct P2MoveGenerator<const N: usize> {}
+  // Below only relevant to current player's pawns:
+  /// The time after which all of this pawn's descendants had been found.
+  /// TODO: In rare cases will need two of these values, if this pawn has 3
+  /// branches coming out of it.
+  exit_time: u32,
+  is_cut: bool,
+}
+
+pub struct P2MoveGenerator<const N: usize> {
+  pawn_meta: [PawnMeta; N],
+}
 
 impl<const N: usize> P2MoveGenerator<N> {
   pub fn new(onoro: &OnoroImpl<N>) -> Self {
     debug_assert!(!onoro.in_phase1());
 
-    Self {}
+    todo!();
   }
 }
 
