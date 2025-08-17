@@ -4,15 +4,30 @@ use onoro::Onoro;
 use crate::{Move, OnoroImpl};
 
 struct PawnMeta {
+  /// The discovery index of this pawn when doing the depth-first exploration
+  /// of the pawn graph.
   discovery_time: u32,
+  /// If true, this pawn has only two neighbors, meaning if we move a pawn
+  /// adjacent to it, it must be placed adjacent to it.
   has_two_neighbors: bool,
 
   // Below only relevant to current player's pawns:
-  /// The time after which all of this pawn's descendants had been found.
-  /// TODO: In rare cases will need two of these values, if this pawn has 3
-  /// branches coming out of it.
-  exit_time: u32,
+  /// Each time we have returned from exploring a subtree of this pawn.
+  ///
+  /// Note that this can happen at most twice, since we can have at most three
+  /// disconnected coming out of a single tile. For non-root tiles, one of the
+  /// branches must be the parent. For the root tile, this will happen three
+  /// times, but we don't need to record the time of the third return, since
+  /// that time would be larger than the discovery time of every tile.
+  exit_times: (u32, u32),
+  /// If true, this pawn is an articulation point.
   is_cut: bool,
+}
+
+impl PawnMeta {
+  fn is_root(&self) -> bool {
+    self.discovery_time == 0
+  }
 }
 
 pub struct P2MoveGenerator<const N: usize> {
