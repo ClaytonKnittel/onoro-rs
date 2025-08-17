@@ -37,17 +37,15 @@ mod tests {
   struct Meta {
     discovery_time: i32,
     earliest_connected_ancestor: i32,
+    is_cut: bool,
   }
   impl Meta {
     fn new() -> Self {
       Self {
         discovery_time: -1,
         earliest_connected_ancestor: -1,
+        is_cut: false,
       }
-    }
-
-    fn is_cut(&self) -> bool {
-      self.discovery_time != 0 && self.discovery_time <= self.earliest_connected_ancestor
     }
   }
 
@@ -76,6 +74,10 @@ mod tests {
 
       let meta = poses.get_mut(&pos).unwrap();
       meta.earliest_connected_ancestor = meta.earliest_connected_ancestor.min(neighbor_eca);
+
+      if neighbor_eca >= meta.discovery_time {
+        meta.is_cut = true;
+      }
     }
   }
 
@@ -108,7 +110,7 @@ mod tests {
       .chain(
         poses
           .into_iter()
-          .filter_map(|(pos, meta)| meta.is_cut().then_some(pos.into())),
+          .filter_map(|(pos, meta)| meta.is_cut.then_some(pos.into())),
       )
   }
 
@@ -137,6 +139,38 @@ mod tests {
     expect_that!(
       find_articulation_points_simple(&poses).collect_vec(),
       unordered_elements_are![&PackedIdx::new(3, 3)]
+    );
+  }
+
+  #[gtest]
+  fn test_articulation_points_fidget_spinner() {
+    let poses = [
+      PackedIdx::new(2, 2),
+      PackedIdx::new(3, 3),
+      PackedIdx::new(4, 3),
+      PackedIdx::new(3, 4),
+    ];
+
+    expect_that!(
+      find_articulation_points_simple(&poses).collect_vec(),
+      unordered_elements_are![&PackedIdx::new(3, 3)]
+    );
+  }
+
+  #[gtest]
+  fn test_articulation_points_ring() {
+    let poses = [
+      PackedIdx::new(2, 2),
+      PackedIdx::new(2, 3),
+      PackedIdx::new(3, 4),
+      PackedIdx::new(4, 4),
+      PackedIdx::new(4, 3),
+      PackedIdx::new(3, 2),
+    ];
+
+    expect_that!(
+      find_articulation_points_simple(&poses).collect_vec(),
+      is_empty()
     );
   }
 }
