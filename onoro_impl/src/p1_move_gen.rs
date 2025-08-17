@@ -1,14 +1,14 @@
 use abstract_game::GameMoveIterator;
+use itertools::Either;
 use num_traits::{PrimInt, Unsigned};
-use onoro::Onoro;
 
 use crate::{
   FilterNullPackedIdx, IdxOffset, Move, OnoroImpl, PackedIdx,
-  util::{likely, packed_positions_bounding_box},
+  util::{IterOnes, likely, packed_positions_bounding_box},
 };
 
 /// An indexing schema for mapping HexPos <-> bitvector index.
-struct BoardVecIndexer {
+pub struct BoardVecIndexer {
   /// The lower left index of the minimal bounding box containing all placed
   /// pawns, with a 1-tile perimeter of empty tiles.
   lower_left: PackedIdx,
@@ -22,13 +22,13 @@ impl BoardVecIndexer {
   }
 
   /// Maps a `PackedIdx` from the Onoro state to an index in the board bitvec.
-  fn index(&self, pos: PackedIdx) -> usize {
+  pub fn index(&self, pos: PackedIdx) -> usize {
     let d = unsafe { PackedIdx::from_idx_offset(pos - self.lower_left) };
     d.y() as usize * self.width as usize + d.x() as usize
   }
 
   /// Maps an index from the board bitvec to a `PackedIdx` in the Onoro state.
-  fn pos_from_index(&self, index: u32) -> PackedIdx {
+  pub fn pos_from_index(&self, index: u32) -> PackedIdx {
     debug_assert!((3..=16).contains(&self.width));
     let x = index % self.width as u32;
     let y = index / self.width as u32;
@@ -123,6 +123,13 @@ impl<I: Unsigned + PrimInt> Impl<I> {
     // call next() again after None is returned.
     None
   }
+
+  /// Returns an iterator over the indices of the neighbors of the pawn at the
+  /// given index.
+  fn neighbors(&self, index: usize) -> impl Iterator<Item = u32> {
+    let neighbors_mask: I = self.indexer.neighbors_mask(index);
+    (neighbors_mask & self.board_vec).iter_ones()
+  }
 }
 
 impl Impl<u64> {
@@ -166,8 +173,7 @@ pub struct P1MoveGenerator<const N: usize> {
 }
 
 impl<const N: usize> P1MoveGenerator<N> {
-  #[cfg(test)]
-  fn indexer(&self) -> &BoardVecIndexer {
+  pub fn indexer(&self) -> &BoardVecIndexer {
     match &self.impl_container {
       ImplContainer::Small(impl_) => &impl_.indexer,
       ImplContainer::Large(impl_) => &impl_.indexer,
@@ -177,8 +183,6 @@ impl<const N: usize> P1MoveGenerator<N> {
 
 impl<const N: usize> P1MoveGenerator<N> {
   pub fn new(onoro: &OnoroImpl<N>) -> Self {
-    debug_assert!(onoro.in_phase1());
-
     // Compute the bounding parallelogram of the pawns that have been placed,
     // which is min/max x/y in coordinate space.
     let (lower_left, upper_right) = packed_positions_bounding_box(onoro.pawn_poses());
@@ -208,6 +212,13 @@ impl<const N: usize> P1MoveGenerator<N> {
           Impl::<u128>::new(lower_left.into(), width as u8, onoro).into(),
         ),
       }
+    }
+  }
+
+  pub fn neighbors(&self, index: usize) -> impl Iterator<Item = u32> {
+    match &self.impl_container {
+      ImplContainer::Small(impl_) => Either::Left(impl_.neighbors(index)),
+      ImplContainer::Large(impl_) => Either::Right(impl_.neighbors(index)),
     }
   }
 }

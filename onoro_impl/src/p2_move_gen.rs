@@ -1,8 +1,9 @@
 use abstract_game::GameMoveIterator;
 use onoro::Onoro;
 
-use crate::{Move, OnoroImpl};
+use crate::{Move, OnoroImpl, p1_move_gen::P1MoveGenerator};
 
+#[derive(Clone, Copy, Default)]
 struct PawnMeta {
   /// The discovery index of this pawn when doing the depth-first exploration
   /// of the pawn graph.
@@ -26,19 +27,45 @@ struct PawnMeta {
 
 impl PawnMeta {
   fn is_root(&self) -> bool {
-    self.discovery_time == 0
+    self.discovery_time == 1
   }
 }
 
 pub struct P2MoveGenerator<const N: usize> {
   pawn_meta: [PawnMeta; N],
+  p1_move_gen: P1MoveGenerator<N>,
 }
 
 impl<const N: usize> P2MoveGenerator<N> {
   pub fn new(onoro: &OnoroImpl<N>) -> Self {
     debug_assert!(!onoro.in_phase1());
 
-    todo!();
+    let p1_move_gen = P1MoveGenerator::new(onoro);
+    let pawn_meta = Self::build_pawn_meta(onoro, &p1_move_gen);
+
+    Self {
+      pawn_meta,
+      p1_move_gen,
+    }
+  }
+
+  fn recursor(
+    pawn_meta: &mut [PawnMeta; N],
+    ecas: &mut [u32; N],
+    p1_move_gen: &P1MoveGenerator<N>,
+  ) {
+  }
+
+  fn build_pawn_meta(onoro: &OnoroImpl<N>, p1_move_gen: &P1MoveGenerator<N>) -> [PawnMeta; N] {
+    let indexer = p1_move_gen.indexer();
+    let mut pawn_meta = [PawnMeta::default(); N];
+    let mut ecas = [0u32; N];
+    pawn_meta[0].discovery_time = 1;
+    ecas[0] = 1;
+
+    for neighbor_index in p1_move_gen.neighbors(indexer.index(onoro.pawn_poses()[0])) {}
+
+    pawn_meta
   }
 }
 
@@ -198,6 +225,26 @@ mod tests {
     expect_that!(
       find_articulation_points_simple(&poses).collect_vec(),
       is_empty()
+    );
+  }
+
+  #[gtest]
+  fn test_articulation_points_c_shape() {
+    let poses = [
+      PackedIdx::new(2, 2),
+      PackedIdx::new(2, 3),
+      PackedIdx::new(3, 4),
+      PackedIdx::new(4, 4),
+      PackedIdx::new(4, 3),
+    ];
+
+    expect_that!(
+      find_articulation_points_simple(&poses).collect_vec(),
+      unordered_elements_are![
+        &PackedIdx::new(2, 3),
+        &PackedIdx::new(3, 4),
+        &PackedIdx::new(4, 4),
+      ]
     );
   }
 }

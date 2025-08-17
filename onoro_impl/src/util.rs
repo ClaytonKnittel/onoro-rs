@@ -6,6 +6,7 @@ use std::arch::x86_64::{
 };
 
 use itertools::Itertools;
+use num_traits::PrimInt;
 use onoro::hex_pos::HexPos;
 
 use crate::{FilterNullPackedIdx, PackedIdx};
@@ -65,6 +66,23 @@ define_cmp!(max_i8, min_i8, i8);
 define_cmp!(max_i16, min_i16, i16);
 define_cmp!(max_i32, min_i32, i32);
 define_cmp!(max_i64, min_i64, i64);
+
+pub trait IterOnes {
+  /// Given an integer, returns an iterator over the bit indices with ones.
+  fn iter_ones(self) -> impl Iterator<Item = u32>;
+}
+
+impl<I: PrimInt> IterOnes for I {
+  fn iter_ones(self) -> impl Iterator<Item = u32> {
+    std::iter::once(()).cycle().scan(self, |state, _| {
+      (*state != I::zero()).then(|| {
+        let bit_index = state.trailing_zeros();
+        *state = *state & (*state - I::one());
+        bit_index
+      })
+    })
+  }
+}
 
 /// Given a `u8`, returns a `u64` with each byte of the `u64` equal to the
 /// passed `u8`.
