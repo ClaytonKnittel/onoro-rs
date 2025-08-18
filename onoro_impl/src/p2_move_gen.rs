@@ -62,6 +62,7 @@ impl<const N: usize> P2MoveGenerator<N> {
   ) -> impl Iterator<Item = usize> {
     let indexer = p1_move_gen.indexer();
 
+    let pawn_index = indexer.index(pawn_poses[pawn_index]);
     p1_move_gen.neighbors(pawn_index).map(|neighbor_index| {
       let neighbor_pos = indexer.pos_from_index(neighbor_index);
       pawn_poses
@@ -120,25 +121,22 @@ impl<const N: usize> P2MoveGenerator<N> {
     pawn_poses: &[PackedIdx; N],
     p1_move_gen: &P1MoveGenerator<N>,
   ) -> [PawnMeta; N] {
-    let indexer = p1_move_gen.indexer();
     let mut pawn_meta = [PawnMeta::default(); N];
     let mut ecas = [0u32; N];
     let mut time = 1;
     pawn_meta[0].discovery_time = time;
     ecas[0] = time;
-
-    let root_pawn = pawn_poses[0];
-    let root_pawn_idx = indexer.index(root_pawn);
+    time += 1;
 
     let mut neighbor_count = 0;
-    for neighbor_index in Self::neighbors(root_pawn_idx, pawn_poses, p1_move_gen) {
+    for neighbor_index in Self::neighbors(0, pawn_poses, p1_move_gen) {
       if pawn_meta[neighbor_index].discovery_time != 0 {
         continue;
       }
 
       Self::recursor(
         neighbor_index,
-        root_pawn_idx,
+        0,
         &mut pawn_meta,
         &mut ecas,
         &mut time,
