@@ -332,6 +332,18 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroImpl<N, N2
     self.adjust_to_new_pawn_and_check_win(pos);
   }
 
+  /// This is very rare, and only called when a pawn is placed on the outer
+  /// perimeter of the bounding parallelogram.
+  #[inline(never)]
+  fn shift_pawns(&mut self, shift: HexPosOffset) {
+    let idx_offset = IdxOffset::from(shift);
+    self.pawn_poses.iter_mut().filter_null().for_each(|pos| {
+      *pos += idx_offset;
+    });
+    self.sum_of_mass =
+      (HexPos::from(self.sum_of_mass) + shift * (self.pawns_in_play() as i32)).into();
+  }
+
   /// Adjust the game state to accomodate a new pawn at position `pos`. This may
   /// shift all pawns on the board. This will also check if the new pawn has
   /// caused the current player to win, and set onoro_state().finished if they
@@ -340,18 +352,10 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroImpl<N, N2
     // The amount to shift the whole board by. This will keep pawns off the
     // outer perimeter.
     let shift = Self::calc_move_shift(pos);
-    // Only shift the pawns if we have to, to avoid extra memory
-    // reading/writing.
     if shift != HexPosOffset::origin() {
-      let idx_offset = IdxOffset::from(shift);
-      self.pawn_poses.iter_mut().filter_null().for_each(|pos| {
-        *pos += idx_offset;
-      });
-      self.sum_of_mass =
-        (HexPos::from(self.sum_of_mass) + shift * (self.pawns_in_play() as i32)).into();
+      self.shift_pawns(shift);
     }
 
-    // Check for a win
     let finished = self.check_win(HexPos::from(pos) + shift);
     self.mut_onoro_state().set_finished(finished);
   }
