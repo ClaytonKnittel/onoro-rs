@@ -849,10 +849,6 @@ mod tests {
     assert_eq!(pawn_idx_at(lower_left + HexPosOffset::new(4, 5), &onoro), 0);
 
     let move_gen = P2MoveGenerator::new(&onoro);
-    assert!(matches!(
-      move_gen.pawn_meta[0].connected_mobility,
-      PawnConnectedMobility::CuttingPoint { .. }
-    ));
     expect_that!(
       move_gen.pawn_meta[0].connected_mobility,
       pat!(PawnConnectedMobility::CuttingPoint {
