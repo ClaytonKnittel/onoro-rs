@@ -16,6 +16,8 @@ jobs:
       matrix:
         ssse3: ["disabled", "enabled"]
 
+    name: Build & Test (ssse3: ${{ matrix.ssse3 }})
+
     steps:
       - uses: actions/checkout@v4
       - name: Set RUSTFLAGS
