@@ -93,7 +93,7 @@ impl<const N: usize> P2MoveGenerator<N> {
     Self {
       pawn_meta,
       p1_move_gen,
-      pawn_index: N + !black_turn as usize,
+      pawn_index: N - 2 + !black_turn as usize,
       neighbor_mask: 0,
       cur_tile: PackedIdx::null(),
     }
@@ -271,14 +271,15 @@ impl<const N: usize> GameMoveIterator for P2MoveGenerator<N> {
 
   fn next(&mut self, onoro: &Self::Game) -> Option<Self::Item> {
     loop {
-      if self.pawn_index >= N {
+      if self.pawn_index >= N - 2 {
         let (pos, neighbor_mask) = self.next_move_with_neighbors(onoro.pawn_poses())?;
         self.cur_tile = pos;
         self.neighbor_mask = neighbor_mask;
-        self.pawn_index -= N;
+        self.pawn_index -= N - 2;
+      } else {
+        self.pawn_index += 2;
       }
 
-      self.pawn_index += 2;
       if self.is_valid_move(onoro) {
         break;
       }

@@ -117,7 +117,8 @@ impl<I: Unsigned + PrimInt> Impl<I> {
       neighbor_candidates = neighbor_candidates & (neighbor_candidates - I::one());
 
       let neighbors_mask: I = self.indexer.neighbors_mask(index);
-      if (neighbors_mask & self.board_vec).count_ones() >= 2 {
+      let neighbors_mask = neighbors_mask & self.board_vec;
+      if neighbors_mask.count_ones() >= 2 {
         self.neighbor_candidates = neighbor_candidates;
         return Some((index, neighbors_mask.iter_ones()));
       }
