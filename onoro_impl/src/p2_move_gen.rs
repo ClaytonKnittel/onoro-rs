@@ -240,14 +240,14 @@ impl<const N: usize> GameMoveIterator for P2MoveGenerator<N> {
 
 #[cfg(test)]
 mod tests {
-  use std::collections::HashMap;
+  use std::collections::{HashMap, HashSet};
 
   use googletest::{gtest, prelude::*};
-  use onoro::hex_pos::HexPos;
+  use onoro::{OnoroIndex, hex_pos::HexPos};
   use rstest::rstest;
   use rstest_reuse::{apply, template};
 
-  use crate::{PackedIdx, p2_move_gen::P2MoveGenerator};
+  use crate::{PackedIdx, p2_move_gen::P2MoveGenerator, util::IterOnes};
 
   struct Meta {
     discovery_time: i32,
@@ -534,5 +534,81 @@ mod tests {
       find_immobile_points(&poses),
       unordered_elements_are![&PackedIdx::new(5, 5)]
     );
+  }
+
+  const NEIGHBOR_INDEX_MASK_INPUTS: (
+    [PackedIdx; 3],
+    [PackedIdx; 5],
+    [PackedIdx; 7],
+    [PackedIdx; 10],
+  ) = (
+    [
+      PackedIdx::new(3, 3),
+      PackedIdx::new(4, 3),
+      PackedIdx::new(4, 4),
+    ],
+    [
+      PackedIdx::new(3, 3),
+      PackedIdx::new(4, 3),
+      PackedIdx::new(3, 2),
+      PackedIdx::new(3, 4),
+      PackedIdx::new(2, 3),
+    ],
+    [
+      PackedIdx::new(2, 2),
+      PackedIdx::new(1, 2),
+      PackedIdx::new(2, 3),
+      PackedIdx::new(3, 4),
+      PackedIdx::new(4, 4),
+      PackedIdx::new(4, 3),
+      PackedIdx::new(5, 4),
+    ],
+    [
+      PackedIdx::new(4, 4),
+      PackedIdx::new(3, 3),
+      PackedIdx::new(4, 3),
+      PackedIdx::new(5, 5),
+      PackedIdx::new(6, 5),
+      PackedIdx::new(7, 5),
+      PackedIdx::new(7, 6),
+      PackedIdx::new(5, 6),
+      PackedIdx::new(5, 7),
+      PackedIdx::new(4, 6),
+    ],
+  );
+
+  #[template]
+  #[rstest]
+  fn test_neighbor_index_mask_inputs<const N: usize>(
+    #[values(
+      &NEIGHBOR_INDEX_MASK_INPUTS.0,
+      &NEIGHBOR_INDEX_MASK_INPUTS.1,
+      &NEIGHBOR_INDEX_MASK_INPUTS.2,
+      &NEIGHBOR_INDEX_MASK_INPUTS.3,
+    )]
+    pawn_poses: &[PackedIdx; N],
+  ) {
+  }
+
+  #[apply(test_neighbor_index_mask_inputs)]
+  #[gtest]
+  fn test_neighbor_index_mask<const N: usize>(pawn_poses: &[PackedIdx; N]) {
+    let p2_move_gen = P2MoveGenerator::from_pawn_poses(pawn_poses, true);
+    for (index, pos) in pawn_poses.iter().enumerate() {
+      let expected_neighbors: HashSet<_> = pos
+        .neighbors()
+        .filter(|neighbor| pawn_poses.iter().any(|pos| pos == neighbor))
+        .map(HexPos::from)
+        .collect();
+
+      let meta = p2_move_gen.pawn_meta[index];
+      let neighbor_pos_from_mask: HashSet<HexPos> = meta
+        .neighbor_index_mask
+        .iter_ones()
+        .map(|index| pawn_poses[index as usize].into())
+        .collect();
+
+      assert_that!(neighbor_pos_from_mask, container_eq(expected_neighbors));
+    }
   }
 }
