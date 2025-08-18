@@ -225,14 +225,18 @@ impl<const N: usize> GameMoveIterator for P2MoveGenerator<N> {
   fn next(&mut self, _onoro: &Self::Game) -> Option<Self::Item> {
     if self.pawn_index >= N {
       self.cur_tile = self.p1_move_gen.next_move_pos()?;
-      self.pawn_index &= 0x1;
+      self.pawn_index -= N;
     }
+
+    let to = self.cur_tile;
+
+    // Check that all dangling neighbors are satisfied.
 
     let pawn_index = self.pawn_index as u32;
     self.pawn_index += 2;
 
     Some(Move::Phase2Move {
-      to: self.cur_tile,
+      to,
       from_idx: pawn_index,
     })
   }

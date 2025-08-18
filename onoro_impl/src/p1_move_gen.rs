@@ -108,8 +108,9 @@ impl<I: Unsigned + PrimInt> Impl<I> {
   }
 
   /// Finds the tile index for the next move we can make, or `None` if all
-  /// moves have been found.
-  fn next_impl(&mut self) -> Option<usize> {
+  /// moves have been found. Returns the tile index for the next move, and an
+  /// iterator over the tile indices of that move's neighbors.
+  fn next_with_neighbors_impl(&mut self) -> Option<(usize, impl Iterator<Item = u32>)> {
     let mut neighbor_candidates = self.neighbor_candidates;
     while neighbor_candidates != I::zero() {
       let index = neighbor_candidates.trailing_zeros() as usize;
@@ -118,13 +119,19 @@ impl<I: Unsigned + PrimInt> Impl<I> {
       let neighbors_mask: I = self.indexer.neighbors_mask(index);
       if (neighbors_mask & self.board_vec).count_ones() >= 2 {
         self.neighbor_candidates = neighbor_candidates;
-        return Some(index);
+        return Some((index, neighbors_mask.iter_ones()));
       }
     }
 
     // No need to store neighbor_candidates again, since we typically don't
     // call next() again after None is returned.
     None
+  }
+
+  /// Finds the tile index for the next move we can make, or `None` if all
+  /// moves have been found.
+  fn next_impl(&mut self) -> Option<usize> {
+    self.next_with_neighbors_impl().map(|(index, _)| index)
   }
 
   /// Returns an iterator over the indices of the neighbors of the pawn at the
@@ -140,7 +147,11 @@ impl Impl<u64> {
     Self::new_impl(lower_left, width, pawn_poses)
   }
 
-  fn next<const N: usize>(&mut self) -> Option<usize> {
+  fn next_with_neighbors(&mut self) -> Option<(usize, impl Iterator<Item = u32>)> {
+    self.next_with_neighbors_impl()
+  }
+
+  fn next(&mut self) -> Option<usize> {
     self.next_impl()
   }
 }
@@ -152,7 +163,12 @@ impl Impl<u128> {
   }
 
   #[cold]
-  fn next<const N: usize>(&mut self) -> Option<usize> {
+  fn next_with_neighbors(&mut self) -> Option<(usize, impl Iterator<Item = u32>)> {
+    self.next_with_neighbors_impl()
+  }
+
+  #[cold]
+  fn next(&mut self) -> Option<usize> {
     self.next_impl()
   }
 }
@@ -233,8 +249,8 @@ impl<const N: usize> P1MoveGenerator<N> {
 
   pub fn next_move_index(&mut self) -> Option<usize> {
     match &mut self.impl_container {
-      ImplContainer::Small(impl_) => impl_.next::<N>(),
-      ImplContainer::Large(impl_) => impl_.next::<N>(),
+      ImplContainer::Small(impl_) => impl_.next(),
+      ImplContainer::Large(impl_) => impl_.next(),
     }
   }
 
@@ -242,6 +258,18 @@ impl<const N: usize> P1MoveGenerator<N> {
     self
       .next_move_index()
       .map(|index| self.indexer().pos_from_index(index as u32))
+  }
+
+  pub fn next_move_pos_with_neighbors(&mut self) -> Option<(PackedIdx, impl Iterator<Item = u32>)> {
+    let (index, iter) = match &mut self.impl_container {
+      ImplContainer::Small(impl_) => impl_
+        .next_with_neighbors()
+        .map(|(index, iter)| (index, Either::Left(iter))),
+      ImplContainer::Large(impl_) => impl_
+        .next_with_neighbors()
+        .map(|(index, iter)| (index, Either::Right(iter))),
+    }
+    .map(|(index, iter)| (self.indexer().pos_from_index(index as u32), iter))
   }
 }
 
