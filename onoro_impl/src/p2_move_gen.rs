@@ -821,6 +821,23 @@ mod tests {
     Ok(())
   }
 
+  fn make_tile_first<const N: usize>(pos: HexPosOffset, onoro: OnoroImpl<N>) -> OnoroImpl<N> {
+    let lower_left_pos = lower_left(&onoro);
+    let mut pawn_indexes = *onoro.pawn_poses();
+    let pawn_index = pawn_indexes
+      .iter()
+      .enumerate()
+      .find(|&(_, &pawn_pos)| pawn_pos == (lower_left_pos + pos).into())
+      .unwrap()
+      .0;
+    pawn_indexes.swap(pawn_index, 0);
+
+    let onoro = OnoroImpl::from_indexes(pawn_indexes);
+    assert_eq!(pawn_idx_at(lower_left(&onoro) + pos, &onoro), 0);
+
+    onoro
+  }
+
   #[gtest]
   fn test_find_moves_cutting_point_first() -> OnoroResult {
     let onoro = Onoro16::from_board_string(
@@ -832,21 +849,7 @@ mod tests {
             W B . . . .",
     )?;
 
-    let mut pawn_indexes = *onoro.pawn_poses();
-    let cutting_pawn_index = pawn_indexes
-      .iter()
-      .enumerate()
-      .step_by(2)
-      .max_by_key(|(_, pos)| pos.x() + pos.y() * 16)
-      .unwrap()
-      .0;
-    pawn_indexes.swap(cutting_pawn_index, 0);
-
-    let onoro = Onoro16::from_indexes(pawn_indexes);
-
-    let lower_left = lower_left(&onoro);
-
-    assert_eq!(pawn_idx_at(lower_left + HexPosOffset::new(4, 5), &onoro), 0);
+    let onoro = make_tile_first(HexPosOffset::new(4, 5), onoro);
 
     let move_gen = P2MoveGenerator::new(&onoro);
     expect_that!(
@@ -858,6 +861,30 @@ mod tests {
 
     let moves = move_gen.to_iter(&onoro).collect_vec();
     expect_eq!(phase2_moves_for(0, &moves).count(), 1);
+
+    Ok(())
+  }
+
+  #[gtest]
+  fn test_find_moves_immobile_first() -> OnoroResult {
+    let onoro = Onoro16::from_board_string(
+      ". . W . . . . .
+        . W B . W B B W
+         . . B W B W B B
+          W W . . . . . .
+           B . . . . . . .",
+    )?;
+
+    let onoro = make_tile_first(HexPosOffset::new(2, 2), onoro);
+
+    let move_gen = P2MoveGenerator::new(&onoro);
+    expect_that!(
+      move_gen.pawn_meta[0].connected_mobility,
+      pat!(PawnConnectedMobility::Immobile)
+    );
+
+    let moves = move_gen.to_iter(&onoro).collect_vec();
+    expect_eq!(phase2_moves_for(0, &moves).count(), 0);
 
     Ok(())
   }
