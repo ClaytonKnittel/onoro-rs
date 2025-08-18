@@ -22,6 +22,21 @@ struct PawnMeta {
   exit_time: u32,
   /// If true, this pawn is an articulation point.
   is_cut: bool,
+  /// If true, this pawn is connecting three disjoint groups. Any pawn in this
+  /// position is immobile, as there is no configuration of pawns with two
+  /// points that join 3 disjoint groups.
+  ///
+  /// Here is an example which uses 20 pawns, moving the pawn at `*` to `_`:
+  /// ```text
+  /// . . P P P P P
+  ///  . P . . . P .
+  ///   P . P P _ . .
+  ///    P . P . P . .
+  ///     P . * P P . .
+  ///      P P . . . . .
+  ///       P . . . . . .
+  /// ```
+  is_immobile: bool,
 }
 
 impl PawnMeta {
