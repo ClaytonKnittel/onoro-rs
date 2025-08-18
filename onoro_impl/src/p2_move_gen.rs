@@ -1,7 +1,46 @@
 use abstract_game::GameMoveIterator;
 use onoro::Onoro;
 
-use crate::{Move, OnoroImpl, PackedIdx, p1_move_gen::P1MoveGenerator};
+use crate::{Move, OnoroImpl, PackedIdx, p1_move_gen::P1MoveGenerator, util::unreachable};
+
+#[derive(Clone, Copy)]
+enum PawnConnectedMobility {
+  /// The pawn is free to move anywhere that is available. This means this pawn
+  /// is not an articulation point.
+  Free,
+  /// The pawn is a cutting point and currently connects two disjoint groups.
+  ///
+  /// When considering positions to move this pawn to, in order to maintain the
+  /// connectedness of the game, one adjacent pawn at the new location must
+  /// have discovery times between this pawn's discovery time and `exit_time`
+  /// (exclusive), and another must be outside this range.
+  CuttingPoint {
+    /// The time we returned from exploring the subtree of this pawn.
+    exit_time: u32,
+  },
+  /// The pawn connects 3 disjoint groups and is thus immobile.
+  ///
+  /// Any pawn that connects 3 disjoint groups is immobile, as there is no
+  /// configuration of pawns with two points that join 3 disjoint groups.
+  ///
+  /// Here is an example which uses 20 pawns, moving the pawn at `*` to `_`:
+  /// ```text
+  /// . . P P P P P
+  ///  . P . . . P .
+  ///   P . P P _ . .
+  ///    P . P . P . .
+  ///     P . * P P . .
+  ///      P P . . . . .
+  ///       P . . . . . .
+  /// ```
+  Immobile,
+}
+
+impl Default for PawnConnectedMobility {
+  fn default() -> Self {
+    Self::Free
+  }
+}
 
 #[derive(Clone, Copy, Default)]
 struct PawnMeta {
@@ -19,24 +58,7 @@ struct PawnMeta {
   /// disconnected coming out of a single tile. However, there is no legal move
   /// which disconnects the board into 3 groups and reconnects them in another
   /// location with 16 or fewer total pawns.
-  exit_time: u32,
-  /// If true, this pawn is an articulation point.
-  is_cut: bool,
-  /// If true, this pawn is connecting three disjoint groups. Any pawn in this
-  /// position is immobile, as there is no configuration of pawns with two
-  /// points that join 3 disjoint groups.
-  ///
-  /// Here is an example which uses 20 pawns, moving the pawn at `*` to `_`:
-  /// ```text
-  /// . . P P P P P
-  ///  . P . . . P .
-  ///   P . P P _ . .
-  ///    P . P . P . .
-  ///     P . * P P . .
-  ///      P P . . . . .
-  ///       P . . . . . .
-  /// ```
-  is_immobile: bool,
+  connected_mobility: PawnConnectedMobility,
 }
 
 impl PawnMeta {
@@ -45,11 +67,11 @@ impl PawnMeta {
   }
 
   fn is_cut(&self) -> bool {
-    self.is_cut
+    !matches!(self.connected_mobility, PawnConnectedMobility::Free)
   }
 
   fn is_immobile(&self) -> bool {
-    self.is_immobile
+    matches!(self.connected_mobility, PawnConnectedMobility::Immobile)
   }
 }
 
@@ -131,12 +153,10 @@ impl<const N: usize> P2MoveGenerator<N> {
 
       let meta = &mut pawn_meta[pawn_index];
       if neighbor_eca >= meta.discovery_time {
-        meta.is_cut = true;
-
-        if meta.exit_time == 0 {
-          meta.exit_time = *time;
-        } else {
-          meta.is_immobile = true;
+        meta.connected_mobility = match meta.connected_mobility {
+          PawnConnectedMobility::Free => PawnConnectedMobility::CuttingPoint { exit_time: *time },
+          PawnConnectedMobility::CuttingPoint { .. } => PawnConnectedMobility::Immobile,
+          PawnConnectedMobility::Immobile => unreachable(),
         }
       }
     }
@@ -153,7 +173,7 @@ impl<const N: usize> P2MoveGenerator<N> {
     ecas[0] = time;
     time += 1;
 
-    let mut neighbor_count = 0;
+    let mut connect_mobility = None;
     for neighbor_index in Self::neighbors(0, pawn_poses, p1_move_gen) {
       if pawn_meta[neighbor_index].discovery_time != 0 {
         continue;
@@ -168,15 +188,18 @@ impl<const N: usize> P2MoveGenerator<N> {
         pawn_poses,
         p1_move_gen,
       );
-      neighbor_count += 1;
+
+      connect_mobility = Some(match connect_mobility {
+        None => PawnConnectedMobility::Free,
+        Some(PawnConnectedMobility::Free) => {
+          PawnConnectedMobility::CuttingPoint { exit_time: time }
+        }
+        Some(PawnConnectedMobility::CuttingPoint { .. }) => PawnConnectedMobility::Immobile,
+        Some(PawnConnectedMobility::Immobile) => unreachable(),
+      });
     }
 
-    if neighbor_count > 1 {
-      pawn_meta[0].is_cut = true;
-    }
-    if neighbor_count > 2 {
-      pawn_meta[0].is_immobile = true;
-    }
+    pawn_meta[0].connected_mobility = connect_mobility.unwrap_or_default();
 
     pawn_meta
   }
