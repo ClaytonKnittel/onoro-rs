@@ -1,7 +1,7 @@
 use abstract_game::GameMoveIterator;
 use onoro::Onoro;
 
-use crate::{Move, OnoroImpl, p1_move_gen::P1MoveGenerator};
+use crate::{Move, OnoroImpl, PackedIdx, p1_move_gen::P1MoveGenerator};
 
 #[derive(Clone, Copy, Default)]
 struct PawnMeta {
@@ -13,14 +13,13 @@ struct PawnMeta {
   has_two_neighbors: bool,
 
   // Below only relevant to current player's pawns:
-  /// Each time we have returned from exploring a subtree of this pawn.
+  /// The time we have returned from exploring the subtree of this pawn.
   ///
   /// Note that this can happen at most twice, since we can have at most three
-  /// disconnected coming out of a single tile. For non-root tiles, one of the
-  /// branches must be the parent. For the root tile, this will happen three
-  /// times, but we don't need to record the time of the third return, since
-  /// that time would be larger than the discovery time of every tile.
-  exit_times: (u32, u32),
+  /// disconnected coming out of a single tile. However, there is no legal move
+  /// which disconnects the board into 3 groups and reconnects them in another
+  /// location with 16 or fewer total pawns.
+  exit_time: u32,
   /// If true, this pawn is an articulation point.
   is_cut: bool,
 }
@@ -28,6 +27,10 @@ struct PawnMeta {
 impl PawnMeta {
   fn is_root(&self) -> bool {
     self.discovery_time == 1
+  }
+
+  fn is_cut(&self) -> bool {
+    self.is_cut
   }
 }
 
@@ -39,9 +42,12 @@ pub struct P2MoveGenerator<const N: usize> {
 impl<const N: usize> P2MoveGenerator<N> {
   pub fn new(onoro: &OnoroImpl<N>) -> Self {
     debug_assert!(!onoro.in_phase1());
+    Self::from_pawn_poses(onoro.pawn_poses())
+  }
 
-    let p1_move_gen = P1MoveGenerator::new(onoro);
-    let pawn_meta = Self::build_pawn_meta(onoro, &p1_move_gen);
+  pub fn from_pawn_poses(pawn_poses: &[PackedIdx; N]) -> Self {
+    let p1_move_gen = P1MoveGenerator::from_pawn_poses(pawn_poses);
+    let pawn_meta = Self::build_pawn_meta(pawn_poses, &p1_move_gen);
 
     Self {
       pawn_meta,
@@ -51,15 +57,14 @@ impl<const N: usize> P2MoveGenerator<N> {
 
   fn neighbors(
     pawn_index: usize,
-    onoro: &OnoroImpl<N>,
+    pawn_poses: &[PackedIdx; N],
     p1_move_gen: &P1MoveGenerator<N>,
   ) -> impl Iterator<Item = usize> {
     let indexer = p1_move_gen.indexer();
 
     p1_move_gen.neighbors(pawn_index).map(|neighbor_index| {
       let neighbor_pos = indexer.pos_from_index(neighbor_index);
-      onoro
-        .pawn_poses()
+      pawn_poses
         .iter()
         .enumerate()
         .find(|&(_, &pos)| pos == neighbor_pos)
@@ -74,22 +79,18 @@ impl<const N: usize> P2MoveGenerator<N> {
     pawn_meta: &mut [PawnMeta; N],
     ecas: &mut [u32; N],
     time: &mut u32,
-    onoro: &OnoroImpl<N>,
+    pawn_poses: &[PackedIdx; N],
     p1_move_gen: &P1MoveGenerator<N>,
   ) {
-    let indexer = p1_move_gen.indexer();
-
     let meta = &mut pawn_meta[pawn_index];
     meta.discovery_time = *time;
     ecas[pawn_index] = *time;
     *time += 1;
 
-    for neighbor_index in Self::neighbors(pawn_index, onoro, p1_move_gen)
+    for neighbor_index in Self::neighbors(pawn_index, pawn_poses, p1_move_gen)
       .filter(|&neighbor_index| neighbor_index != parent_index)
     {
-      let neighbor_meta = &mut pawn_meta[neighbor_index];
-      let neighbor_t = neighbor_meta.discovery_time;
-
+      let neighbor_t = pawn_meta[neighbor_index].discovery_time;
       if neighbor_t != 0 {
         ecas[pawn_index] = ecas[pawn_index].min(neighbor_t);
         continue;
@@ -101,23 +102,24 @@ impl<const N: usize> P2MoveGenerator<N> {
         pawn_meta,
         ecas,
         time,
-        onoro,
+        pawn_poses,
         p1_move_gen,
       );
 
-      let neighbor_meta = poses.get_mut(&neighbor).unwrap();
-      let neighbor_eca = neighbor_meta.earliest_connected_ancestor;
+      let neighbor_eca = ecas[neighbor_index];
+      ecas[pawn_index] = ecas[pawn_index].min(neighbor_eca);
 
-      let meta = poses.get_mut(&pos).unwrap();
-      meta.earliest_connected_ancestor = meta.earliest_connected_ancestor.min(neighbor_eca);
-
+      let meta = &mut pawn_meta[pawn_index];
       if neighbor_eca >= meta.discovery_time {
         meta.is_cut = true;
       }
     }
   }
 
-  fn build_pawn_meta(onoro: &OnoroImpl<N>, p1_move_gen: &P1MoveGenerator<N>) -> [PawnMeta; N] {
+  fn build_pawn_meta(
+    pawn_poses: &[PackedIdx; N],
+    p1_move_gen: &P1MoveGenerator<N>,
+  ) -> [PawnMeta; N] {
     let indexer = p1_move_gen.indexer();
     let mut pawn_meta = [PawnMeta::default(); N];
     let mut ecas = [0u32; N];
@@ -125,11 +127,11 @@ impl<const N: usize> P2MoveGenerator<N> {
     pawn_meta[0].discovery_time = time;
     ecas[0] = time;
 
-    let root_pawn = onoro.pawn_poses()[0];
+    let root_pawn = pawn_poses[0];
     let root_pawn_idx = indexer.index(root_pawn);
 
     let mut neighbor_count = 0;
-    for neighbor_index in Self::neighbors(root_pawn_idx, onoro, p1_move_gen) {
+    for neighbor_index in Self::neighbors(root_pawn_idx, pawn_poses, p1_move_gen) {
       if pawn_meta[neighbor_index].discovery_time != 0 {
         continue;
       }
@@ -140,7 +142,7 @@ impl<const N: usize> P2MoveGenerator<N> {
         &mut pawn_meta,
         &mut ecas,
         &mut time,
-        onoro,
+        pawn_poses,
         p1_move_gen,
       );
       neighbor_count += 1;
@@ -168,10 +170,11 @@ mod tests {
   use std::collections::HashMap;
 
   use googletest::{gtest, prelude::*};
-  use itertools::Itertools;
   use onoro::hex_pos::HexPos;
+  use rstest::rstest;
+  use rstest_reuse::{apply, template};
 
-  use crate::PackedIdx;
+  use crate::{PackedIdx, p2_move_gen::P2MoveGenerator};
 
   struct Meta {
     discovery_time: i32,
@@ -220,7 +223,9 @@ mod tests {
     }
   }
 
-  fn find_articulation_points_simple(pawn_poses: &[PackedIdx]) -> impl Iterator<Item = PackedIdx> {
+  fn find_articulation_points_simple<const N: usize>(
+    pawn_poses: &[PackedIdx; N],
+  ) -> Vec<PackedIdx> {
     let mut poses: HashMap<_, _> = pawn_poses
       .iter()
       .map(|&pos| (HexPos::from(pos), Meta::new()))
@@ -251,24 +256,46 @@ mod tests {
           .into_iter()
           .filter_map(|(pos, meta)| meta.is_cut.then_some(pos.into())),
       )
+      .collect()
   }
 
+  fn find_articulation_points<const N: usize>(pawn_poses: &[PackedIdx; N]) -> Vec<PackedIdx> {
+    let move_gen = P2MoveGenerator::from_pawn_poses(pawn_poses);
+    move_gen
+      .pawn_meta
+      .into_iter()
+      .enumerate()
+      .filter_map(|(idx, meta)| meta.is_cut().then_some(pawn_poses[idx]))
+      .collect()
+  }
+
+  #[template]
+  #[rstest]
+  fn test_find_articulation_points<const N: usize>(
+    #[values(find_articulation_points, find_articulation_points_simple)]
+    find_articulation_points: impl FnOnce(&[PackedIdx; N]) -> Vec<PackedIdx>,
+  ) {
+  }
+
+  #[apply(test_find_articulation_points)]
   #[gtest]
-  fn test_no_articulation_points() {
+  fn test_no_articulation_points(
+    find_articulation_points: impl FnOnce(&[PackedIdx; 3]) -> Vec<PackedIdx>,
+  ) {
     let poses = [
       PackedIdx::new(3, 3),
       PackedIdx::new(4, 3),
       PackedIdx::new(4, 4),
     ];
 
-    expect_that!(
-      find_articulation_points_simple(&poses).collect_vec(),
-      is_empty()
-    );
+    expect_that!(find_articulation_points(&poses), is_empty());
   }
 
+  #[apply(test_find_articulation_points)]
   #[gtest]
-  fn test_one_articulation_point() {
+  fn test_one_articulation_point(
+    find_articulation_points: impl FnOnce(&[PackedIdx; 3]) -> Vec<PackedIdx>,
+  ) {
     let poses = [
       PackedIdx::new(3, 3),
       PackedIdx::new(4, 3),
@@ -276,13 +303,16 @@ mod tests {
     ];
 
     expect_that!(
-      find_articulation_points_simple(&poses).collect_vec(),
+      find_articulation_points(&poses),
       unordered_elements_are![&PackedIdx::new(3, 3)]
     );
   }
 
+  #[apply(test_find_articulation_points)]
   #[gtest]
-  fn test_articulation_points_fidget_spinner() {
+  fn test_articulation_points_fidget_spinner(
+    find_articulation_points: impl FnOnce(&[PackedIdx; 4]) -> Vec<PackedIdx>,
+  ) {
     let poses = [
       PackedIdx::new(2, 2),
       PackedIdx::new(3, 3),
@@ -291,13 +321,16 @@ mod tests {
     ];
 
     expect_that!(
-      find_articulation_points_simple(&poses).collect_vec(),
+      find_articulation_points(&poses),
       unordered_elements_are![&PackedIdx::new(3, 3)]
     );
   }
 
+  #[apply(test_find_articulation_points)]
   #[gtest]
-  fn test_articulation_points_ring() {
+  fn test_articulation_points_ring(
+    find_articulation_points: impl FnOnce(&[PackedIdx; 6]) -> Vec<PackedIdx>,
+  ) {
     let poses = [
       PackedIdx::new(2, 2),
       PackedIdx::new(2, 3),
@@ -307,14 +340,14 @@ mod tests {
       PackedIdx::new(3, 2),
     ];
 
-    expect_that!(
-      find_articulation_points_simple(&poses).collect_vec(),
-      is_empty()
-    );
+    expect_that!(find_articulation_points(&poses), is_empty());
   }
 
+  #[apply(test_find_articulation_points)]
   #[gtest]
-  fn test_articulation_points_c_shape() {
+  fn test_articulation_points_c_shape(
+    find_articulation_points: impl FnOnce(&[PackedIdx; 5]) -> Vec<PackedIdx>,
+  ) {
     let poses = [
       PackedIdx::new(2, 2),
       PackedIdx::new(2, 3),
@@ -324,7 +357,7 @@ mod tests {
     ];
 
     expect_that!(
-      find_articulation_points_simple(&poses).collect_vec(),
+      find_articulation_points(&poses),
       unordered_elements_are![
         &PackedIdx::new(2, 3),
         &PackedIdx::new(3, 4),

@@ -91,11 +91,15 @@ struct Impl<I> {
 impl<I: Unsigned + PrimInt> Impl<I> {
   /// Initializes the move generator, which builds the board vec and neighbor
   /// candidates masks.
-  fn new_impl<const N: usize>(lower_left: PackedIdx, width: u8, onoro: &OnoroImpl<N>) -> Self {
+  fn new_impl<const N: usize>(
+    lower_left: PackedIdx,
+    width: u8,
+    pawn_poses: &[PackedIdx; N],
+  ) -> Self {
     debug_assert!(lower_left.x() > 0);
     debug_assert!(lower_left.y() > 0);
     let indexer = BoardVecIndexer::new(lower_left + IdxOffset::new(-1, -1), width);
-    let (board_vec, neighbor_candidates) = indexer.build_bitvecs(onoro.pawn_poses());
+    let (board_vec, neighbor_candidates) = indexer.build_bitvecs(pawn_poses);
     Self {
       board_vec,
       neighbor_candidates,
@@ -133,8 +137,8 @@ impl<I: Unsigned + PrimInt> Impl<I> {
 }
 
 impl Impl<u64> {
-  fn new<const N: usize>(lower_left: PackedIdx, width: u8, onoro: &OnoroImpl<N>) -> Self {
-    Self::new_impl(lower_left, width, onoro)
+  fn new<const N: usize>(lower_left: PackedIdx, width: u8, pawn_poses: &[PackedIdx; N]) -> Self {
+    Self::new_impl(lower_left, width, pawn_poses)
   }
 
   fn next<const N: usize>(&mut self, _onoro: &OnoroImpl<N>) -> Option<Move> {
@@ -144,8 +148,8 @@ impl Impl<u64> {
 
 impl Impl<u128> {
   #[cold]
-  fn new<const N: usize>(lower_left: PackedIdx, width: u8, onoro: &OnoroImpl<N>) -> Self {
-    Self::new_impl(lower_left, width, onoro)
+  fn new<const N: usize>(lower_left: PackedIdx, width: u8, pawn_poses: &[PackedIdx; N]) -> Self {
+    Self::new_impl(lower_left, width, pawn_poses)
   }
 
   #[cold]
@@ -183,9 +187,13 @@ impl<const N: usize> P1MoveGenerator<N> {
 
 impl<const N: usize> P1MoveGenerator<N> {
   pub fn new(onoro: &OnoroImpl<N>) -> Self {
+    Self::from_pawn_poses(onoro.pawn_poses())
+  }
+
+  pub fn from_pawn_poses(pawn_poses: &[PackedIdx; N]) -> Self {
     // Compute the bounding parallelogram of the pawns that have been placed,
     // which is min/max x/y in coordinate space.
-    let (lower_left, upper_right) = packed_positions_bounding_box(onoro.pawn_poses());
+    let (lower_left, upper_right) = packed_positions_bounding_box(pawn_poses);
     let delta = upper_right - lower_left;
 
     // We will represent the board with a bitvector, where each bit corresponds
@@ -203,13 +211,13 @@ impl<const N: usize> P1MoveGenerator<N> {
         impl_container: ImplContainer::Small(Impl::<u64>::new(
           lower_left.into(),
           width as u8,
-          onoro,
+          pawn_poses,
         )),
       }
     } else {
       P1MoveGenerator {
         impl_container: ImplContainer::Large(
-          Impl::<u128>::new(lower_left.into(), width as u8, onoro).into(),
+          Impl::<u128>::new(lower_left.into(), width as u8, pawn_poses).into(),
         ),
       }
     }
