@@ -130,9 +130,10 @@ impl<I: Unsigned + PrimInt> Impl<I> {
 
   /// Returns an iterator over the indices of the neighbors of the pawn at the
   /// given index.
-  fn neighbors(&self, index: usize) -> impl Iterator<Item = u32> {
+  fn neighbors(&self, index: usize) -> (impl Iterator<Item = u32>, u32) {
     let neighbors_mask: I = self.indexer.neighbors_mask(index);
-    (neighbors_mask & self.board_vec).iter_ones()
+    let neighbors_mask = neighbors_mask & self.board_vec;
+    (neighbors_mask.iter_ones(), neighbors_mask.count_ones())
   }
 }
 
@@ -163,8 +164,8 @@ enum ImplContainer {
   /// including a 1-tile padding around the perimeter. This is much faster to
   /// operate on than a u128.
   Small(Impl<u64>),
-  /// We need to support any board size. The largest possible board is 8 x 8
-  /// (see test_worst_case below), which, with a 1-tile padding, requires 81
+  /// We need to support any board size. The largest possible board is 9 x 8
+  /// (see test_worst_case below), which, with a 1-tile padding, requires 90
   /// bits for the board bitvec.
   Large(Box<Impl<u128>>),
 }
@@ -223,10 +224,18 @@ impl<const N: usize> P1MoveGenerator<N> {
     }
   }
 
-  pub fn neighbors(&self, index: usize) -> impl Iterator<Item = u32> {
+  /// Returns a tuple of (neighbor index iterator, neighbor count), where the
+  /// iterator is guaranteed to yield "neighbor count" elements.
+  pub fn neighbors(&self, index: usize) -> (impl Iterator<Item = u32>, u32) {
     match &self.impl_container {
-      ImplContainer::Small(impl_) => Either::Left(impl_.neighbors(index)),
-      ImplContainer::Large(impl_) => Either::Right(impl_.neighbors(index)),
+      ImplContainer::Small(impl_) => {
+        let (iter, count) = impl_.neighbors(index);
+        (Either::Left(iter), count)
+      }
+      ImplContainer::Large(impl_) => {
+        let (iter, count) = impl_.neighbors(index);
+        (Either::Right(iter), count)
+      }
     }
   }
 }
@@ -358,18 +367,19 @@ mod tests {
   #[test]
   fn test_worst_case() -> OnoroResult {
     let worst_case = Onoro16::from_board_string(
-      ". B . . . . . .
-        B W . . . . . .
-         . B . . . . . .
-          . W . . . . . .
-           . B . . . . . .
-            . W . . . . . .
-             . B W B W B W B
-              . . . . . . W .",
+      ". W . . . . . .
+        B B . . . . . .
+         . W . . . . . .
+          . B . . . . . .
+           . W . . . . . .
+            . B . . . . . .
+             . W . . . . . .
+              . B W B W B W B
+               . . . . . . W .",
     )?;
 
     let move_gen = P1MoveGenerator::new(&worst_case);
-    assert_eq!(move_gen.to_iter(&worst_case).count(), 23);
+    assert_eq!(move_gen.to_iter(&worst_case).count(), 25);
 
     Ok(())
   }

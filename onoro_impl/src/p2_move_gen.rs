@@ -100,19 +100,23 @@ impl<const N: usize> P2MoveGenerator<N> {
     pawn_index: usize,
     pawn_poses: &[PackedIdx; N],
     p1_move_gen: &P1MoveGenerator<N>,
-  ) -> impl Iterator<Item = usize> {
+  ) -> (impl Iterator<Item = usize>, u32) {
     let indexer = p1_move_gen.indexer();
 
     let pawn_index = indexer.index(pawn_poses[pawn_index]);
-    p1_move_gen.neighbors(pawn_index).map(|neighbor_index| {
-      let neighbor_pos = indexer.pos_from_index(neighbor_index);
-      pawn_poses
-        .iter()
-        .enumerate()
-        .find(|&(_, &pos)| pos == neighbor_pos)
-        .unwrap()
-        .0
-    })
+    let (iter, count) = p1_move_gen.neighbors(pawn_index);
+    (
+      iter.map(|neighbor_index| {
+        let neighbor_pos = indexer.pos_from_index(neighbor_index);
+        pawn_poses
+          .iter()
+          .enumerate()
+          .find(|&(_, &pos)| pos == neighbor_pos)
+          .unwrap()
+          .0
+      }),
+      count,
+    )
   }
 
   fn recursor(
@@ -129,9 +133,12 @@ impl<const N: usize> P2MoveGenerator<N> {
     ecas[pawn_index] = *time;
     *time += 1;
 
-    for neighbor_index in Self::neighbors(pawn_index, pawn_poses, p1_move_gen)
-      .filter(|&neighbor_index| neighbor_index != parent_index)
-    {
+    let (neighbors_iter, count) = Self::neighbors(pawn_index, pawn_poses, p1_move_gen);
+
+    debug_assert!(count >= 2);
+    meta.has_two_neighbors = count == 2;
+
+    for neighbor_index in neighbors_iter.filter(|&neighbor_index| neighbor_index != parent_index) {
       let neighbor_t = pawn_meta[neighbor_index].discovery_time;
       if neighbor_t != 0 {
         ecas[pawn_index] = ecas[pawn_index].min(neighbor_t);
@@ -173,8 +180,13 @@ impl<const N: usize> P2MoveGenerator<N> {
     ecas[0] = time;
     time += 1;
 
+    let (neighbors_iter, count) = Self::neighbors(0, pawn_poses, p1_move_gen);
+
+    debug_assert!(count >= 2);
+    pawn_meta[0].has_two_neighbors = count == 2;
+
     let mut connect_mobility = None;
-    for neighbor_index in Self::neighbors(0, pawn_poses, p1_move_gen) {
+    for neighbor_index in neighbors_iter {
       if pawn_meta[neighbor_index].discovery_time != 0 {
         continue;
       }
@@ -353,12 +365,14 @@ mod tests {
   #[apply(test_find_articulation_points)]
   #[gtest]
   fn test_one_articulation_point(
-    find_articulation_points: impl FnOnce(&[PackedIdx; 3]) -> Vec<PackedIdx>,
+    find_articulation_points: impl FnOnce(&[PackedIdx; 5]) -> Vec<PackedIdx>,
   ) {
     let poses = [
       PackedIdx::new(3, 3),
       PackedIdx::new(4, 3),
+      PackedIdx::new(3, 2),
       PackedIdx::new(3, 4),
+      PackedIdx::new(2, 3),
     ];
 
     expect_that!(
@@ -370,19 +384,52 @@ mod tests {
   #[apply(test_find_articulation_points)]
   #[gtest]
   fn test_articulation_points_fidget_spinner(
-    find_articulation_points: impl FnOnce(&[PackedIdx; 4]) -> Vec<PackedIdx>,
+    find_articulation_points: impl FnOnce(&[PackedIdx; 10]) -> Vec<PackedIdx>,
   ) {
     let poses = [
-      PackedIdx::new(2, 2),
+      // Bottom left blade
+      PackedIdx::new(4, 4),
       PackedIdx::new(3, 3),
       PackedIdx::new(4, 3),
-      PackedIdx::new(3, 4),
+      // Center
+      PackedIdx::new(5, 5),
+      // Right blade
+      PackedIdx::new(6, 5),
+      PackedIdx::new(7, 5),
+      PackedIdx::new(7, 6),
+      // Top blade
+      PackedIdx::new(5, 6),
+      PackedIdx::new(5, 7),
+      PackedIdx::new(4, 6),
     ];
 
     expect_that!(
       find_articulation_points(&poses),
-      unordered_elements_are![&PackedIdx::new(3, 3)]
+      unordered_elements_are![
+        &PackedIdx::new(5, 5),
+        &PackedIdx::new(4, 4),
+        &PackedIdx::new(5, 6),
+        &PackedIdx::new(6, 5)
+      ]
     );
+  }
+
+  #[apply(test_find_articulation_points)]
+  #[gtest]
+  fn test_articulation_points_filled_hex(
+    find_articulation_points: impl FnOnce(&[PackedIdx; 7]) -> Vec<PackedIdx>,
+  ) {
+    let poses = [
+      PackedIdx::new(2, 2),
+      PackedIdx::new(2, 3),
+      PackedIdx::new(3, 4),
+      PackedIdx::new(4, 4),
+      PackedIdx::new(4, 3),
+      PackedIdx::new(3, 2),
+      PackedIdx::new(3, 3),
+    ];
+
+    expect_that!(find_articulation_points(&poses), is_empty());
   }
 
   #[apply(test_find_articulation_points)]
@@ -405,14 +452,16 @@ mod tests {
   #[apply(test_find_articulation_points)]
   #[gtest]
   fn test_articulation_points_c_shape(
-    find_articulation_points: impl FnOnce(&[PackedIdx; 5]) -> Vec<PackedIdx>,
+    find_articulation_points: impl FnOnce(&[PackedIdx; 7]) -> Vec<PackedIdx>,
   ) {
     let poses = [
       PackedIdx::new(2, 2),
+      PackedIdx::new(1, 2),
       PackedIdx::new(2, 3),
       PackedIdx::new(3, 4),
       PackedIdx::new(4, 4),
       PackedIdx::new(4, 3),
+      PackedIdx::new(5, 4),
     ];
 
     expect_that!(
@@ -428,30 +477,50 @@ mod tests {
   #[gtest]
   fn test_immobile_fidget_spinner() {
     let poses = [
-      PackedIdx::new(2, 2),
+      // Bottom left blade
+      PackedIdx::new(4, 4),
       PackedIdx::new(3, 3),
       PackedIdx::new(4, 3),
-      PackedIdx::new(3, 4),
+      // Center
+      PackedIdx::new(5, 5),
+      // Right blade
+      PackedIdx::new(6, 5),
+      PackedIdx::new(7, 5),
+      PackedIdx::new(7, 6),
+      // Top blade
+      PackedIdx::new(5, 6),
+      PackedIdx::new(5, 7),
+      PackedIdx::new(4, 6),
     ];
 
     expect_that!(
       find_immobile_points(&poses),
-      unordered_elements_are![&PackedIdx::new(3, 3)]
+      unordered_elements_are![&PackedIdx::new(5, 5)]
     );
   }
 
   #[gtest]
   fn test_immobile_starting_point_fidget_spinner() {
     let poses = [
+      // Center
+      PackedIdx::new(5, 5),
+      // Bottom left blade
+      PackedIdx::new(4, 4),
       PackedIdx::new(3, 3),
-      PackedIdx::new(2, 2),
       PackedIdx::new(4, 3),
-      PackedIdx::new(3, 4),
+      // Right blade
+      PackedIdx::new(6, 5),
+      PackedIdx::new(7, 5),
+      PackedIdx::new(7, 6),
+      // Top blade
+      PackedIdx::new(5, 6),
+      PackedIdx::new(5, 7),
+      PackedIdx::new(4, 6),
     ];
 
     expect_that!(
       find_immobile_points(&poses),
-      unordered_elements_are![&PackedIdx::new(3, 3)]
+      unordered_elements_are![&PackedIdx::new(5, 5)]
     );
   }
 }
