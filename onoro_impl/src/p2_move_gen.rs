@@ -47,6 +47,10 @@ impl PawnMeta {
   fn is_cut(&self) -> bool {
     self.is_cut
   }
+
+  fn is_immobile(&self) -> bool {
+    self.is_immobile
+  }
 }
 
 pub struct P2MoveGenerator<const N: usize> {
@@ -128,6 +132,12 @@ impl<const N: usize> P2MoveGenerator<N> {
       let meta = &mut pawn_meta[pawn_index];
       if neighbor_eca >= meta.discovery_time {
         meta.is_cut = true;
+
+        if meta.exit_time == 0 {
+          meta.exit_time = *time;
+        } else {
+          meta.is_immobile = true;
+        }
       }
     }
   }
@@ -163,6 +173,9 @@ impl<const N: usize> P2MoveGenerator<N> {
 
     if neighbor_count > 1 {
       pawn_meta[0].is_cut = true;
+    }
+    if neighbor_count > 2 {
+      pawn_meta[0].is_immobile = true;
     }
 
     pawn_meta
@@ -282,6 +295,16 @@ mod tests {
       .collect()
   }
 
+  fn find_immobile_points<const N: usize>(pawn_poses: &[PackedIdx; N]) -> Vec<PackedIdx> {
+    let move_gen = P2MoveGenerator::from_pawn_poses(pawn_poses);
+    move_gen
+      .pawn_meta
+      .into_iter()
+      .enumerate()
+      .filter_map(|(idx, meta)| meta.is_immobile().then_some(pawn_poses[idx]))
+      .collect()
+  }
+
   #[template]
   #[rstest]
   fn test_find_articulation_points<const N: usize>(
@@ -376,6 +399,36 @@ mod tests {
         &PackedIdx::new(3, 4),
         &PackedIdx::new(4, 4),
       ]
+    );
+  }
+
+  #[gtest]
+  fn test_immobile_fidget_spinner() {
+    let poses = [
+      PackedIdx::new(2, 2),
+      PackedIdx::new(3, 3),
+      PackedIdx::new(4, 3),
+      PackedIdx::new(3, 4),
+    ];
+
+    expect_that!(
+      find_immobile_points(&poses),
+      unordered_elements_are![&PackedIdx::new(3, 3)]
+    );
+  }
+
+  #[gtest]
+  fn test_immobile_starting_point_fidget_spinner() {
+    let poses = [
+      PackedIdx::new(3, 3),
+      PackedIdx::new(2, 2),
+      PackedIdx::new(4, 3),
+      PackedIdx::new(3, 4),
+    ];
+
+    expect_that!(
+      find_immobile_points(&poses),
+      unordered_elements_are![&PackedIdx::new(3, 3)]
     );
   }
 }
