@@ -110,7 +110,7 @@ impl<I: Unsigned + PrimInt> Impl<I> {
   /// Finds the tile index for the next move we can make, or `None` if all
   /// moves have been found. Returns the tile index for the next move, and an
   /// iterator over the tile indices of that move's neighbors.
-  fn next_with_neighbors_impl(&mut self) -> Option<(usize, impl Iterator<Item = u32>)> {
+  fn next_with_neighbors_impl(&mut self) -> Option<(usize, impl Iterator<Item = u32> + use<I>)> {
     let mut neighbor_candidates = self.neighbor_candidates;
     while neighbor_candidates != I::zero() {
       let index = neighbor_candidates.trailing_zeros() as usize;
@@ -147,7 +147,7 @@ impl Impl<u64> {
     Self::new_impl(lower_left, width, pawn_poses)
   }
 
-  fn next_with_neighbors(&mut self) -> Option<(usize, impl Iterator<Item = u32>)> {
+  fn next_with_neighbors(&mut self) -> Option<(usize, impl Iterator<Item = u32> + use<>)> {
     self.next_with_neighbors_impl()
   }
 
@@ -163,7 +163,7 @@ impl Impl<u128> {
   }
 
   #[cold]
-  fn next_with_neighbors(&mut self) -> Option<(usize, impl Iterator<Item = u32>)> {
+  fn next_with_neighbors(&mut self) -> Option<(usize, impl Iterator<Item = u32> + use<>)> {
     self.next_with_neighbors_impl()
   }
 
@@ -260,16 +260,20 @@ impl<const N: usize> P1MoveGenerator<N> {
       .map(|index| self.indexer().pos_from_index(index as u32))
   }
 
-  pub fn next_move_pos_with_neighbors(&mut self) -> Option<(PackedIdx, impl Iterator<Item = u32>)> {
+  pub fn next_move_pos_with_neighbors(
+    &mut self,
+  ) -> Option<(PackedIdx, impl Iterator<Item = u32> + use<N>)> {
     let (index, iter) = match &mut self.impl_container {
-      ImplContainer::Small(impl_) => impl_
-        .next_with_neighbors()
-        .map(|(index, iter)| (index, Either::Left(iter))),
-      ImplContainer::Large(impl_) => impl_
-        .next_with_neighbors()
-        .map(|(index, iter)| (index, Either::Right(iter))),
-    }
-    .map(|(index, iter)| (self.indexer().pos_from_index(index as u32), iter))
+      ImplContainer::Small(impl_) => {
+        let (index, iter) = impl_.next_with_neighbors()?;
+        (index, Either::Left(iter))
+      }
+      ImplContainer::Large(impl_) => {
+        let (index, iter) = impl_.next_with_neighbors()?;
+        (index, Either::Right(iter))
+      }
+    };
+    Some((self.indexer().pos_from_index(index as u32), iter))
   }
 }
 

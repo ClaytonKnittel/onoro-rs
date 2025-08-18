@@ -1,7 +1,11 @@
 use abstract_game::GameMoveIterator;
-use onoro::{Onoro, PawnColor};
+use onoro::{Onoro, OnoroIndex, PawnColor};
 
-use crate::{Move, OnoroImpl, PackedIdx, p1_move_gen::P1MoveGenerator, util::unreachable};
+use crate::{
+  Move, OnoroImpl, PackedIdx,
+  p1_move_gen::P1MoveGenerator,
+  util::{IterOnes, unreachable},
+};
 
 #[derive(Clone, Copy)]
 enum PawnConnectedMobility {
@@ -84,6 +88,7 @@ pub struct P2MoveGenerator<const N: usize> {
   pawn_meta: [PawnMeta; N],
   p1_move_gen: P1MoveGenerator<N>,
   cur_tile: PackedIdx,
+  neighbor_mask: u16,
   pawn_index: usize,
 }
 
@@ -101,6 +106,7 @@ impl<const N: usize> P2MoveGenerator<N> {
       pawn_meta,
       p1_move_gen,
       pawn_index: N + !black_turn as usize,
+      neighbor_mask: 0,
       cur_tile: PackedIdx::null(),
     }
   }
@@ -122,6 +128,23 @@ impl<const N: usize> P2MoveGenerator<N> {
         .unwrap()
         .0
     })
+  }
+
+  fn next_move_with_neighbors(&mut self, pawn_poses: &[PackedIdx; N]) -> Option<(PackedIdx, u16)> {
+    let (pos, neighbors) = self.p1_move_gen.next_move_pos_with_neighbors()?;
+    Some((
+      pos,
+      neighbors.fold(0, |neighbor_mask, neighbor_index| {
+        let neighbor_pos = self.p1_move_gen.indexer().pos_from_index(neighbor_index);
+        let neighbor_index = pawn_poses
+          .iter()
+          .enumerate()
+          .find(|&(_, &pos)| pos == neighbor_pos)
+          .unwrap()
+          .0;
+        neighbor_mask | (1 << neighbor_index)
+      }),
+    ))
   }
 
   fn recursor(
@@ -216,28 +239,66 @@ impl<const N: usize> P2MoveGenerator<N> {
 
     pawn_meta
   }
+
+  fn is_valid_move(&self, onoro: &OnoroImpl<N>) -> bool {
+    let meta = self.pawn_meta[self.pawn_index];
+    // Check that board connectedness is satisfied.
+    match meta.connected_mobility {
+      PawnConnectedMobility::Free => {}
+      PawnConnectedMobility::CuttingPoint { exit_time } => {
+        let mut contains_subtree = false;
+        let mut contains_supertree = false;
+        for neighbor_index in meta.neighbor_index_mask.iter_ones() {
+          let neighbor_meta = self.pawn_meta[neighbor_index as usize];
+          if (meta.discovery_time..exit_time).contains(&neighbor_meta.discovery_time) {
+            contains_subtree = true;
+          } else {
+            contains_supertree = true;
+          }
+        }
+
+        if !contains_subtree || !contains_supertree {
+          return false;
+        }
+      }
+      PawnConnectedMobility::Immobile => return false,
+    }
+
+    // Check that all dangling neighbors are satisfied.
+    for neighbor_index in meta.neighbor_index_mask.iter_ones() {
+      let neighbor_pos = onoro.pawn_poses()[neighbor_index as usize];
+      let neighbor_meta = self.pawn_meta[neighbor_index as usize];
+      if neighbor_meta.has_two_neighbors() && !neighbor_pos.adjacent(self.cur_tile) {
+        return false;
+      }
+    }
+
+    true
+  }
 }
 
 impl<const N: usize> GameMoveIterator for P2MoveGenerator<N> {
   type Item = Move;
   type Game = OnoroImpl<N>;
 
-  fn next(&mut self, _onoro: &Self::Game) -> Option<Self::Item> {
-    if self.pawn_index >= N {
-      self.cur_tile = self.p1_move_gen.next_move_pos()?;
-      self.pawn_index -= N;
+  fn next(&mut self, onoro: &Self::Game) -> Option<Self::Item> {
+    loop {
+      if self.pawn_index >= N {
+        let (pos, neighbor_mask) = self.next_move_with_neighbors(onoro.pawn_poses())?;
+        self.cur_tile = pos;
+        self.neighbor_mask = neighbor_mask;
+        self.pawn_index -= N;
+      }
+
+      self.pawn_index += 2;
+      if self.is_valid_move(onoro) {
+        break;
+      }
     }
 
-    let to = self.cur_tile;
-
-    // Check that all dangling neighbors are satisfied.
-
-    let pawn_index = self.pawn_index as u32;
-    self.pawn_index += 2;
-
     Some(Move::Phase2Move {
-      to,
-      from_idx: pawn_index,
+      to: self.cur_tile,
+      from_idx: self.pawn_index as u32,
     })
   }
 }
