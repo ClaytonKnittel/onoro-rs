@@ -316,7 +316,7 @@ mod tests {
   use rstest_reuse::{apply, template};
 
   use crate::{
-    Move, Onoro8, OnoroImpl, PackedIdx,
+    Move, Onoro8, Onoro16, OnoroImpl, PackedIdx,
     p2_move_gen::{P2MoveGenerator, PawnConnectedMobility},
     util::IterOnes,
   };
@@ -793,6 +793,27 @@ mod tests {
     expect_eq!(phase2_moves_for(b2, &moves).count(), 1);
     expect_eq!(phase2_moves_for(b3, &moves).count(), 1);
     expect_eq!(phase2_moves_for(b4, &moves).count(), 0);
+
+    Ok(())
+  }
+
+  #[gtest]
+  fn test_find_moves_immobile() -> OnoroResult {
+    let onoro = Onoro16::from_board_string(
+      ". . W . . . . .
+        . W B . W B B W
+         . . B W B W B B
+          W W . . . . . .
+           B . . . . . . .",
+    )?;
+
+    let lower_left = lower_left(&onoro);
+
+    let immobile_pawn = pawn_idx_at(lower_left + HexPosOffset::new(2, 2), &onoro);
+
+    let move_gen = P2MoveGenerator::new(&onoro);
+    let moves = move_gen.to_iter(&onoro).collect_vec();
+    expect_eq!(phase2_moves_for(immobile_pawn, &moves).count(), 0);
 
     Ok(())
   }
