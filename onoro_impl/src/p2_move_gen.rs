@@ -7,7 +7,7 @@ use crate::{
   util::{IterOnes, unreachable},
 };
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 enum PawnConnectedMobility {
   /// The pawn is free to move anywhere that is available. This means this pawn
   /// is not an articulation point.
@@ -196,6 +196,7 @@ impl<const N: usize> P2MoveGenerator<N> {
     ecas[0] = time;
     time += 1;
 
+    let mut previous_exit_time = 0;
     let mut connect_mobility = None;
     for neighbor_index in Self::neighbors(0, pawn_poses, p1_move_gen) {
       pawn_meta[0].neighbor_index_mask |= 1 << neighbor_index;
@@ -215,12 +216,14 @@ impl<const N: usize> P2MoveGenerator<N> {
 
       connect_mobility = Some(match connect_mobility {
         None => PawnConnectedMobility::Free,
-        Some(PawnConnectedMobility::Free) => {
-          PawnConnectedMobility::CuttingPoint { exit_time: time }
-        }
+        Some(PawnConnectedMobility::Free) => PawnConnectedMobility::CuttingPoint {
+          exit_time: previous_exit_time,
+        },
         Some(PawnConnectedMobility::CuttingPoint { .. }) => PawnConnectedMobility::Immobile,
         Some(PawnConnectedMobility::Immobile) => unreachable(),
       });
+
+      previous_exit_time = time;
     }
 
     pawn_meta[0].connected_mobility = connect_mobility.unwrap_or_default();
@@ -814,6 +817,51 @@ mod tests {
     let move_gen = P2MoveGenerator::new(&onoro);
     let moves = move_gen.to_iter(&onoro).collect_vec();
     expect_eq!(phase2_moves_for(immobile_pawn, &moves).count(), 0);
+
+    Ok(())
+  }
+
+  #[gtest]
+  fn test_find_moves_cutting_point_first() -> OnoroResult {
+    let onoro = Onoro16::from_board_string(
+      ". . . B B .
+        . B W . B W
+         . W . . W W
+          W B . . W .
+           B B . . . .
+            W B . . . .",
+    )?;
+
+    let mut pawn_indexes = *onoro.pawn_poses();
+    let cutting_pawn_index = pawn_indexes
+      .iter()
+      .enumerate()
+      .step_by(2)
+      .max_by_key(|(_, pos)| pos.x() + pos.y() * 16)
+      .unwrap()
+      .0;
+    pawn_indexes.swap(cutting_pawn_index, 0);
+
+    let onoro = Onoro16::from_indexes(pawn_indexes);
+
+    let lower_left = lower_left(&onoro);
+
+    assert_eq!(pawn_idx_at(lower_left + HexPosOffset::new(4, 5), &onoro), 0);
+
+    let move_gen = P2MoveGenerator::new(&onoro);
+    assert!(matches!(
+      move_gen.pawn_meta[0].connected_mobility,
+      PawnConnectedMobility::CuttingPoint { .. }
+    ));
+    expect_that!(
+      move_gen.pawn_meta[0].connected_mobility,
+      pat!(PawnConnectedMobility::CuttingPoint {
+        exit_time: any![7, 12]
+      })
+    );
+
+    let moves = move_gen.to_iter(&onoro).collect_vec();
+    expect_eq!(phase2_moves_for(0, &moves).count(), 1);
 
     Ok(())
   }
