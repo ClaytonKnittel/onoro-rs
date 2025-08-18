@@ -1,5 +1,5 @@
 use abstract_game::GameMoveIterator;
-use onoro::Onoro;
+use onoro::{Onoro, PawnColor};
 
 use crate::{Move, OnoroImpl, PackedIdx, p1_move_gen::P1MoveGenerator, util::unreachable};
 
@@ -78,21 +78,25 @@ impl PawnMeta {
 pub struct P2MoveGenerator<const N: usize> {
   pawn_meta: [PawnMeta; N],
   p1_move_gen: P1MoveGenerator<N>,
+  cur_tile: PackedIdx,
+  pawn_index: usize,
 }
 
 impl<const N: usize> P2MoveGenerator<N> {
   pub fn new(onoro: &OnoroImpl<N>) -> Self {
     debug_assert!(!onoro.in_phase1());
-    Self::from_pawn_poses(onoro.pawn_poses())
+    Self::from_pawn_poses(onoro.pawn_poses(), matches!(onoro.turn(), PawnColor::Black))
   }
 
-  pub fn from_pawn_poses(pawn_poses: &[PackedIdx; N]) -> Self {
+  pub fn from_pawn_poses(pawn_poses: &[PackedIdx; N], black_turn: bool) -> Self {
     let p1_move_gen = P1MoveGenerator::from_pawn_poses(pawn_poses);
     let pawn_meta = Self::build_pawn_meta(pawn_poses, &p1_move_gen);
 
     Self {
       pawn_meta,
       p1_move_gen,
+      pawn_index: N + !black_turn as usize,
+      cur_tile: PackedIdx::null(),
     }
   }
 
@@ -221,8 +225,19 @@ impl<const N: usize> GameMoveIterator for P2MoveGenerator<N> {
   type Item = Move;
   type Game = OnoroImpl<N>;
 
-  fn next(&mut self, _game: &Self::Game) -> Option<Self::Item> {
-    None
+  fn next(&mut self, _onoro: &Self::Game) -> Option<Self::Item> {
+    if self.pawn_index >= N {
+      self.cur_tile = self.p1_move_gen.next_move_pos()?;
+      self.pawn_index &= 0x1;
+    }
+
+    let pawn_index = self.pawn_index as u32;
+    self.pawn_index += 2;
+
+    Some(Move::Phase2Move {
+      to: self.cur_tile,
+      from_idx: pawn_index,
+    })
   }
 }
 
@@ -321,7 +336,7 @@ mod tests {
   }
 
   fn find_articulation_points<const N: usize>(pawn_poses: &[PackedIdx; N]) -> Vec<PackedIdx> {
-    let move_gen = P2MoveGenerator::from_pawn_poses(pawn_poses);
+    let move_gen = P2MoveGenerator::from_pawn_poses(pawn_poses, true);
     move_gen
       .pawn_meta
       .into_iter()
@@ -331,7 +346,7 @@ mod tests {
   }
 
   fn find_immobile_points<const N: usize>(pawn_poses: &[PackedIdx; N]) -> Vec<PackedIdx> {
-    let move_gen = P2MoveGenerator::from_pawn_poses(pawn_poses);
+    let move_gen = P2MoveGenerator::from_pawn_poses(pawn_poses, true);
     move_gen
       .pawn_meta
       .into_iter()

@@ -107,8 +107,9 @@ impl<I: Unsigned + PrimInt> Impl<I> {
     }
   }
 
-  /// Finds the next move we can make, or `None` if all moves have been found.
-  fn next_impl(&mut self) -> Option<Move> {
+  /// Finds the tile index for the next move we can make, or `None` if all
+  /// moves have been found.
+  fn next_impl(&mut self) -> Option<usize> {
     let mut neighbor_candidates = self.neighbor_candidates;
     while neighbor_candidates != I::zero() {
       let index = neighbor_candidates.trailing_zeros() as usize;
@@ -117,9 +118,7 @@ impl<I: Unsigned + PrimInt> Impl<I> {
       let neighbors_mask: I = self.indexer.neighbors_mask(index);
       if (neighbors_mask & self.board_vec).count_ones() >= 2 {
         self.neighbor_candidates = neighbor_candidates;
-        return Some(Move::Phase1Move {
-          to: self.indexer.pos_from_index(index as u32),
-        });
+        return Some(index);
       }
     }
 
@@ -142,7 +141,7 @@ impl Impl<u64> {
     Self::new_impl(lower_left, width, pawn_poses)
   }
 
-  fn next<const N: usize>(&mut self, _onoro: &OnoroImpl<N>) -> Option<Move> {
+  fn next<const N: usize>(&mut self) -> Option<usize> {
     self.next_impl()
   }
 }
@@ -154,7 +153,7 @@ impl Impl<u128> {
   }
 
   #[cold]
-  fn next<const N: usize>(&mut self, _onoro: &OnoroImpl<N>) -> Option<Move> {
+  fn next<const N: usize>(&mut self) -> Option<usize> {
     self.next_impl()
   }
 }
@@ -238,6 +237,19 @@ impl<const N: usize> P1MoveGenerator<N> {
       }
     }
   }
+
+  pub fn next_move_index(&mut self) -> Option<usize> {
+    match &mut self.impl_container {
+      ImplContainer::Small(impl_) => impl_.next::<N>(),
+      ImplContainer::Large(impl_) => impl_.next::<N>(),
+    }
+  }
+
+  pub fn next_move_pos(&mut self) -> Option<PackedIdx> {
+    self
+      .next_move_index()
+      .map(|index| self.indexer().pos_from_index(index as u32))
+  }
 }
 
 impl<const N: usize> GameMoveIterator for P1MoveGenerator<N> {
@@ -245,10 +257,7 @@ impl<const N: usize> GameMoveIterator for P1MoveGenerator<N> {
   type Game = OnoroImpl<N>;
 
   fn next(&mut self, _onoro: &Self::Game) -> Option<Self::Item> {
-    match &mut self.impl_container {
-      ImplContainer::Small(impl_) => impl_.next(_onoro),
-      ImplContainer::Large(impl_) => impl_.next(_onoro),
-    }
+    self.next_move_pos().map(|to| Move::Phase1Move { to })
   }
 }
 
