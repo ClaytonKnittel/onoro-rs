@@ -67,18 +67,6 @@ struct PawnMeta {
 }
 
 impl PawnMeta {
-  fn is_root(&self) -> bool {
-    self.discovery_time == 1
-  }
-
-  fn is_cut(&self) -> bool {
-    !matches!(self.connected_mobility, PawnConnectedMobility::Free)
-  }
-
-  fn is_immobile(&self) -> bool {
-    matches!(self.connected_mobility, PawnConnectedMobility::Immobile)
-  }
-
   fn has_two_neighbors(&self) -> bool {
     self.neighbor_index_mask.count_ones() == 2
   }
@@ -312,7 +300,11 @@ mod tests {
   use rstest::rstest;
   use rstest_reuse::{apply, template};
 
-  use crate::{PackedIdx, p2_move_gen::P2MoveGenerator, util::IterOnes};
+  use crate::{
+    PackedIdx,
+    p2_move_gen::{P2MoveGenerator, PawnConnectedMobility},
+    util::IterOnes,
+  };
 
   struct Meta {
     discovery_time: i32,
@@ -403,7 +395,9 @@ mod tests {
       .pawn_meta
       .into_iter()
       .enumerate()
-      .filter_map(|(idx, meta)| meta.is_cut().then_some(pawn_poses[idx]))
+      .filter_map(|(idx, meta)| {
+        (!matches!(meta.connected_mobility, PawnConnectedMobility::Free)).then_some(pawn_poses[idx])
+      })
       .collect()
   }
 
@@ -413,7 +407,10 @@ mod tests {
       .pawn_meta
       .into_iter()
       .enumerate()
-      .filter_map(|(idx, meta)| meta.is_immobile().then_some(pawn_poses[idx]))
+      .filter_map(|(idx, meta)| {
+        matches!(meta.connected_mobility, PawnConnectedMobility::Immobile)
+          .then_some(pawn_poses[idx])
+      })
       .collect()
   }
 
