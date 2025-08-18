@@ -229,6 +229,8 @@ impl<const N: usize> P2MoveGenerator<N> {
   }
 
   fn is_valid_move(&self, onoro: &OnoroImpl<N>) -> bool {
+    let dst_neighbors = self.neighbor_mask & !(1 << self.pawn_index);
+
     let meta = self.pawn_meta[self.pawn_index];
     // Check that board connectedness is satisfied.
     match meta.connected_mobility {
@@ -236,7 +238,7 @@ impl<const N: usize> P2MoveGenerator<N> {
       PawnConnectedMobility::CuttingPoint { exit_time } => {
         let mut contains_subtree = false;
         let mut contains_supertree = false;
-        for neighbor_index in meta.neighbor_index_mask.iter_ones() {
+        for neighbor_index in dst_neighbors.iter_ones() {
           let neighbor_meta = self.pawn_meta[neighbor_index as usize];
           if (meta.discovery_time..exit_time).contains(&neighbor_meta.discovery_time) {
             contains_subtree = true;
@@ -254,7 +256,7 @@ impl<const N: usize> P2MoveGenerator<N> {
 
     // Check that this pawn has enough neighbors to move here after excluding
     // itself from the neighbors list.
-    if (self.neighbor_mask & !(1 << self.pawn_index)).count_ones() < 2 {
+    if dst_neighbors.count_ones() < 2 {
       return false;
     }
 
@@ -279,7 +281,6 @@ impl<const N: usize> GameMoveIterator for P2MoveGenerator<N> {
     loop {
       if self.pawn_index >= N - 2 {
         let (pos, neighbor_mask) = self.next_move_with_neighbors(onoro.pawn_poses())?;
-        println!("Next candidate: {pos} ({neighbor_mask:04x})");
         self.cur_tile = pos;
         self.neighbor_mask = neighbor_mask;
         self.pawn_index -= N - 2;
@@ -764,6 +765,34 @@ mod tests {
     expect_eq!(phase2_moves_for(b2, &moves).count(), 1);
     expect_eq!(phase2_moves_for(b3, &moves).count(), 2);
     expect_eq!(phase2_moves_for(b4, &moves).count(), 5);
+
+    Ok(())
+  }
+
+  #[gtest]
+  fn test_find_moves_disconnected() -> OnoroResult {
+    let onoro = Onoro8::from_board_string(
+      ". W W
+        W B .
+         . B .
+          B B .
+           W . .",
+    )?;
+
+    let lower_left = lower_left(&onoro);
+
+    let b1 = pawn_idx_at(lower_left + HexPosOffset::new(0, 1), &onoro);
+    let b2 = pawn_idx_at(lower_left + HexPosOffset::new(1, 1), &onoro);
+    let b3 = pawn_idx_at(lower_left + HexPosOffset::new(1, 2), &onoro);
+    let b4 = pawn_idx_at(lower_left + HexPosOffset::new(1, 3), &onoro);
+
+    let move_gen = P2MoveGenerator::new(&onoro);
+    let moves = move_gen.to_iter(&onoro).collect_vec();
+
+    expect_eq!(phase2_moves_for(b1, &moves).count(), 1);
+    expect_eq!(phase2_moves_for(b2, &moves).count(), 1);
+    expect_eq!(phase2_moves_for(b3, &moves).count(), 1);
+    expect_eq!(phase2_moves_for(b4, &moves).count(), 0);
 
     Ok(())
   }
