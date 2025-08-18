@@ -47,9 +47,10 @@ struct PawnMeta {
   /// The discovery index of this pawn when doing the depth-first exploration
   /// of the pawn graph.
   discovery_time: u32,
-  /// If true, this pawn has only two neighbors, meaning if we move a pawn
-  /// adjacent to it, it must be placed adjacent to it.
-  has_two_neighbors: bool,
+
+  /// A mask of the neighbors of this pawn in the pawn metadata/pawn_poses
+  /// lists. Each bit corresponds to an index in these lists in the same order.
+  neighbor_index_mask: u16,
 
   // Below only relevant to current player's pawns:
   /// The time we have returned from exploring the subtree of this pawn.
@@ -72,6 +73,10 @@ impl PawnMeta {
 
   fn is_immobile(&self) -> bool {
     matches!(self.connected_mobility, PawnConnectedMobility::Immobile)
+  }
+
+  fn has_two_neighbors(&self) -> bool {
+    self.neighbor_index_mask.count_ones() == 2
   }
 }
 
@@ -104,23 +109,19 @@ impl<const N: usize> P2MoveGenerator<N> {
     pawn_index: usize,
     pawn_poses: &[PackedIdx; N],
     p1_move_gen: &P1MoveGenerator<N>,
-  ) -> (impl Iterator<Item = usize>, u32) {
+  ) -> impl Iterator<Item = usize> {
     let indexer = p1_move_gen.indexer();
 
     let pawn_index = indexer.index(pawn_poses[pawn_index]);
-    let (iter, count) = p1_move_gen.neighbors(pawn_index);
-    (
-      iter.map(|neighbor_index| {
-        let neighbor_pos = indexer.pos_from_index(neighbor_index);
-        pawn_poses
-          .iter()
-          .enumerate()
-          .find(|&(_, &pos)| pos == neighbor_pos)
-          .unwrap()
-          .0
-      }),
-      count,
-    )
+    p1_move_gen.neighbors(pawn_index).map(|neighbor_index| {
+      let neighbor_pos = indexer.pos_from_index(neighbor_index);
+      pawn_poses
+        .iter()
+        .enumerate()
+        .find(|&(_, &pos)| pos == neighbor_pos)
+        .unwrap()
+        .0
+    })
   }
 
   fn recursor(
@@ -137,12 +138,12 @@ impl<const N: usize> P2MoveGenerator<N> {
     ecas[pawn_index] = *time;
     *time += 1;
 
-    let (neighbors_iter, count) = Self::neighbors(pawn_index, pawn_poses, p1_move_gen);
+    for neighbor_index in Self::neighbors(pawn_index, pawn_poses, p1_move_gen) {
+      pawn_meta[pawn_index].neighbor_index_mask |= 1 << neighbor_index;
+      if neighbor_index == parent_index {
+        continue;
+      }
 
-    debug_assert!(count >= 2);
-    meta.has_two_neighbors = count == 2;
-
-    for neighbor_index in neighbors_iter.filter(|&neighbor_index| neighbor_index != parent_index) {
       let neighbor_t = pawn_meta[neighbor_index].discovery_time;
       if neighbor_t != 0 {
         ecas[pawn_index] = ecas[pawn_index].min(neighbor_t);
@@ -184,13 +185,9 @@ impl<const N: usize> P2MoveGenerator<N> {
     ecas[0] = time;
     time += 1;
 
-    let (neighbors_iter, count) = Self::neighbors(0, pawn_poses, p1_move_gen);
-
-    debug_assert!(count >= 2);
-    pawn_meta[0].has_two_neighbors = count == 2;
-
     let mut connect_mobility = None;
-    for neighbor_index in neighbors_iter {
+    for neighbor_index in Self::neighbors(0, pawn_poses, p1_move_gen) {
+      pawn_meta[0].neighbor_index_mask |= 1 << neighbor_index;
       if pawn_meta[neighbor_index].discovery_time != 0 {
         continue;
       }

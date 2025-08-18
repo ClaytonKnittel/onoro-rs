@@ -129,10 +129,9 @@ impl<I: Unsigned + PrimInt> Impl<I> {
 
   /// Returns an iterator over the indices of the neighbors of the pawn at the
   /// given index.
-  fn neighbors(&self, index: usize) -> (impl Iterator<Item = u32>, u32) {
+  fn neighbors(&self, index: usize) -> impl Iterator<Item = u32> {
     let neighbors_mask: I = self.indexer.neighbors_mask(index);
-    let neighbors_mask = neighbors_mask & self.board_vec;
-    (neighbors_mask.iter_ones(), neighbors_mask.count_ones())
+    (neighbors_mask & self.board_vec).iter_ones()
   }
 }
 
@@ -225,16 +224,10 @@ impl<const N: usize> P1MoveGenerator<N> {
 
   /// Returns a tuple of (neighbor index iterator, neighbor count), where the
   /// iterator is guaranteed to yield "neighbor count" elements.
-  pub fn neighbors(&self, index: usize) -> (impl Iterator<Item = u32>, u32) {
+  pub fn neighbors(&self, index: usize) -> impl Iterator<Item = u32> {
     match &self.impl_container {
-      ImplContainer::Small(impl_) => {
-        let (iter, count) = impl_.neighbors(index);
-        (Either::Left(iter), count)
-      }
-      ImplContainer::Large(impl_) => {
-        let (iter, count) = impl_.neighbors(index);
-        (Either::Right(iter), count)
-      }
+      ImplContainer::Small(impl_) => Either::Left(impl_.neighbors(index)),
+      ImplContainer::Large(impl_) => Either::Right(impl_.neighbors(index)),
     }
   }
 
