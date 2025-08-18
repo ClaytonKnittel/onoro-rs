@@ -12,9 +12,6 @@ num-traits = { version = "0.2.19", features = ["i128"] }
 onoro = { path = "../onoro" }
 rand = "0.8"
 
-[build]
-rustflags = ["-C", "target-feature=+ssse3"]
-
 [dev-dependencies]
 googletest = "0.14.2"
 rstest = "0.26.1"

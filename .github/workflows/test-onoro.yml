@@ -12,9 +12,21 @@ env:
 jobs:
   build:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        ssse3: ["disabled", "enabled"]
+
+    name: "Build & Test (ssse3: ${{ matrix.ssse3 }})"
 
     steps:
       - uses: actions/checkout@v4
+      - name: Set RUSTFLAGS
+        run: |
+          if [ "${{ matrix.ssse3 }}" = "disabled" ]; then
+            echo "RUSTFLAGS=-C target-feature=-ssse3" >> $GITHUB_ENV
+          else
+            echo "RUSTFLAGS=-C target-feature=+ssse3" >> $GITHUB_ENV
+          fi
       - name: Build
         run: cargo build --verbose
       - name: Test abstract game
