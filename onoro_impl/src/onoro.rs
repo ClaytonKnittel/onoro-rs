@@ -642,7 +642,7 @@ impl<const N: usize> Onoro for OnoroImpl<N> {
   }
 
   fn in_phase1(&self) -> bool {
-    self.onoro_state().turn() < 0xf
+    self.onoro_state().turn() < N as u32 - 1
   }
 
   fn each_move(&self) -> impl Iterator<Item = Move> {

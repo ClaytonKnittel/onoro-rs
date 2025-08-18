@@ -252,6 +252,12 @@ impl<const N: usize> P2MoveGenerator<N> {
       PawnConnectedMobility::Immobile => return false,
     }
 
+    // Check that this pawn has enough neighbors to move here after excluding
+    // itself from the neighbors list.
+    if (self.neighbor_mask & !(1 << self.pawn_index)).count_ones() < 2 {
+      return false;
+    }
+
     // Check that all dangling neighbors are satisfied.
     for neighbor_index in meta.neighbor_index_mask.iter_ones() {
       let neighbor_pos = onoro.pawn_poses()[neighbor_index as usize];
@@ -273,6 +279,7 @@ impl<const N: usize> GameMoveIterator for P2MoveGenerator<N> {
     loop {
       if self.pawn_index >= N - 2 {
         let (pos, neighbor_mask) = self.next_move_with_neighbors(onoro.pawn_poses())?;
+        println!("Next candidate: {pos} ({neighbor_mask:04x})");
         self.cur_tile = pos;
         self.neighbor_mask = neighbor_mask;
         self.pawn_index -= N - 2;
@@ -296,13 +303,19 @@ impl<const N: usize> GameMoveIterator for P2MoveGenerator<N> {
 mod tests {
   use std::collections::{HashMap, HashSet};
 
+  use abstract_game::GameMoveIterator;
   use googletest::{gtest, prelude::*};
-  use onoro::{OnoroIndex, hex_pos::HexPos};
+  use itertools::Itertools;
+  use onoro::{
+    Onoro, OnoroIndex,
+    error::OnoroResult,
+    hex_pos::{HexPos, HexPosOffset},
+  };
   use rstest::rstest;
   use rstest_reuse::{apply, template};
 
   use crate::{
-    PackedIdx,
+    Move, Onoro8, OnoroImpl, PackedIdx,
     p2_move_gen::{P2MoveGenerator, PawnConnectedMobility},
     util::IterOnes,
   };
@@ -673,5 +686,85 @@ mod tests {
 
       assert_that!(neighbor_pos_from_mask, container_eq(expected_neighbors));
     }
+  }
+
+  fn lower_left<const N: usize>(onoro: &OnoroImpl<N>) -> HexPos {
+    let (min_x, min_y) = onoro
+      .pawn_poses()
+      .iter()
+      .fold((u32::MAX, u32::MAX), |(min_x, min_y), pawn_pos| {
+        (min_x.min(pawn_pos.x()), min_y.min(pawn_pos.y()))
+      });
+    HexPos::new(min_x, min_y)
+  }
+
+  fn pawn_idx_at<const N: usize>(pos: HexPos, onoro: &OnoroImpl<N>) -> u32 {
+    onoro
+      .pawn_poses()
+      .iter()
+      .enumerate()
+      .find_map(|(i, &pawn_pos)| (pawn_pos == pos.into()).then_some(i))
+      .unwrap() as u32
+  }
+
+  fn phase2_moves_for(pawn_index: u32, moves: &[Move]) -> impl Iterator<Item = &Move> {
+    moves.iter().filter(move |m| match m {
+      Move::Phase2Move { from_idx, .. } => *from_idx == pawn_index,
+      _ => unreachable!(),
+    })
+  }
+
+  #[gtest]
+  fn test_find_moves_simple() -> OnoroResult {
+    let onoro = Onoro8::from_board_string(
+      ". W W
+        B B B
+         W W .
+          B . .",
+    )?;
+
+    let lower_left = lower_left(&onoro);
+
+    let b1 = pawn_idx_at(lower_left, &onoro);
+    let b2 = pawn_idx_at(lower_left + HexPosOffset::new(0, 2), &onoro);
+    let b3 = pawn_idx_at(lower_left + HexPosOffset::new(1, 2), &onoro);
+    let b4 = pawn_idx_at(lower_left + HexPosOffset::new(2, 2), &onoro);
+
+    let move_gen = P2MoveGenerator::new(&onoro);
+    let moves = move_gen.to_iter(&onoro).collect_vec();
+
+    expect_eq!(phase2_moves_for(b1, &moves).count(), 5);
+    expect_eq!(phase2_moves_for(b2, &moves).count(), 5);
+    expect_eq!(phase2_moves_for(b3, &moves).count(), 7);
+    expect_eq!(phase2_moves_for(b4, &moves).count(), 5);
+
+    Ok(())
+  }
+
+  #[gtest]
+  fn test_find_moves_dangling() -> OnoroResult {
+    let onoro = Onoro8::from_board_string(
+      ". W W B
+        . B W .
+         B B . .
+          W . . .",
+    )?;
+
+    let lower_left = lower_left(&onoro);
+
+    let b1 = pawn_idx_at(lower_left + HexPosOffset::new(0, 1), &onoro);
+    let b2 = pawn_idx_at(lower_left + HexPosOffset::new(1, 1), &onoro);
+    let b3 = pawn_idx_at(lower_left + HexPosOffset::new(1, 2), &onoro);
+    let b4 = pawn_idx_at(lower_left + HexPosOffset::new(3, 3), &onoro);
+
+    let move_gen = P2MoveGenerator::new(&onoro);
+    let moves = move_gen.to_iter(&onoro).collect_vec();
+
+    expect_eq!(phase2_moves_for(b1, &moves).count(), 1);
+    expect_eq!(phase2_moves_for(b2, &moves).count(), 1);
+    expect_eq!(phase2_moves_for(b3, &moves).count(), 2);
+    expect_eq!(phase2_moves_for(b4, &moves).count(), 5);
+
+    Ok(())
   }
 }
