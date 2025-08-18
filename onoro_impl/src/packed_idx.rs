@@ -15,9 +15,11 @@ pub struct PackedIdx {
 }
 
 impl PackedIdx {
+  const MAX_VAL: u32 = 0x10;
+
   pub const fn new(x: u32, y: u32) -> Self {
-    debug_assert!(x < 0x10);
-    debug_assert!(y < 0x10);
+    debug_assert!(x < Self::MAX_VAL);
+    debug_assert!(y < Self::MAX_VAL);
 
     Self {
       bytes: Wrapping((x | (y << 4)) as u8),
@@ -68,6 +70,11 @@ impl PackedIdx {
       bytes: Wrapping(offset.bytes.0),
     }
   }
+
+  #[allow(dead_code)]
+  const fn on_perimeter(&self) -> bool {
+    self.x() == 0 || self.x() == Self::MAX_VAL - 1 || self.y() == 0 || self.y() == Self::MAX_VAL - 1
+  }
 }
 
 impl OnoroIndex for PackedIdx {
@@ -82,6 +89,13 @@ impl OnoroIndex for PackedIdx {
   fn y(&self) -> i32 {
     self.y() as i32
   }
+
+  // TODO: try something like this
+  // fn adjacent(&self, other: Self) -> bool {
+  //   debug_assert!(!self.on_perimeter() || !other.on_perimeter());
+  //   let delta = (Wrapping(0x11) + self.bytes - other.bytes).0;
+  //   (delta & 0xcc) == 0 && (delta & (delta >> 1)) == 0 && delta != 0x02 && delta != 0x20
+  // }
 }
 
 impl From<HexPos> for PackedIdx {
@@ -232,6 +246,8 @@ where
 
 #[cfg(test)]
 mod tests {
+  use onoro::{OnoroIndex, hex_pos::HexPos};
+
   use super::{IdxOffset, PackedIdx};
 
   #[test]
@@ -279,5 +295,22 @@ mod tests {
     let pos = PackedIdx::new(3, 7);
     let offset = IdxOffset::new(-2, -1);
     assert_eq!(pos + offset, PackedIdx::new(1, 6));
+  }
+
+  #[test]
+  fn test_adjacent() {
+    for y1 in 0..16 {
+      for x1 in 0..16 {
+        for y2 in 1..15 {
+          for x2 in 1..15 {
+            assert_eq!(
+              PackedIdx::new(x1, y1).adjacent(PackedIdx::new(x2, y2)),
+              HexPos::new(x1, y1).adjacent(&HexPos::new(x2, y2)),
+              "({x1}, {y1}) adjacent to ({x2}, {y2})"
+            );
+          }
+        }
+      }
+    }
   }
 }

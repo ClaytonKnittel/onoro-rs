@@ -66,6 +66,13 @@ impl HexPos {
     .into_iter()
   }
 
+  /// Returns true if `self` and `other` are adjacent.
+  pub fn adjacent(&self, other: &HexPos) -> bool {
+    let dx = self.x() as i32 - other.x() as i32;
+    let dy = self.y() as i32 - other.y() as i32;
+    (-1..=1).contains(&dx) && (-1..=1).contains(&dy) && dx * dy != -1
+  }
+
   pub const fn clone_const(&self) -> Self {
     Self {
       x: self.x,
