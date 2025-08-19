@@ -30,6 +30,8 @@ name = "onoro"
 harness = false
 
 # [profile.bench]
+# opt-level = 1
+# lto = "none"
 # debug = 2
 # strip = "none"
 

@@ -25,7 +25,7 @@ use crate::{
   p2_move_gen::P2MoveGenerator,
   packed_hex_pos::PackedHexPos,
   packed_idx::{IdxOffset, PackedIdx},
-  util::{broadcast_u8_to_u64, equal_mask_epi8, packed_positions_to_mask, unlikely},
+  util::{equal_mask_epi8, packed_positions_to_mask, unlikely},
 };
 
 /// An Onoro game state with `N / 2` pawns per player.
@@ -145,8 +145,8 @@ impl<const N: usize> OnoroImpl<N> {
       res = format!("{res}{: <width$}", "", width = max_y - y);
       for x in min_x..=max_x {
         let pos = PackedIdx::new(x as u32, y as u32);
-        let former_pawn_idx = self.get_pawn_idx_slow(pos);
-        let new_pawn_idx = g.get_pawn_idx_slow(pos);
+        let former_pawn_idx = Self::get_pawn_idx_slow(&self.pawn_poses, pos);
+        let new_pawn_idx = Self::get_pawn_idx_slow(&g.pawn_poses, pos);
 
         res = format!(
           "{res}{}",
@@ -548,40 +548,19 @@ impl<const N: usize> OnoroImpl<N> {
 
   /// Given a position on the board, returns the index of the pawn with that
   /// position, or `None` if no such pawn exists.
-  fn get_pawn_idx_slow(&self, idx: PackedIdx) -> Option<u32> {
+  fn get_pawn_idx_slow(pawn_poses: &[PackedIdx; N], idx: PackedIdx) -> Option<u32> {
     if idx == PackedIdx::null() {
       return None;
     }
 
-    let pawn_poses_ptr = self.pawn_poses.as_ptr() as *const u64;
-
-    // Read the internal representation of `idx` as a `u8`, and spread it across
-    // all 8 bytes of a `u64` mask.
-    let mask = broadcast_u8_to_u64(unsafe { idx.bytes() });
-
-    for i in 0..N / 8 {
-      let xor_search = mask ^ unsafe { *pawn_poses_ptr.add(i) };
-
-      let zero_mask =
-        (xor_search.wrapping_sub(0x0101010101010101u64)) & !xor_search & 0x8080808080808080u64;
-      if zero_mask != 0 {
-        let set_bit_idx = zero_mask.trailing_zeros();
-        return Some(8 * i as u32 + (set_bit_idx / 8));
-      }
-    }
-
-    // Only necessary if N not a multiple of eight.
-    for i in 8 * (N / 8)..N {
-      if unsafe { *self.pawn_poses.get_unchecked(i) } == idx {
-        return Some(i as u32);
-      }
-    }
-
-    None
+    pawn_poses
+      .iter()
+      .enumerate()
+      .find_map(|(i, &pos)| (pos == idx).then_some(i as u32))
   }
 
   fn get_tile_slow(&self, idx: PackedIdx) -> TileState {
-    match self.get_pawn_idx_slow(idx) {
+    match Self::get_pawn_idx_slow(&self.pawn_poses, idx) {
       Some(i) => {
         if i % 2 == 0 {
           TileState::Black
@@ -593,6 +572,16 @@ impl<const N: usize> OnoroImpl<N> {
     }
   }
 
+  pub fn pawn_idx_from_pawn_poses(pawn_poses: &[PackedIdx; N], idx: PackedIdx) -> u32 {
+    debug_assert_ne!(idx, PackedIdx::null());
+
+    #[cfg(target_feature = "ssse3")]
+    if N == 16 {
+      return unsafe { Self::get_pawn_idx_fast(pawn_poses, idx) };
+    }
+    Self::get_pawn_idx_slow(pawn_poses, idx).unwrap()
+  }
+
   pub fn get_pawn_idx(&self, idx: PackedIdx) -> u32 {
     debug_assert_ne!(idx, PackedIdx::null());
 
@@ -600,7 +589,7 @@ impl<const N: usize> OnoroImpl<N> {
     if N == 16 {
       return unsafe { Self::get_pawn_idx_fast(&self.pawn_poses, idx) };
     }
-    self.get_pawn_idx_slow(idx).unwrap()
+    Self::get_pawn_idx_slow(&self.pawn_poses, idx).unwrap()
   }
 
   /// Bounds checks a hex pos before turning it into a PackedIdx for lookup.
@@ -930,27 +919,12 @@ impl<const N: usize> GameMoveIterator for MoveGenerator<N> {
 
 #[cfg(test)]
 mod tests {
-  use std::ops::{Index, IndexMut};
-
   use googletest::{expect_false, expect_true, gtest};
   use onoro::{Onoro, TileState, hex_pos::HexPos};
 
-  use crate::{Onoro16, OnoroImpl, onoro_defs::Onoro8, packed_idx::PackedIdx};
-
-  #[repr(align(8))]
-  struct PawnPoses([PackedIdx; 16]);
-  impl Index<usize> for PawnPoses {
-    type Output = PackedIdx;
-
-    fn index(&self, index: usize) -> &Self::Output {
-      &self.0[index]
-    }
-  }
-  impl IndexMut<usize> for PawnPoses {
-    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
-      &mut self.0[index]
-    }
-  }
+  use crate::{
+    Onoro16, OnoroImpl, onoro_defs::Onoro8, packed_idx::PackedIdx, test_util::PawnPoses,
+  };
 
   /// Given a position on the board, returns the tile state of that position,
   /// i.e. the color of the piece on that tile, or `Empty` if no piece is there.
@@ -1000,20 +974,6 @@ mod tests {
     }
   }
 
-  /// Given a position on the board, returns the index of the pawn on that
-  /// tile, or `None` if no piece is there.
-  fn get_pawn_idx_test<const N: usize>(onoro: &OnoroImpl<N>, idx: PackedIdx) -> Option<u32> {
-    if idx == PackedIdx::null() {
-      return None;
-    }
-
-    onoro
-      .pawn_poses
-      .iter()
-      .enumerate()
-      .find_map(|(i, &pos)| (pos == idx).then_some(i as u32))
-  }
-
   #[test]
   fn test_get_pawn_idx_simple() {
     let onoro = Onoro8::default_start();
@@ -1021,7 +981,7 @@ mod tests {
     for y in 0..Onoro8::board_width() {
       for x in 0..Onoro8::board_width() {
         let idx = PackedIdx::new(x as u32, y as u32);
-        if let Some(pawn_idx) = get_pawn_idx_test(&onoro, idx) {
+        if let Some(pawn_idx) = OnoroImpl::get_pawn_idx_slow(&onoro.pawn_poses, idx) {
           assert_eq!(onoro.get_pawn_idx(idx), pawn_idx);
         }
       }
@@ -1035,7 +995,7 @@ mod tests {
     for y in 0..Onoro16::board_width() {
       for x in 0..Onoro16::board_width() {
         let idx = PackedIdx::new(x as u32, y as u32);
-        if let Some(pawn_idx) = get_pawn_idx_test(&onoro, idx) {
+        if let Some(pawn_idx) = OnoroImpl::get_pawn_idx_slow(&onoro.pawn_poses, idx) {
           assert_eq!(onoro.get_pawn_idx(idx), pawn_idx);
         }
       }
