@@ -77,6 +77,15 @@ pub trait OnoroIndex: Clone + Copy + Eq + Debug {
     let dy = self.y() - other.y();
     (dx.abs() + dy.abs() + (dx - dy).abs()) as u32 / 2
   }
+
+  /// Returns the area of the minimum bounding parallelogram containing both of
+  /// these points.
+  fn minimum_bounding_parallelogram_area(&self, other: Self) -> u64 {
+    let dx = (self.x() - other.x()).unsigned_abs() as u64 + 1;
+    let dy = (self.y() - other.y()).unsigned_abs() as u64 + 1;
+    let dxy = ((self.y() - self.x()) - (other.y() - other.x())).unsigned_abs() as u64 + 1;
+    dx * dy * dxy / dx.max(dy).max(dxy)
+  }
 }
 
 impl OnoroIndex for (i32, i32) {

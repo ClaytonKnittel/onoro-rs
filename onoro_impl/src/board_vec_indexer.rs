@@ -10,7 +10,7 @@ use crate::{
 /// pawns on the board. In the diagrams below, x is the first coordinate axis,
 /// and y is the second. A `-` sign in front of the axis label means the arrow
 /// is pointing in the negative direction.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub enum Basis {
   ///```text
   /// +y
@@ -108,7 +108,7 @@ impl BoardVecIndexer {
     }
   }
 
-  const fn coords(&self, pos: PackedIdx) -> (u32, u32) {
+  const fn hex_coords(&self, pos: HexPos) -> (u32, u32) {
     let x = pos.x();
     let y = pos.y();
     let cx = self.corner.x();
@@ -118,6 +118,10 @@ impl BoardVecIndexer {
       Basis::XvXY => (y - cy, y + cx - x - cy),
       Basis::XYvY => (x + cy - y - cx, x - cx),
     }
+  }
+
+  fn coords(&self, pos: PackedIdx) -> (u32, u32) {
+    self.hex_coords(pos.into())
   }
 
   const fn pos_from_coords(&self, coords: (u32, u32)) -> PackedIdx {
@@ -131,11 +135,14 @@ impl BoardVecIndexer {
     }
   }
 
-  /// Maps a `PackedIdx` from the Onoro state to an index in the board bitvec.
-  pub fn index(&self, pos: PackedIdx) -> usize {
-    let (c1, c2) = self.coords(pos);
+  pub fn index_from_coords(&self, (c1, c2): (u32, u32)) -> u32 {
     debug_assert!(c1 < self.width as u32);
-    c2 as usize * self.width as usize + c1 as usize
+    c2 * self.width as u32 + c1
+  }
+
+  /// Maps a `PackedIdx` from the Onoro state to an index in the board bitvec.
+  pub fn index(&self, pos: PackedIdx) -> u32 {
+    self.index_from_coords(self.coords(pos))
   }
 
   /// Maps an index from the board bitvec to a `PackedIdx` in the Onoro state.
@@ -151,7 +158,7 @@ impl BoardVecIndexer {
   /// candidates have a 1 in each index corresponding to an empty neighbor of
   /// any pawn.
   pub fn build_bitvecs<I: PrimInt>(&self, pawn_poses: &[PackedIdx]) -> (I, I) {
-    let width = self.width as usize;
+    let width = self.width as u32;
 
     let board = pawn_poses
       .iter()
@@ -159,11 +166,12 @@ impl BoardVecIndexer {
       .fold(I::zero(), |board_vec, &pos| {
         let index = self.index(pos);
         debug_assert!(index > width);
-        board_vec | (I::one() << index)
+        board_vec | (I::one() << index as usize)
       });
 
     // All neighbors are -(width+1), -width, -1, +1, +width, +(width+1) in
     // index space.
+    let width = width as usize;
     let neighbor_candidates = (board >> (width + 1))
       | (board >> width)
       | (board >> 1)
@@ -189,53 +197,114 @@ impl BoardVecIndexer {
 
 #[cfg(test)]
 mod tests {
-  use onoro::OnoroIndex;
+  use std::fmt::Debug;
+
+  use onoro::{OnoroIndex, hex_pos::HexPosOffset};
 
   use crate::{PackedIdx, util::packed_positions_coord_limits};
 
   use super::*;
 
+  fn each_index(n: u32) -> impl Iterator<Item = PackedIdx> {
+    (1..(n - 1)).flat_map(move |y| (1..(n - 1)).map(move |x| PackedIdx::new(x, y)))
+  }
+
+  fn each_corner(n: u32) -> impl Iterator<Item = (PackedIdx, PackedIdx)> {
+    each_index(n)
+      .flat_map(move |p1| each_index(n).map(move |p2| (p1, p2)))
+      .filter(move |&(p1, p2)| p1 != p2 && p1.axial_distance(p2) <= n - 3)
+  }
+
   #[test]
   fn test_determine_basis() {
     const N: u32 = 16;
-    for y1 in 1..(N - 1) {
-      for x1 in 1..(N - 1) {
-        let p1 = PackedIdx::new(x1, y1);
-        for y2 in 1..(N - 1) {
-          for x2 in 1..(N - 1) {
-            if x1 == x2 && y1 == y2 {
-              continue;
-            }
-            let p2 = PackedIdx::new(x2, y2);
-            if p1.axial_distance(p2) > N - 3 {
-              // These two points are farther apart than any two pawns could be.
-              continue;
-            }
+    for (p1, p2) in each_corner(N) {
+      let mut coord_poses = [PackedIdx::null(); N as usize];
+      coord_poses[0] = p1;
+      coord_poses[1] = p2;
+      let coord_limits = packed_positions_coord_limits(&coord_poses);
 
-            let mut coord_poses = [PackedIdx::null(); N as usize];
-            coord_poses[0] = p1;
-            coord_poses[1] = p2;
-            let coord_limits = packed_positions_coord_limits(&coord_poses);
+      let DetermineBasisOutput {
+        basis,
+        corner,
+        width,
+        use_u128,
+      } = determine_basis::<{ N as usize }>(coord_limits);
+      let indexer = BoardVecIndexer::new(basis, corner, width);
 
-            let DetermineBasisOutput {
-              basis,
-              corner,
-              width,
-              use_u128,
-            } = determine_basis::<{ N as usize }>(coord_limits);
-            let indexer = BoardVecIndexer::new(basis, corner, width);
+      let width = width as u32;
+      assert!(indexer.index(p1) > width);
+      assert!(indexer.index(p1) < if use_u128 { u128::BITS } else { u64::BITS } - width);
+      assert!(indexer.index(p2) < if use_u128 { u128::BITS } else { u64::BITS } - width);
+    }
+  }
 
-            assert!(indexer.index(p1) > width as usize);
-            assert!(
-              indexer.index(p1)
-                < if use_u128 { u128::BITS } else { u64::BITS } as usize - width as usize
-            );
-            assert!(
-              indexer.index(p2)
-                < if use_u128 { u128::BITS } else { u64::BITS } as usize - width as usize
-            );
-          }
+  fn min_bb_area_with_padding(p1: PackedIdx, p2: PackedIdx) -> u64 {
+    let x1 = p1.x() as i32;
+    let y1 = p1.y() as i32;
+    let x2 = p2.x() as i32;
+    let y2 = p2.y() as i32;
+    let dx = (x1 - x2).unsigned_abs() as u64 + 3;
+    let dy = (y1 - y2).unsigned_abs() as u64 + 3;
+    let dxy = ((y1 - x1) - (y2 - x2)).unsigned_abs() as u64 + 3;
+    dx * dy * dxy / dx.max(dy).max(dxy)
+  }
+
+  fn check_is_bijection<I: PrimInt + Debug>(
+    indexer: &BoardVecIndexer,
+    p1: PackedIdx,
+    p2: PackedIdx,
+  ) {
+    let mut board_vec = I::zero();
+    let min_bb_area = min_bb_area_with_padding(p1, p2);
+    assert_eq!(min_bb_area % indexer.width as u64, 0);
+
+    let xlim = indexer.width as i32;
+    let ylim = (min_bb_area / indexer.width as u64) as i32;
+    for y in 0..ylim {
+      for x in 0..xlim {
+        if (x == 0 && y == ylim - 1) || (x == xlim - 1 && y == 0) {
+          continue;
         }
+        let pos = indexer.corner
+          + match indexer.basis {
+            Basis::XvY => HexPosOffset::new(x, y),
+            Basis::XvXY => HexPosOffset::new(x - y, x),
+            Basis::XYvY => HexPosOffset::new(y, y - x),
+          };
+
+        let index = indexer.index(pos.into());
+        let mask = I::one() << index as usize;
+        assert_eq!(board_vec & mask, I::zero());
+        board_vec = board_vec | mask;
+
+        assert_eq!(indexer.pos_from_coords((x as u32, y as u32)), pos.into());
+        assert_eq!(indexer.pos_from_index(index), pos.into());
+      }
+    }
+  }
+
+  #[test]
+  fn test_indexer_bijection() {
+    const N: u32 = 16;
+    for (p1, p2) in each_corner(N) {
+      let mut coord_poses = [PackedIdx::null(); N as usize];
+      coord_poses[0] = p1;
+      coord_poses[1] = p2;
+      let coord_limits = packed_positions_coord_limits(&coord_poses);
+
+      let DetermineBasisOutput {
+        basis,
+        corner,
+        width,
+        use_u128,
+      } = determine_basis::<{ N as usize }>(coord_limits);
+      let indexer = BoardVecIndexer::new(basis, corner, width);
+
+      if use_u128 {
+        check_is_bijection::<u128>(&indexer, p1, p2);
+      } else {
+        check_is_bijection::<u64>(&indexer, p1, p2);
       }
     }
   }
