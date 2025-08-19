@@ -277,8 +277,8 @@ enum ImplContainer {
   /// including a 1-tile padding around the perimeter. This is much faster to
   /// operate on than a u128.
   Small(Impl<u64>),
-  /// We need to support any board size. The largest possible board is 8 x 8
-  /// (see test_worst_case below), which, with a 1-tile padding, requires 81
+  /// We need to support any board size. The largest possible board is 8 x 9
+  /// (see test_worst_case below), which, with a 1-tile padding, requires 110
   /// bits for the board bitvec.
   Large(Box<Impl<u128>>),
 }
@@ -455,6 +455,10 @@ mod tests {
               indexer.index(p1)
                 < if use_u128 { u128::BITS } else { u64::BITS } as usize - width as usize
             );
+            assert!(
+              indexer.index(p2)
+                < if use_u128 { u128::BITS } else { u64::BITS } as usize - width as usize
+            );
           }
         }
       }
@@ -475,16 +479,6 @@ mod tests {
   #[apply(test_build)]
   #[rstest]
   fn test_build_board_vec(onoro: Onoro16) {
-    let move_gen = P1MoveGenerator::new(&onoro);
-    let indexer = &move_gen.indexer();
-    let board_vec = build_board_vec(onoro.pawn_poses(), indexer);
-
-    assert_eq!(get_board_vec(&move_gen), board_vec);
-  }
-
-  #[test]
-  fn test_build_board_vec2() {
-    let onoro = Onoro16::default_start();
     let move_gen = P1MoveGenerator::new(&onoro);
     let indexer = &move_gen.indexer();
     let board_vec = build_board_vec(onoro.pawn_poses(), indexer);
@@ -532,21 +526,21 @@ mod tests {
 
   #[test]
   fn test_line_x() -> OnoroResult {
-    let worst_case = Onoro16::from_board_string(
+    let line_x = Onoro16::from_board_string(
       ". B . . . . . . . . . . . .
         W B W B W B W B W B W B W B
          . . . . . . . . . . . . W .",
     )?;
 
-    let move_gen = P1MoveGenerator::new(&worst_case);
-    assert_eq!(move_gen.to_iter(&worst_case).count(), 26);
+    let move_gen = P1MoveGenerator::new(&line_x);
+    assert_eq!(move_gen.to_iter(&line_x).count(), 26);
 
     Ok(())
   }
 
   #[test]
   fn test_line_y() -> OnoroResult {
-    let worst_case = Onoro16::from_board_string(
+    let line_y = Onoro16::from_board_string(
       ". B .
         W B .
          . W .
@@ -563,15 +557,15 @@ mod tests {
                     . W .",
     )?;
 
-    let move_gen = P1MoveGenerator::new(&worst_case);
-    assert_eq!(move_gen.to_iter(&worst_case).count(), 26);
+    let move_gen = P1MoveGenerator::new(&line_y);
+    assert_eq!(move_gen.to_iter(&line_y).count(), 26);
 
     Ok(())
   }
 
   #[test]
   fn test_line_xy() -> OnoroResult {
-    let worst_case = Onoro16::from_board_string(
+    let line_xy = Onoro16::from_board_string(
       ". . . . . . . . . . . . W B
         . . . . . . . . . . . . W .
          . . . . . . . . . . . B . .
@@ -588,8 +582,8 @@ mod tests {
                     B W . . . . . . . . . . . .",
     )?;
 
-    let move_gen = P1MoveGenerator::new(&worst_case);
-    assert_eq!(move_gen.to_iter(&worst_case).count(), 26);
+    let move_gen = P1MoveGenerator::new(&line_xy);
+    assert_eq!(move_gen.to_iter(&line_xy).count(), 26);
 
     Ok(())
   }
