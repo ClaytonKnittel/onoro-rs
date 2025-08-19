@@ -109,15 +109,17 @@ impl<const N: usize> P2MoveGenerator<N> {
     let indexer = p1_move_gen.indexer();
 
     let pawn_index = indexer.index(pawn_poses[pawn_index]);
-    p1_move_gen.neighbors(pawn_index).map(|neighbor_index| {
-      let neighbor_pos = indexer.pos_from_index(neighbor_index);
-      pawn_poses
-        .iter()
-        .enumerate()
-        .find(|&(_, &pos)| pos == neighbor_pos)
-        .unwrap()
-        .0
-    })
+    p1_move_gen
+      .neighbors(pawn_index as usize)
+      .map(|neighbor_index| {
+        let neighbor_pos = indexer.pos_from_index(neighbor_index);
+        pawn_poses
+          .iter()
+          .enumerate()
+          .find(|&(_, &pos)| pos == neighbor_pos)
+          .unwrap()
+          .0
+      })
   }
 
   fn next_move_with_neighbors(&mut self, pawn_poses: &[PackedIdx; N]) -> Option<(PackedIdx, u16)> {

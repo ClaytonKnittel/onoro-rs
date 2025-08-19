@@ -6,7 +6,7 @@ use onoro::hex_pos::HexPos;
 use crate::{
   Move, OnoroImpl, PackedIdx,
   board_vec_indexer::{Basis, BoardVecIndexer, DetermineBasisOutput, determine_basis},
-  util::{likely, packed_positions_coord_limits},
+  util::{IterOnes, likely, packed_positions_coord_limits},
 };
 
 struct Impl<I> {
@@ -151,7 +151,7 @@ impl<const N: usize> P1MoveGenerator<N> {
   pub fn from_pawn_poses(pawn_poses: &[PackedIdx; N]) -> Self {
     // Compute the bounding parallelogram of the pawns that have been placed,
     // which is min/max x/y in coordinate space.
-    let coord_limits = packed_positions_coord_limits(onoro.pawn_poses());
+    let coord_limits = packed_positions_coord_limits(pawn_poses);
     let DetermineBasisOutput {
       basis,
       corner,
