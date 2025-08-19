@@ -47,7 +47,7 @@ impl PackedIdx {
   /// the x- and y-axes. This is normalized such that any PackedIdx will return
   /// a positive value.
   ///
-  ///```
+  ///```text
   /// (0,3)   (1,3)   (2,3)   (3,3)
   ///   3       2       1       0
   ///     (0,2)   (1,2)   (2,2)   (3,2)

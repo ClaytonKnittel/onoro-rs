@@ -114,14 +114,14 @@ impl BoardVecIndexer {
     }
   }
 
-  const fn offset_from_coords(&self, coords: (u32, u32)) -> PackedIdx {
+  const fn pos_from_coords(&self, coords: (u32, u32)) -> PackedIdx {
     let (x, y) = coords;
     let cx = self.corner.x();
     let cy = self.corner.y();
     match self.basis {
       Basis::XvY => PackedIdx::new(x + cx, y + cy),
       Basis::XvXY => PackedIdx::new(x + cx - y, x + cy),
-      Basis::XYvY => PackedIdx::new(y + cx, x + cy - y),
+      Basis::XYvY => PackedIdx::new(y + cx, y + cy - x),
     }
   }
 
@@ -137,7 +137,7 @@ impl BoardVecIndexer {
     debug_assert!((3..=16).contains(&self.width));
     let c1 = index % self.width as u32;
     let c2 = index / self.width as u32;
-    self.offset_from_coords((c1, c2))
+    self.pos_from_coords((c1, c2))
   }
 
   /// Builds both the board bitvec and neighbor candidates. The board bitvec
