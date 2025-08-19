@@ -1,38 +1,146 @@
 use abstract_game::GameMoveIterator;
 use num_traits::{PrimInt, Unsigned};
-use onoro::Onoro;
+use onoro::hex_pos::HexPos;
 
 use crate::{
-  FilterNullPackedIdx, IdxOffset, Move, OnoroImpl, PackedIdx,
-  util::{likely, packed_positions_bounding_box},
+  FilterNullPackedIdx, Move, OnoroImpl, PackedIdx,
+  util::{CoordLimits, MinAndMax, likely, packed_positions_coord_limits},
 };
+
+#[derive(Clone, Copy)]
+enum Basis {
+  ///```text
+  /// Γ
+  ///  \
+  ///   \
+  ///    +--->
+  ///```
+  XvY,
+  ///```text
+  ///    7
+  ///   /
+  ///  /
+  /// +--->
+  ///```
+  XvXY,
+  ///```text
+  /// Γ     7
+  ///  \   /
+  ///   \ /
+  ///    +
+  ///```
+  XYvY,
+}
+
+struct DetermineBasisOutput {
+  basis: Basis,
+  corner: HexPos,
+  width: u8,
+  use_u128: bool,
+}
+
+fn determine_basis<const N: usize>(coord_limits: CoordLimits) -> DetermineBasisOutput {
+  let x = coord_limits.x();
+  let y = coord_limits.y();
+  let xy = coord_limits.xy();
+
+  let dx = x.delta();
+  let dy = y.delta();
+  let dxy = xy.delta();
+
+  let x_y_corner = HexPos::new(x.min() - 1, y.min() - 1);
+  let x_xy_corner = HexPos::new(
+    y.min() + PackedIdx::xy_offset::<N>() - xy.min(),
+    y.min() - 1,
+  );
+  let xy_y_corner = HexPos::new(
+    x.min() - 1,
+    x.min() + xy.max() - PackedIdx::xy_offset::<N>(),
+  );
+
+  let build_output =
+    |basis: Basis, corner: HexPos, coord1: MinAndMax<u32>, coord2: MinAndMax<u32>| {
+      DetermineBasisOutput {
+        basis,
+        corner,
+        width: (coord1.delta() + 3) as u8,
+        // We will represent the board with a bitvector, where each bit corresponds
+        // to a tile and is set if there is a pawn there. We want a 1-tile padding
+        // around the perimeter so we can also represent the neighbor candidates
+        // with a bitvec.
+        use_u128: (coord1.delta() + 3) * (coord2.delta() + 3) > u64::BITS,
+      }
+    };
+
+  if dx > dy {
+    if dx > dxy {
+      build_output(Basis::XYvY, xy_y_corner, xy, y)
+    } else {
+      build_output(Basis::XvY, x_y_corner, x, y)
+    }
+  } else if dy > dxy {
+    println!("Corner for {x:?} {y:?} {xy:?}: {x_xy_corner}");
+    build_output(Basis::XvXY, x_xy_corner, x, xy)
+  } else {
+    build_output(Basis::XYvY, xy_y_corner, xy, y)
+  }
+}
 
 /// An indexing schema for mapping HexPos <-> bitvector index.
 struct BoardVecIndexer {
-  /// The lower left index of the minimal bounding box containing all placed
-  /// pawns, with a 1-tile perimeter of empty tiles.
-  lower_left: PackedIdx,
+  /// The basis that is used for indexing positions.
+  basis: Basis,
+  /// The corner of the minimal bounding box containing all placed pawns, with
+  /// a 1-tile perimeter of empty tiles.
+  corner: HexPos,
   /// The width of this minimal bounding box.
   width: u8,
 }
 
 impl BoardVecIndexer {
-  fn new(lower_left: PackedIdx, width: u8) -> Self {
-    Self { lower_left, width }
+  fn new(basis: Basis, corner: HexPos, width: u8) -> Self {
+    Self {
+      basis,
+      corner,
+      width,
+    }
+  }
+
+  const fn coords(&self, pos: PackedIdx) -> (u32, u32) {
+    let x = pos.x();
+    let y = pos.y();
+    let cx = self.corner.x();
+    let cy = self.corner.y();
+    match self.basis {
+      Basis::XvY => (x - cx, y - cy),
+      Basis::XvXY => (y - cy, y + cx - x - cy),
+      Basis::XYvY => (x + cy - y - cx, x - cx),
+    }
+  }
+
+  const fn offset_from_coords(&self, coords: (u32, u32)) -> PackedIdx {
+    let (x, y) = coords;
+    let cx = self.corner.x();
+    let cy = self.corner.y();
+    match self.basis {
+      Basis::XvY => PackedIdx::new(x + cx, y + cy),
+      Basis::XvXY => PackedIdx::new(x + cx - y, x + cy),
+      Basis::XYvY => PackedIdx::new(y + cx, x + cy - y),
+    }
   }
 
   /// Maps a `PackedIdx` from the Onoro state to an index in the board bitvec.
   fn index(&self, pos: PackedIdx) -> usize {
-    let d = unsafe { PackedIdx::from_idx_offset(pos - self.lower_left) };
-    d.y() as usize * self.width as usize + d.x() as usize
+    let (c1, c2) = self.coords(pos);
+    c2 as usize * self.width as usize + c1 as usize
   }
 
   /// Maps an index from the board bitvec to a `PackedIdx` in the Onoro state.
   fn pos_from_index(&self, index: u32) -> PackedIdx {
     debug_assert!((3..=16).contains(&self.width));
-    let x = index % self.width as u32;
-    let y = index / self.width as u32;
-    self.lower_left + IdxOffset::new(x as i32, y as i32)
+    let c1 = index % self.width as u32;
+    let c2 = index / self.width as u32;
+    self.offset_from_coords((c1, c2))
   }
 
   /// Builds both the board bitvec and neighbor candidates. The board bitvec
@@ -91,15 +199,14 @@ struct Impl<I> {
 impl<I: Unsigned + PrimInt> Impl<I> {
   /// Initializes the move generator, which builds the board vec and neighbor
   /// candidates masks.
-  fn new_impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize>(
-    lower_left: PackedIdx,
+  fn new_impl<const N: usize>(
+    basis: Basis,
+    corner: HexPos,
     width: u8,
-    onoro: &OnoroImpl<N, N2, ADJ_CNT_SIZE>,
+    pawn_poses: &[PackedIdx; N],
   ) -> Self {
-    debug_assert!(lower_left.x() > 0);
-    debug_assert!(lower_left.y() > 0);
-    let indexer = BoardVecIndexer::new(lower_left + IdxOffset::new(-1, -1), width);
-    let (board_vec, neighbor_candidates) = indexer.build_bitvecs(onoro.pawn_poses());
+    let indexer = BoardVecIndexer::new(basis, corner, width);
+    let (board_vec, neighbor_candidates) = indexer.build_bitvecs(pawn_poses);
     Self {
       board_vec,
       neighbor_candidates,
@@ -130,37 +237,33 @@ impl<I: Unsigned + PrimInt> Impl<I> {
 }
 
 impl Impl<u64> {
-  fn new<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize>(
-    lower_left: PackedIdx,
+  fn new<const N: usize>(
+    basis: Basis,
+    corner: HexPos,
     width: u8,
-    onoro: &OnoroImpl<N, N2, ADJ_CNT_SIZE>,
+    pawn_poses: &[PackedIdx; N],
   ) -> Self {
-    Self::new_impl(lower_left, width, onoro)
+    Self::new_impl(basis, corner, width, pawn_poses)
   }
 
-  fn next<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize>(
-    &mut self,
-    _onoro: &OnoroImpl<N, N2, ADJ_CNT_SIZE>,
-  ) -> Option<Move> {
+  fn next(&mut self) -> Option<Move> {
     self.next_impl()
   }
 }
 
 impl Impl<u128> {
   #[cold]
-  fn new<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize>(
-    lower_left: PackedIdx,
+  fn new<const N: usize>(
+    basis: Basis,
+    corner: HexPos,
     width: u8,
-    onoro: &OnoroImpl<N, N2, ADJ_CNT_SIZE>,
+    pawn_poses: &[PackedIdx; N],
   ) -> Self {
-    Self::new_impl(lower_left, width, onoro)
+    Self::new_impl(basis, corner, width, pawn_poses)
   }
 
   #[cold]
-  fn next<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize>(
-    &mut self,
-    _onoro: &OnoroImpl<N, N2, ADJ_CNT_SIZE>,
-  ) -> Option<Move> {
+  fn next(&mut self) -> Option<Move> {
     self.next_impl()
   }
 }
@@ -199,35 +302,32 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize>
   P1MoveGenerator<N, N2, ADJ_CNT_SIZE>
 {
   pub fn new(onoro: &OnoroImpl<N, N2, ADJ_CNT_SIZE>) -> Self {
-    debug_assert!(onoro.in_phase1());
-
     // Compute the bounding parallelogram of the pawns that have been placed,
     // which is min/max x/y in coordinate space.
-    let (lower_left, upper_right) = packed_positions_bounding_box(onoro.pawn_poses());
-    let delta = upper_right - lower_left;
-
-    // We will represent the board with a bitvector, where each bit corresponds
-    // to a tile and is set if there is a pawn there. We want a 1-tile padding
-    // around the perimeter so we can also represent the neighbor candidates
-    // with a bitvec.
-    let width = delta.x() as u32 + 3;
-    let height = delta.y() as u32 + 3;
+    let coord_limits = packed_positions_coord_limits(onoro.pawn_poses());
+    let DetermineBasisOutput {
+      basis,
+      corner,
+      width,
+      use_u128,
+    } = determine_basis::<N>(coord_limits);
 
     // Specialize for the case where the board bitvec fits in a u64, which is
     // by far the most common. Only in pathological cases will we need more
     // than 64 bits.
-    if likely(width * height <= u64::BITS) {
+    if likely(!use_u128) {
       P1MoveGenerator {
         impl_container: ImplContainer::Small(Impl::<u64>::new(
-          lower_left.into(),
-          width as u8,
-          onoro,
+          basis,
+          corner,
+          width,
+          onoro.pawn_poses(),
         )),
       }
     } else {
       P1MoveGenerator {
         impl_container: ImplContainer::Large(
-          Impl::<u128>::new(lower_left.into(), width as u8, onoro).into(),
+          Impl::<u128>::new(basis, corner, width, onoro.pawn_poses()).into(),
         ),
       }
     }
@@ -242,8 +342,8 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> GameMoveIterato
 
   fn next(&mut self, _onoro: &Self::Game) -> Option<Self::Item> {
     match &mut self.impl_container {
-      ImplContainer::Small(impl_) => impl_.next(_onoro),
-      ImplContainer::Large(impl_) => impl_.next(_onoro),
+      ImplContainer::Small(impl_) => impl_.next(),
+      ImplContainer::Large(impl_) => impl_.next(),
     }
   }
 }
@@ -257,7 +357,10 @@ mod tests {
 
   use crate::{
     FilterNullPackedIdx, Onoro16, PackedIdx,
-    p1_move_gen::{BoardVecIndexer, ImplContainer, P1MoveGenerator},
+    p1_move_gen::{
+      BoardVecIndexer, DetermineBasisOutput, ImplContainer, P1MoveGenerator, determine_basis,
+    },
+    util::packed_positions_coord_limits,
   };
 
   fn get_board_vec<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize>(
@@ -288,20 +391,8 @@ mod tests {
 
   fn neighbors_mask(pos: PackedIdx, indexer: &BoardVecIndexer) -> u128 {
     let mut neighbors = 0;
-    let rel_pos = HexPos::from(pos) - HexPos::from(indexer.lower_left);
     for offset in HexPos::neighbor_offsets() {
-      if (rel_pos.x() + offset.x()) < 0
-        || (rel_pos.y() + offset.y()) < 0
-        || rel_pos.x() + offset.x() >= indexer.width as i32
-        || pos.y() as i32 + offset.y() >= 0x10
-      {
-        continue;
-      }
-
       let neighbor = HexPos::from(pos) + offset;
-      debug_assert!(neighbor.x() >= indexer.lower_left.x());
-      debug_assert!(neighbor.y() >= indexer.lower_left.y());
-
       let neighbor_idx = indexer.index(PackedIdx::new(neighbor.x(), neighbor.y()));
       neighbors |= 1 << neighbor_idx;
     }
@@ -325,6 +416,44 @@ mod tests {
     neighbors & !board_vec
   }
 
+  #[test]
+  fn test_determine_basis() {
+    const N: u32 = 16;
+    for y1 in 1..(N - 1) {
+      for x1 in 1..(N - 1) {
+        let p1 = PackedIdx::new(x1, y1);
+        for y2 in 1..(N - 1) {
+          for x2 in 1..(N - 1) {
+            if x1 == x2 && y1 == y2 {
+              continue;
+            }
+            let p2 = PackedIdx::new(x2, y2);
+            println!("{p1} {p2}");
+
+            let mut coord_poses = [PackedIdx::null(); N as usize];
+            coord_poses[0] = p1;
+            coord_poses[1] = p2;
+            let coord_limits = packed_positions_coord_limits(&coord_poses);
+
+            let DetermineBasisOutput {
+              basis,
+              corner,
+              width,
+              use_u128,
+            } = determine_basis::<{ N as usize }>(coord_limits);
+            let indexer = BoardVecIndexer::new(basis, corner, width);
+
+            assert!(indexer.index(p1) > width as usize);
+            assert!(
+              indexer.index(p1)
+                < if use_u128 { u128::BITS } else { u64::BITS } as usize - width as usize
+            );
+          }
+        }
+      }
+    }
+  }
+
   #[template]
   fn test_build(
     #[values(
@@ -339,6 +468,16 @@ mod tests {
   #[apply(test_build)]
   #[rstest]
   fn test_build_board_vec(onoro: Onoro16) {
+    let move_gen = P1MoveGenerator::new(&onoro);
+    let indexer = &move_gen.indexer();
+    let board_vec = build_board_vec(onoro.pawn_poses(), indexer);
+
+    assert_eq!(get_board_vec(&move_gen), board_vec);
+  }
+
+  #[test]
+  fn test_build_board_vec2() {
+    let onoro = Onoro16::default_start();
     let move_gen = P1MoveGenerator::new(&onoro);
     let indexer = &move_gen.indexer();
     let board_vec = build_board_vec(onoro.pawn_poses(), indexer);
@@ -367,18 +506,83 @@ mod tests {
   #[test]
   fn test_worst_case() -> OnoroResult {
     let worst_case = Onoro16::from_board_string(
-      ". B . . . . . .
-        B W . . . . . .
-         . B . . . . . .
-          . W . . . . . .
-           . B . . . . . .
-            . W . . . . . .
-             . B W B W B W B
-              . . . . . . W .",
+      ". W . . . . . .
+        B B . . . . . .
+         . W . . . . . .
+          . B . . . . . .
+           . W . . . . . .
+            . B . . . . . .
+             . W . . . . . .
+              . B W B W B W B
+               . . . . . . W .",
     )?;
 
     let move_gen = P1MoveGenerator::new(&worst_case);
-    assert_eq!(move_gen.to_iter(&worst_case).count(), 23);
+    assert_eq!(move_gen.to_iter(&worst_case).count(), 25);
+
+    Ok(())
+  }
+
+  #[test]
+  fn test_line_x() -> OnoroResult {
+    let worst_case = Onoro16::from_board_string(
+      ". B . . . . . . . . . . . .
+        W B W B W B W B W B W B W B
+         . . . . . . . . . . . . W .",
+    )?;
+
+    let move_gen = P1MoveGenerator::new(&worst_case);
+    assert_eq!(move_gen.to_iter(&worst_case).count(), 26);
+
+    Ok(())
+  }
+
+  #[test]
+  fn test_line_y() -> OnoroResult {
+    let worst_case = Onoro16::from_board_string(
+      ". B .
+        W B .
+         . W .
+          . B .
+           . W .
+            . B .
+             . W .
+              . B .
+               . W .
+                . B .
+                 . W .
+                  . B .
+                   . W B
+                    . W .",
+    )?;
+
+    let move_gen = P1MoveGenerator::new(&worst_case);
+    assert_eq!(move_gen.to_iter(&worst_case).count(), 26);
+
+    Ok(())
+  }
+
+  #[test]
+  fn test_line_xy() -> OnoroResult {
+    let worst_case = Onoro16::from_board_string(
+      ". . . . . . . . . . . . W B
+        . . . . . . . . . . . . W .
+         . . . . . . . . . . . B . .
+          . . . . . . . . . . W . . .
+           . . . . . . . . . B . . . .
+            . . . . . . . . W . . . . .
+             . . . . . . . B . . . . . .
+              . . . . . . W . . . . . . .
+               . . . . . B . . . . . . . .
+                . . . . W . . . . . . . . .
+                 . . . B . . . . . . . . . .
+                  . . W . . . . . . . . . . .
+                   . B . . . . . . . . . . . .
+                    B W . . . . . . . . . . . .",
+    )?;
+
+    let move_gen = P1MoveGenerator::new(&worst_case);
+    assert_eq!(move_gen.to_iter(&worst_case).count(), 26);
 
     Ok(())
   }

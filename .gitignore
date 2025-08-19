@@ -3,4 +3,4 @@ target
 *.s
 *.svg
 *.swp
-output.txt
+*.txt

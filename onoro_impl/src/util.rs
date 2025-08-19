@@ -1,12 +1,7 @@
-use core::arch::x86_64::{_mm_set_epi8, _mm_shuffle_epi8};
-use std::arch::x86_64::{
-  __m128i, _mm_and_si128, _mm_bsrli_si128, _mm_cmpeq_epi8, _mm_cvtsi128_si32, _mm_cvtsi128_si64x,
-  _mm_loadu_si128, _mm_max_epu8, _mm_min_epu8, _mm_or_si128, _mm_set_epi64x, _mm_setzero_si128,
-  _mm_unpackhi_epi64, _mm_unpacklo_epi8,
-};
+use std::arch::x86_64::*;
 
 use itertools::Itertools;
-use onoro::hex_pos::HexPos;
+use num_traits::PrimInt;
 
 use crate::{FilterNullPackedIdx, PackedIdx};
 
@@ -65,6 +60,63 @@ define_cmp!(max_i8, min_i8, i8);
 define_cmp!(max_i16, min_i16, i16);
 define_cmp!(max_i32, min_i32, i32);
 define_cmp!(max_i64, min_i64, i64);
+
+pub trait IterOnes {
+  /// Given an integer, returns an iterator over the bit indices with ones.
+  fn iter_ones(self) -> impl Iterator<Item = u32>;
+}
+
+impl<I: PrimInt> IterOnes for I {
+  fn iter_ones(self) -> impl Iterator<Item = u32> {
+    std::iter::once(()).cycle().scan(self, |state, _| {
+      (*state != I::zero()).then(|| {
+        let bit_index = state.trailing_zeros();
+        *state = *state & (*state - I::one());
+        bit_index
+      })
+    })
+  }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct MinAndMax<I: PrimInt> {
+  min: I,
+  max: I,
+}
+
+impl<I: PrimInt> MinAndMax<I> {
+  pub fn new(min: I, max: I) -> Self {
+    Self { min, max }
+  }
+
+  pub fn min(&self) -> I {
+    self.min
+  }
+
+  pub fn max(&self) -> I {
+    self.max
+  }
+
+  pub fn delta(&self) -> I {
+    self.max - self.min
+  }
+
+  pub fn acc(self, value: I) -> Self {
+    Self {
+      min: self.min.min(value),
+      max: self.max.max(value),
+    }
+  }
+}
+
+impl<I: PrimInt> Default for MinAndMax<I> {
+  fn default() -> Self {
+    Self {
+      min: I::max_value(),
+      max: I::min_value(),
+    }
+  }
+}
 
 /// Given a `u8`, returns a `u64` with each byte of the `u64` equal to the
 /// passed `u8`.
@@ -216,94 +268,109 @@ where
   result as u8
 }
 
-/// Returns the minimum and maximum 1-byte values found in the 16 bytes of
-/// `vec`, ignoring any 0 bytes.
-#[target_feature(enable = "ssse3")]
-fn mm_min_max_ignore_zero_epu8(vec: __m128i) -> (u8, u8) {
-  let zeros = _mm_cmpeq_epi8(vec, _mm_setzero_si128());
-  let min_vec = _mm_or_si128(vec, zeros);
-  let max_vec = vec;
+#[derive(Default, PartialEq, Eq, Debug)]
+pub struct CoordLimits {
+  x: MinAndMax<u32>,
+  y: MinAndMax<u32>,
+  xy: MinAndMax<u32>,
+}
 
-  unsafe {
-    (
-      horizontal_compress(min_vec, |v1, v2| _mm_min_epu8(v1, v2)),
-      horizontal_compress(max_vec, |v1, v2| _mm_max_epu8(v1, v2)),
-    )
+impl CoordLimits {
+  pub fn new(x: MinAndMax<u32>, y: MinAndMax<u32>, xy: MinAndMax<u32>) -> Self {
+    Self { x, y, xy }
+  }
+
+  pub fn x(&self) -> MinAndMax<u32> {
+    self.x
+  }
+
+  pub fn y(&self) -> MinAndMax<u32> {
+    self.y
+  }
+
+  pub fn xy(&self) -> MinAndMax<u32> {
+    self.xy
   }
 }
 
 #[inline]
 #[target_feature(enable = "ssse3")]
-fn packed_positions_boinding_box_sse3(pawn_poses: &[PackedIdx]) -> (HexPos, HexPos) {
+fn packed_positions_coord_limits_sse3(pawn_poses: &[PackedIdx]) -> CoordLimits {
   debug_assert_eq!(pawn_poses.len(), 16);
+  const N: usize = 16;
+
+  let min_max_ignore_zero = |vec: __m128i, zeros: __m128i| -> MinAndMax<u32> {
+    let min_vec = _mm_or_si128(vec, zeros);
+    let max_vec = vec;
+
+    let min = unsafe { horizontal_compress(min_vec, |v1, v2| _mm_min_epu8(v1, v2)) };
+    let max = unsafe { horizontal_compress(max_vec, |v1, v2| _mm_max_epu8(v1, v2)) };
+
+    MinAndMax::new(min as u32, max as u32)
+  };
 
   /// Selects the x-coordinates of every PackedIdx position.
   const SELECT_X_MASK: i64 = 0x0f0f_0f0f_0f0f_0f0f;
 
-  let select_x = _mm_set_epi64x(SELECT_X_MASK, SELECT_X_MASK);
+  let select_x = _mm_set1_epi64x(SELECT_X_MASK);
 
   let pawns = unsafe { _mm_loadu_si128(pawn_poses.as_ptr() as *const _) };
 
+  // Mark the zero bytes of pawns.
+  let zeros = _mm_cmpeq_epi8(pawns, _mm_setzero_si128());
+
   let x_coords = _mm_and_si128(pawns, select_x);
-  // We don't need to mask off the x coordinates since the y coordinates are in
-  // the higher 4 bits, and y = 0 iff x = 0.
-  let y_coords = pawns;
+  let y_coords = _mm_and_si128(_mm_srli_epi64::<4>(pawns), select_x);
 
-  let (min_x, max_x) = mm_min_max_ignore_zero_epu8(x_coords);
-  let (min_y, max_y) = mm_min_max_ignore_zero_epu8(y_coords);
+  let diff_offset = _mm_set1_epi8(PackedIdx::xy_offset::<N>() as i8);
+  let diff_offset = _mm_andnot_si128(zeros, diff_offset);
+  let xy_coords = _mm_sub_epi8(_mm_add_epi8(y_coords, diff_offset), x_coords);
 
-  (
-    HexPos::new(min_x as u32, (min_y >> 4) as u32),
-    HexPos::new(max_x as u32, (max_y >> 4) as u32),
+  CoordLimits::new(
+    min_max_ignore_zero(x_coords, zeros),
+    min_max_ignore_zero(y_coords, zeros),
+    min_max_ignore_zero(xy_coords, zeros),
   )
 }
 
 #[inline]
-fn packed_positions_bounding_box_slow<const N: usize>(
-  pawn_poses: &[PackedIdx; N],
-) -> (HexPos, HexPos) {
+fn packed_positions_coord_limits_slow<const N: usize>(pawn_poses: &[PackedIdx; N]) -> CoordLimits {
   debug_assert!(!pawn_poses.is_empty(), "Pawn positions cannot be empty");
 
-  let (min_pos, max_pos) = pawn_poses.iter().filter_null().fold(
-    ((u32::MAX, u32::MAX), (0, 0)),
-    |(min_pos, max_pos), &pos| {
-      (
-        (min_pos.0.min(pos.x()), min_pos.1.min(pos.y())),
-        (max_pos.0.max(pos.x()), max_pos.1.max(pos.y())),
-      )
-    },
-  );
-
-  (
-    HexPos::new(min_pos.0, min_pos.1),
-    HexPos::new(max_pos.0, max_pos.1),
-  )
+  pawn_poses
+    .iter()
+    .filter_null()
+    .fold(CoordLimits::default(), |CoordLimits { x, y, xy }, &pos| {
+      CoordLimits {
+        x: x.acc(pos.x()),
+        y: y.acc(pos.y()),
+        xy: xy.acc(pos.xy::<N>()),
+      }
+    })
 }
 
 /// Returns the lower-left and upper-right corner of the bounding
 /// parallellogram of all the pawns in `pawn_poses`, ignoring null indices.
 #[inline(always)]
-pub fn packed_positions_bounding_box<const N: usize>(
-  pawn_poses: &[PackedIdx; N],
-) -> (HexPos, HexPos) {
+pub fn packed_positions_coord_limits<const N: usize>(pawn_poses: &[PackedIdx; N]) -> CoordLimits {
   #[cfg(target_feature = "ssse3")]
   if N == 16 {
-    return unsafe { packed_positions_boinding_box_sse3(pawn_poses) };
+    return unsafe { packed_positions_coord_limits_sse3(pawn_poses) };
   }
-  packed_positions_bounding_box_slow(pawn_poses)
+  packed_positions_coord_limits_slow(pawn_poses)
 }
 
 #[cfg(test)]
 mod tests {
-  use onoro::hex_pos::HexPos;
   use rstest::rstest;
   use rstest_reuse::{apply, template};
 
   use crate::{
     PackedIdx,
     util::{
-      broadcast_u8_to_u64, equal_mask_epi8, equal_mask_epi8_slow, packed_positions_bounding_box,
-      packed_positions_bounding_box_slow, packed_positions_to_mask, packed_positions_to_mask_slow,
+      CoordLimits, MinAndMax, broadcast_u8_to_u64, equal_mask_epi8, equal_mask_epi8_slow,
+      packed_positions_coord_limits, packed_positions_coord_limits_slow, packed_positions_to_mask,
+      packed_positions_to_mask_slow,
     },
   };
 
@@ -391,21 +458,35 @@ mod tests {
   #[template]
   #[rstest]
   fn packed_positions_bounding_box<const N: usize>(
-    #[values(packed_positions_bounding_box, packed_positions_bounding_box_slow)]
-    packed_positions: impl FnOnce(&[PackedIdx; N]) -> (HexPos, HexPos),
+    #[values(packed_positions_coord_limits, packed_positions_coord_limits_slow)]
+    packed_positions: impl FnOnce(&[PackedIdx; N]) -> CoordLimits,
     #[values(
-      (&[PackedIdx::new(1, 1)], (HexPos::new(1, 1), HexPos::new(1, 1))),
-      (&POSES_BB_EXAMPLE.0, (HexPos::new(1, 1), HexPos::new(3, 5))),
+      (
+        &[PackedIdx::new(1, 1)],
+        CoordLimits::new(
+          MinAndMax::new(1, 1),
+          MinAndMax::new(1, 1),
+          MinAndMax::new(0xf, 0xf),
+        ),
+      ),
+      (
+        &POSES_BB_EXAMPLE.0,
+        CoordLimits::new(
+          MinAndMax::new(1, 3),
+          MinAndMax::new(1, 5),
+          MinAndMax::new(11, 16),
+        ),
+      ),
     )]
-    args: (&[PackedIdx; N], (HexPos, HexPos)),
+    args: (&[PackedIdx; N], CoordLimits),
   ) {
   }
 
   #[apply(packed_positions_bounding_box)]
   #[test]
   fn test_packed_positions_bounding_box<const N: usize>(
-    packed_positions: impl FnOnce(&[PackedIdx; N]) -> (HexPos, HexPos),
-    args: (&[PackedIdx; N], (HexPos, HexPos)),
+    packed_positions: impl FnOnce(&[PackedIdx; N]) -> CoordLimits,
+    args: (&[PackedIdx; N], CoordLimits),
   ) {
     let (input, expected) = args;
     assert_eq!(packed_positions(input), expected);

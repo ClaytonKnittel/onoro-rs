@@ -15,6 +15,10 @@ pub struct PackedIdx {
 }
 
 impl PackedIdx {
+  pub const fn xy_offset<const N: usize>() -> u32 {
+    N as u32
+  }
+
   pub const fn new(x: u32, y: u32) -> Self {
     debug_assert!(x < 0x10);
     debug_assert!(y < 0x10);
@@ -37,6 +41,24 @@ impl PackedIdx {
 
   pub const fn y(&self) -> u32 {
     ((self.bytes.0 as u32) >> 4) & 0x0fu32
+  }
+
+  /// Returns the coordinate along the xy-axis, the angular bisector between
+  /// the x- and y-axes. This is normalized such that any PackedIdx will return
+  /// a positive value.
+  ///
+  ///```
+  /// (0,3)   (1,3)   (2,3)   (3,3)
+  ///   3       2       1       0
+  ///     (0,2)   (1,2)   (2,2)   (3,2)
+  ///       2       1       0      -1
+  ///         (0,1)   (1,1)   (2,1)   (3,1)
+  ///           1       0      -1      -2
+  ///             (0,0)   (1,0)   (2,0)   (3,0)
+  ///               0      -1      -2      -3
+  ///```
+  pub const fn xy<const N: usize>(&self) -> u32 {
+    self.y() + Self::xy_offset::<N>() - self.x()
   }
 
   /// Returns the underlying representation of the `PackedIdx` as a `u8`.
