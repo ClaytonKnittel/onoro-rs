@@ -1,4 +1,5 @@
 pub mod benchmark_util;
+mod board_vec_indexer;
 mod canonicalize;
 mod const_rand;
 mod hash;
