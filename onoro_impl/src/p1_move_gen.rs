@@ -39,10 +39,7 @@ impl<I: Unsigned + PrimInt> Impl<I> {
     }
   }
 
-  /// Finds the tile index for the next move we can make, or `None` if all
-  /// moves have been found. Returns the tile index for the next move, and an
-  /// iterator over the tile indices of that move's neighbors.
-  fn next_with_neighbors_impl(&mut self) -> Option<(usize, impl Iterator<Item = u32> + use<I>)> {
+  fn next_internal(&mut self) -> Option<(usize, I)> {
     let mut neighbor_candidates = self.neighbor_candidates;
     while neighbor_candidates != I::zero() {
       let index = neighbor_candidates.trailing_zeros() as usize;
@@ -52,7 +49,7 @@ impl<I: Unsigned + PrimInt> Impl<I> {
       let neighbors_mask = neighbors_mask & self.board_vec;
       if neighbors_mask.count_ones() >= 2 {
         self.neighbor_candidates = neighbor_candidates;
-        return Some((index, neighbors_mask.iter_ones()));
+        return Some((index, neighbors_mask));
       }
     }
 
@@ -62,9 +59,18 @@ impl<I: Unsigned + PrimInt> Impl<I> {
   }
 
   /// Finds the tile index for the next move we can make, or `None` if all
+  /// moves have been found. Returns the tile index for the next move, and an
+  /// iterator over the tile indices of that move's neighbors.
+  fn next_with_neighbors_impl(&mut self) -> Option<(usize, impl Iterator<Item = u32> + use<I>)> {
+    self
+      .next_internal()
+      .map(|(index, neighbors_mask)| (index, neighbors_mask.iter_ones()))
+  }
+
+  /// Finds the tile index for the next move we can make, or `None` if all
   /// moves have been found.
   fn next_impl(&mut self) -> Option<usize> {
-    self.next_with_neighbors_impl().map(|(index, _)| index)
+    self.next_internal().map(|(index, _)| index)
   }
 
   /// Returns an iterator over the indices of the neighbors of the pawn at the
