@@ -294,7 +294,6 @@ fn packed_positions_coord_limits_sse3(pawn_poses: &[PackedIdx]) -> CoordLimits {
 
   /// Selects the x-coordinates of every PackedIdx position.
   const SELECT_X_MASK: i64 = 0x0f0f_0f0f_0f0f_0f0f;
-
   let select_x = _mm_set1_epi64x(SELECT_X_MASK);
 
   let pawns = unsafe { _mm_loadu_si128(pawn_poses.as_ptr() as *const _) };
@@ -305,8 +304,12 @@ fn packed_positions_coord_limits_sse3(pawn_poses: &[PackedIdx]) -> CoordLimits {
   let x_coords = _mm_and_si128(pawns, select_x);
   let y_coords = _mm_and_si128(_mm_srli_epi64::<4>(pawns), select_x);
 
+  // Derive (y - x) from x_ and y_coords. To prevent underflow, we add
+  // xy_offset from PackedIdx (which will match PackedIdx::xy()).
   let diff_offset = _mm_set1_epi8(PackedIdx::xy_offset::<N>() as i8);
+  // Mask off the offset for the zero bytes.
   let diff_offset = _mm_andnot_si128(zeros, diff_offset);
+  // Calculate `y + xy_offset - x`.
   let xy_coords = _mm_sub_epi8(_mm_add_epi8(y_coords, diff_offset), x_coords);
 
   CoordLimits::new(
@@ -332,8 +335,8 @@ fn packed_positions_coord_limits_slow<const N: usize>(pawn_poses: &[PackedIdx; N
     })
 }
 
-/// Returns the lower-left and upper-right corner of the bounding
-/// parallellogram of all the pawns in `pawn_poses`, ignoring null indices.
+/// Returns the ranges of x-, y-, and (y - x)-coordinates of all the pawns in
+/// `pawn_poses`, ignoring null indices.
 #[inline(always)]
 pub fn packed_positions_coord_limits<const N: usize>(pawn_poses: &[PackedIdx; N]) -> CoordLimits {
   #[cfg(target_feature = "ssse3")]
