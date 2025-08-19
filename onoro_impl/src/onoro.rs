@@ -499,27 +499,33 @@ impl<const N: usize> OnoroImpl<N> {
     Self::check_win_fast(&self.pawn_poses, last_move, self.onoro_state().black_turn())
   }
 
+  /// Returns a mask with a single bit set in the index corresponding to the
+  /// pawn at tile `idx`.
   #[target_feature(enable = "ssse3")]
-  unsafe fn get_tile_fast(pawn_poses: &[PackedIdx; N], idx: PackedIdx) -> TileState {
+  unsafe fn pawn_search_mask(pawn_poses: &[PackedIdx; N], idx: PackedIdx) -> u32 {
     use std::arch::x86_64::*;
-
-    debug_assert_eq!(N, 16);
-    if unlikely(idx == PackedIdx::null()) {
-      return TileState::Empty;
-    }
 
     let pawns = unsafe { _mm_loadu_si128(pawn_poses.as_ptr() as *const _) };
 
     // Construct a mask to search for `idx` in the positions lists.
-    let i = unsafe { idx.bytes() } as i8;
-    let idx_search = _mm_set_epi8(i, i, i, i, i, i, i, i, i, i, i, i, i, i, i, i);
+    let idx_search = _mm_set1_epi8(unsafe { idx.bytes() } as i8);
 
     // Search for `idx` in the positions list. This will either return 0, or
     // a mask with a single byte set to 0xff.
     let masked_pawns = _mm_cmpeq_epi8(pawns, idx_search);
 
-    // Compress the mask to the first 16 bits of an i32.
-    let mask = _mm_movemask_epi8(masked_pawns);
+    // Compress the mask to the first 16 bits of a u32.
+    _mm_movemask_epi8(masked_pawns) as u32
+  }
+
+  #[target_feature(enable = "ssse3")]
+  unsafe fn get_tile_fast(pawn_poses: &[PackedIdx; N], idx: PackedIdx) -> TileState {
+    debug_assert_eq!(N, 16);
+    if unlikely(idx == PackedIdx::null()) {
+      return TileState::Empty;
+    }
+
+    let mask = unsafe { Self::pawn_search_mask(pawn_poses, idx) };
 
     // If an even-indexed bit it set, the tile is black. Otherwise, if any
     // other bit is set, the tile is white, else the tile is empty.
@@ -530,6 +536,14 @@ impl<const N: usize> OnoroImpl<N> {
     } else {
       TileState::Empty
     }
+  }
+
+  #[target_feature(enable = "ssse3")]
+  unsafe fn get_pawn_idx_fast(pawn_poses: &[PackedIdx; N], idx: PackedIdx) -> u32 {
+    debug_assert_eq!(N, 16);
+    let mask = unsafe { Self::pawn_search_mask(pawn_poses, idx) };
+    debug_assert_ne!(mask, 0);
+    mask.trailing_zeros()
   }
 
   /// Given a position on the board, returns the index of the pawn with that
@@ -577,6 +591,16 @@ impl<const N: usize> OnoroImpl<N> {
       }
       None => TileState::Empty,
     }
+  }
+
+  pub fn get_pawn_idx(&self, idx: PackedIdx) -> u32 {
+    debug_assert_ne!(idx, PackedIdx::null());
+
+    #[cfg(target_feature = "ssse3")]
+    if N == 16 {
+      return unsafe { Self::get_pawn_idx_fast(&self.pawn_poses, idx) };
+    }
+    self.get_pawn_idx_slow(idx).unwrap()
   }
 
   /// Bounds checks a hex pos before turning it into a PackedIdx for lookup.
@@ -972,6 +996,48 @@ mod tests {
       for x in 0..Onoro16::board_width() {
         let idx = PackedIdx::new(x as u32, y as u32);
         assert_eq!(onoro.get_tile(idx), get_tile_test(&onoro, idx));
+      }
+    }
+  }
+
+  /// Given a position on the board, returns the index of the pawn on that
+  /// tile, or `None` if no piece is there.
+  fn get_pawn_idx_test<const N: usize>(onoro: &OnoroImpl<N>, idx: PackedIdx) -> Option<u32> {
+    if idx == PackedIdx::null() {
+      return None;
+    }
+
+    onoro
+      .pawn_poses
+      .iter()
+      .enumerate()
+      .find_map(|(i, &pos)| (pos == idx).then_some(i as u32))
+  }
+
+  #[test]
+  fn test_get_pawn_idx_simple() {
+    let onoro = Onoro8::default_start();
+
+    for y in 0..Onoro8::board_width() {
+      for x in 0..Onoro8::board_width() {
+        let idx = PackedIdx::new(x as u32, y as u32);
+        if let Some(pawn_idx) = get_pawn_idx_test(&onoro, idx) {
+          assert_eq!(onoro.get_pawn_idx(idx), pawn_idx);
+        }
+      }
+    }
+  }
+
+  #[test]
+  fn test_get_pawn_idx_simple_16() {
+    let onoro = Onoro16::default_start();
+
+    for y in 0..Onoro16::board_width() {
+      for x in 0..Onoro16::board_width() {
+        let idx = PackedIdx::new(x as u32, y as u32);
+        if let Some(pawn_idx) = get_pawn_idx_test(&onoro, idx) {
+          assert_eq!(onoro.get_pawn_idx(idx), pawn_idx);
+        }
       }
     }
   }
