@@ -52,7 +52,7 @@ impl Default for PawnConnectedMobility {
 struct PawnMeta {
   /// The discovery index of this pawn when doing the depth-first exploration
   /// of the pawn graph.
-  discovery_time: u32,
+  discovery_time: u16,
 
   /// A mask of the neighbors of this pawn in the pawn metadata/pawn_poses
   /// lists. Each bit corresponds to an index in these lists in the same order.
@@ -150,7 +150,7 @@ impl<const N: usize> P2MoveGenerator<N> {
     p1_move_gen: &P1MoveGenerator<N>,
   ) {
     let meta = &mut pawn_meta[pawn_index];
-    meta.discovery_time = *time;
+    meta.discovery_time = *time as u16;
     ecas[pawn_index] = *time;
     *time += 1;
 
@@ -160,7 +160,7 @@ impl<const N: usize> P2MoveGenerator<N> {
         continue;
       }
 
-      let neighbor_t = pawn_meta[neighbor_index].discovery_time;
+      let neighbor_t = pawn_meta[neighbor_index].discovery_time as u32;
       if neighbor_t != 0 {
         ecas[pawn_index] = ecas[pawn_index].min(neighbor_t);
         continue;
@@ -181,7 +181,7 @@ impl<const N: usize> P2MoveGenerator<N> {
       ecas[pawn_index] = ecas[pawn_index].min(neighbor_eca);
 
       let meta = &mut pawn_meta[pawn_index];
-      if neighbor_eca >= meta.discovery_time {
+      if neighbor_eca >= meta.discovery_time as u32 {
         meta.connected_mobility = match meta.connected_mobility {
           PawnConnectedMobility::Free => PawnConnectedMobility::CuttingPoint {
             enter_time,
@@ -201,7 +201,7 @@ impl<const N: usize> P2MoveGenerator<N> {
     let mut pawn_meta = [PawnMeta::default(); N];
     let mut ecas = [0u32; N];
     let mut time = 1;
-    pawn_meta[0].discovery_time = time;
+    pawn_meta[0].discovery_time = time as u16;
     ecas[0] = time;
     time += 1;
 
@@ -254,7 +254,7 @@ impl<const N: usize> P2MoveGenerator<N> {
         let mut contains_supertree = false;
         for neighbor_index in dst_neighbors.iter_ones() {
           let neighbor_meta = self.pawn_meta[neighbor_index as usize];
-          if (enter_time..exit_time).contains(&neighbor_meta.discovery_time) {
+          if (enter_time..exit_time).contains(&(neighbor_meta.discovery_time as u32)) {
             contains_subtree = true;
           } else {
             contains_supertree = true;
