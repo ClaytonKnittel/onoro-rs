@@ -67,10 +67,11 @@ impl<I: Unsigned + PrimInt> Impl<I> {
       .map(|(index, neighbors_mask)| (index, neighbors_mask.iter_ones()))
   }
 
-  /// Finds the tile index for the next move we can make, or `None` if all
-  /// moves have been found.
-  fn next_impl(&mut self) -> Option<usize> {
-    self.next_internal().map(|(index, _)| index)
+  /// Finds the next move we can make, or `None` if all moves have been found.
+  fn next_impl(&mut self) -> Option<Move> {
+    self.next_internal().map(|(index, _)| Move::Phase1Move {
+      to: self.indexer.pos_from_index(index as u32),
+    })
   }
 
   /// Returns an iterator over the indices of the neighbors of the pawn at the
@@ -95,7 +96,7 @@ impl Impl<u64> {
     self.next_with_neighbors_impl()
   }
 
-  fn next(&mut self) -> Option<usize> {
+  fn next(&mut self) -> Option<Move> {
     self.next_impl()
   }
 }
@@ -117,7 +118,7 @@ impl Impl<u128> {
   }
 
   #[cold]
-  fn next(&mut self) -> Option<usize> {
+  fn next(&mut self) -> Option<Move> {
     self.next_impl()
   }
 }
@@ -190,14 +191,10 @@ impl<const N: usize> P1MoveGenerator<N> {
     }
   }
 
-  pub fn next_move_pos(&mut self) -> Option<PackedIdx> {
+  pub fn next_move(&mut self) -> Option<Move> {
     match &mut self.impl_container {
-      ImplContainer::Small(impl_) => impl_
-        .next()
-        .map(|index| impl_.indexer.pos_from_index(index as u32)),
-      ImplContainer::Large(impl_) => impl_
-        .next()
-        .map(|index| impl_.indexer.pos_from_index(index as u32)),
+      ImplContainer::Small(impl_) => impl_.next(),
+      ImplContainer::Large(impl_) => impl_.next(),
     }
   }
 
@@ -228,7 +225,7 @@ impl<const N: usize> GameMoveIterator for P1MoveGenerator<N> {
   type Game = OnoroImpl<N>;
 
   fn next(&mut self, _onoro: &Self::Game) -> Option<Self::Item> {
-    self.next_move_pos().map(|to| Move::Phase1Move { to })
+    self.next_move()
   }
 }
 
