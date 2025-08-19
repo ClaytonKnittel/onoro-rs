@@ -15,6 +15,7 @@ pub struct PackedIdx {
 }
 
 impl PackedIdx {
+  /// An offset to apply to (y - x) so it is never negative.
   pub const fn xy_offset<const N: usize>() -> u32 {
     N as u32
   }
