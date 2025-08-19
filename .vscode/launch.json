@@ -40,6 +40,25 @@
       },
       "args": [],
       "cwd": "${workspaceFolder}"
+    },
+    {
+      "name": "Debug Bad Guy",
+      "type": "lldb",
+      "request": "launch",
+      "program": "${workspaceFolder}/target/debug/deps/exploration_test-e98b18a2a97f2db7",
+      "args": ["--test-threads=1", "test_random_exploration::_factories_1__Onoro16Factory_AiOnoroFactory_::board_string_02_BOARD_POSITIONS_1_::seed_01_0x97153c8af3d7e275"],
+      "cwd": "${workspaceFolder}",
+      "cargo": {
+        "args": [
+          "test",
+          "--no-run",
+          "--test=exploration_test"
+        ],
+        "filter": {
+          "name": "exploration_test",
+          "kind": "test"
+        }
+      },
     }
   ]
 }

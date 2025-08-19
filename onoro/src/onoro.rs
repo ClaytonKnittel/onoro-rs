@@ -5,7 +5,7 @@ use itertools::interleave;
 use crate::{
   error::{OnoroError, OnoroResult},
   hex_pos::HexPosOffset,
-  onoro_util::{BoardLayoutPawns, pawns_from_board_string},
+  onoro_util::{pawns_from_board_string, BoardLayoutPawns},
 };
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -259,12 +259,10 @@ pub trait Onoro: Sized {
     for i in 0..(n_pawns - 1) / 2 {
       pawns.swap(2 * i + 1, n_pawns.div_ceil(2) + i);
     }
-    debug_assert!(
-      pawns
-        .iter()
-        .enumerate()
-        .all(|(idx, (_, color))| { (idx % 2 == 0) == matches!(color, PawnColor::Black) })
-    );
+    debug_assert!(pawns
+      .iter()
+      .enumerate()
+      .all(|(idx, (_, color))| { (idx % 2 == 0) == matches!(color, PawnColor::Black) }));
 
     Ok(Self::from_indexes(pawns.into_iter().map(|(pos, _)| {
       Self::Index::from_coords((pos.x() - min_x + 1) as u32, (pos.y() - min_y + 1) as u32)
@@ -297,11 +295,6 @@ pub trait Onoro: Sized {
   }
 
   fn display(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    match self.turn() {
-      PawnColor::Black => writeln!(f, "black:")?,
-      PawnColor::White => writeln!(f, "white:")?,
-    }
-
     let ((min_x, min_y), (max_x, max_y)) = self.pawns().fold(
       ((Self::board_width(), Self::board_width()), (0, 0)),
       |((min_x, min_y), (max_x, max_y)), pawn| {
@@ -322,6 +315,16 @@ pub trait Onoro: Sized {
     let min_y = min_y.saturating_sub(1);
     let max_x = (max_x + 1).min(Self::board_width() - 1);
     let max_y = (max_y + 1).min(Self::board_width() - 1);
+
+    writeln!(
+      f,
+      "{}: {:?} is bottom left",
+      match self.turn() {
+        PawnColor::Black => "black",
+        PawnColor::White => "white",
+      },
+      (min_x, min_y)
+    )?;
 
     for y in (min_y..=max_y).rev() {
       write!(f, "{: <width$}", "", width = max_y - y)?;
