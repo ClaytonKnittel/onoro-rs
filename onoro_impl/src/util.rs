@@ -279,8 +279,8 @@ impl CoordLimits {
 #[inline]
 #[target_feature(enable = "ssse3")]
 fn packed_positions_coord_limits_sse3(pawn_poses: &[PackedIdx]) -> CoordLimits {
-  debug_assert_eq!(pawn_poses.len(), 16);
   const N: usize = 16;
+  debug_assert_eq!(pawn_poses.len(), N);
 
   let min_max_ignore_zero = |vec: __m128i, zeros: __m128i| -> MinAndMax<u32> {
     let min_vec = _mm_or_si128(vec, zeros);

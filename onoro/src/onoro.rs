@@ -69,6 +69,9 @@ pub trait OnoroIndex: Clone + Copy + Eq + Debug {
     .into_iter()
   }
 
+  /// The distance between two hex tiles on the infinite hexagonal plane,
+  /// measured by the minimum number of tiles you would need to cross to get
+  /// from one to the other.
   fn axial_distance(&self, other: Self) -> u32 {
     let dx = self.x() - other.x();
     let dy = self.y() - other.y();

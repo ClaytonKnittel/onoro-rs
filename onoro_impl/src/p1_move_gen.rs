@@ -7,23 +7,30 @@ use crate::{
   util::{CoordLimits, MinAndMax, likely, packed_positions_coord_limits},
 };
 
+/// The choice of basis to use for the minimum bounding parallelogram of the
+/// pawns on the board. In the diagrams below, x is the first coordinate axis,
+/// and y is the second. A `-` sign in front of the axis label means the arrow
+/// is pointing in the negative direction.
 #[derive(Clone, Copy)]
 enum Basis {
   ///```text
+  /// +y
   /// Γ
   ///  \
   ///   \
-  ///    +--->
+  ///    +---> +x
   ///```
   XvY,
   ///```text
+  ///    +x
   ///    7
   ///   /
   ///  /
-  /// +--->
+  /// +---> -y
   ///```
   XvXY,
   ///```text
+  /// -x    +y
   /// Γ     7
   ///  \   /
   ///   \ /
