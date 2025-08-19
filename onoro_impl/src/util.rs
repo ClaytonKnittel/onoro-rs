@@ -68,13 +68,12 @@ pub trait IterOnes {
 
 impl<I: PrimInt> IterOnes for I {
   fn iter_ones(self) -> impl Iterator<Item = u32> {
-    std::iter::once(()).cycle().scan(self, |state, _| {
-      (*state != I::zero()).then(|| {
-        let bit_index = state.trailing_zeros();
-        *state = *state & (*state - I::one());
-        bit_index
-      })
+    let if_ne_zero = |value: I| (value != I::zero()).then_some(value);
+    std::iter::successors(if_ne_zero(self), move |&value| {
+      let value = value & (value - I::one());
+      if_ne_zero(value)
     })
+    .map(|value| value.trailing_zeros())
   }
 }
 
