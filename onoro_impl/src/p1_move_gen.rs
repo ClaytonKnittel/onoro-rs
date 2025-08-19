@@ -48,16 +48,6 @@ fn determine_basis<const N: usize>(coord_limits: CoordLimits) -> DetermineBasisO
   let dy = y.delta();
   let dxy = xy.delta();
 
-  let x_y_corner = HexPos::new(x.min() - 1, y.min() - 1);
-  let x_xy_corner = HexPos::new(
-    y.min() + PackedIdx::xy_offset::<N>() - xy.min(),
-    y.min() - 1,
-  );
-  let xy_y_corner = HexPos::new(
-    x.min() - 1,
-    x.min() + xy.max() - PackedIdx::xy_offset::<N>(),
-  );
-
   let build_output =
     |basis: Basis, corner: HexPos, coord1: MinAndMax<u32>, coord2: MinAndMax<u32>| {
       DetermineBasisOutput {
@@ -72,17 +62,23 @@ fn determine_basis<const N: usize>(coord_limits: CoordLimits) -> DetermineBasisO
       }
     };
 
-  if dx > dy {
-    if dx > dxy {
-      build_output(Basis::XYvY, xy_y_corner, xy, y)
-    } else {
-      build_output(Basis::XvY, x_y_corner, x, y)
-    }
-  } else if dy > dxy {
-    println!("Corner for {x:?} {y:?} {xy:?}: {x_xy_corner}");
-    build_output(Basis::XvXY, x_xy_corner, x, xy)
+  let max = dx.max(dy).max(dxy);
+  if dxy == max {
+    let x_y_corner = HexPos::new(x.min() - 1, y.min() - 1);
+    build_output(Basis::XvY, x_y_corner, x, y)
+  } else if dy == max {
+    let xy_y_corner = HexPos::new(
+      x.min() - 1,
+      x.min() + xy.max() - PackedIdx::xy_offset::<N>(),
+    );
+    build_output(Basis::XYvY, xy_y_corner, xy, x)
   } else {
-    build_output(Basis::XYvY, xy_y_corner, xy, y)
+    debug_assert_eq!(dx, max);
+    let x_xy_corner = HexPos::new(
+      y.min() + PackedIdx::xy_offset::<N>() - xy.min(),
+      y.min() - 1,
+    );
+    build_output(Basis::XvXY, x_xy_corner, y, xy)
   }
 }
 
@@ -132,6 +128,7 @@ impl BoardVecIndexer {
   /// Maps a `PackedIdx` from the Onoro state to an index in the board bitvec.
   fn index(&self, pos: PackedIdx) -> usize {
     let (c1, c2) = self.coords(pos);
+    debug_assert!(c1 < self.width as u32);
     c2 as usize * self.width as usize + c1 as usize
   }
 
@@ -351,7 +348,7 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> GameMoveIterato
 #[cfg(test)]
 mod tests {
   use abstract_game::GameMoveIterator;
-  use onoro::{Onoro, error::OnoroResult, hex_pos::HexPos, test_util::BOARD_POSITIONS};
+  use onoro::{Onoro, OnoroIndex, error::OnoroResult, hex_pos::HexPos, test_util::BOARD_POSITIONS};
   use rstest::rstest;
   use rstest_reuse::{apply, template};
 
@@ -428,7 +425,10 @@ mod tests {
               continue;
             }
             let p2 = PackedIdx::new(x2, y2);
-            println!("{p1} {p2}");
+            if p1.axial_distance(p2) > N - 3 {
+              // These two points are farther apart than any two pawns could be.
+              continue;
+            }
 
             let mut coord_poses = [PackedIdx::null(); N as usize];
             coord_poses[0] = p1;

@@ -5,7 +5,7 @@ use itertools::interleave;
 use crate::{
   error::{OnoroError, OnoroResult},
   hex_pos::HexPosOffset,
-  onoro_util::{BoardLayoutPawns, pawns_from_board_string},
+  onoro_util::{pawns_from_board_string, BoardLayoutPawns},
 };
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -67,6 +67,12 @@ pub trait OnoroIndex: Clone + Copy + Eq + Debug {
       Self::from_coords((self.x() + 1) as u32, (self.y() + 1) as u32),
     ]
     .into_iter()
+  }
+
+  fn axial_distance(&self, other: Self) -> u32 {
+    let dx = self.x() - other.x();
+    let dy = self.y() - other.y();
+    (dx.abs() + dy.abs() + (dx - dy).abs()) as u32 / 2
   }
 }
 
@@ -259,12 +265,10 @@ pub trait Onoro: Sized {
     for i in 0..(n_pawns - 1) / 2 {
       pawns.swap(2 * i + 1, n_pawns.div_ceil(2) + i);
     }
-    debug_assert!(
-      pawns
-        .iter()
-        .enumerate()
-        .all(|(idx, (_, color))| { (idx % 2 == 0) == matches!(color, PawnColor::Black) })
-    );
+    debug_assert!(pawns
+      .iter()
+      .enumerate()
+      .all(|(idx, (_, color))| { (idx % 2 == 0) == matches!(color, PawnColor::Black) }));
 
     Ok(Self::from_indexes(pawns.into_iter().map(|(pos, _)| {
       Self::Index::from_coords((pos.x() - min_x + 1) as u32, (pos.y() - min_y + 1) as u32)
