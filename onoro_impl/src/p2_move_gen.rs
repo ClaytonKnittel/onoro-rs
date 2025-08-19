@@ -124,10 +124,11 @@ impl<const N: usize> P2MoveGenerator<N> {
 
   fn next_move_with_neighbors(&mut self, pawn_poses: &[PackedIdx; N]) -> Option<(PackedIdx, u16)> {
     let (pos, neighbors) = self.p1_move_gen.next_move_pos_with_neighbors()?;
+    let indexer = self.p1_move_gen.indexer();
     Some((
       pos,
       neighbors.fold(0, |neighbor_mask, neighbor_index| {
-        let neighbor_pos = self.p1_move_gen.indexer().pos_from_index(neighbor_index);
+        let neighbor_pos = indexer.pos_from_index(neighbor_index);
         let neighbor_index = pawn_poses
           .iter()
           .enumerate()

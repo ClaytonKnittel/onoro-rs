@@ -190,33 +190,36 @@ impl<const N: usize> P1MoveGenerator<N> {
     }
   }
 
-  pub fn next_move_index(&mut self) -> Option<usize> {
-    match &mut self.impl_container {
-      ImplContainer::Small(impl_) => impl_.next(),
-      ImplContainer::Large(impl_) => impl_.next(),
-    }
-  }
-
   pub fn next_move_pos(&mut self) -> Option<PackedIdx> {
-    self
-      .next_move_index()
-      .map(|index| self.indexer().pos_from_index(index as u32))
+    match &mut self.impl_container {
+      ImplContainer::Small(impl_) => impl_
+        .next()
+        .map(|index| impl_.indexer.pos_from_index(index as u32)),
+      ImplContainer::Large(impl_) => impl_
+        .next()
+        .map(|index| impl_.indexer.pos_from_index(index as u32)),
+    }
   }
 
   pub fn next_move_pos_with_neighbors(
     &mut self,
   ) -> Option<(PackedIdx, impl Iterator<Item = u32> + use<N>)> {
-    let (index, iter) = match &mut self.impl_container {
+    match &mut self.impl_container {
       ImplContainer::Small(impl_) => {
         let (index, iter) = impl_.next_with_neighbors()?;
-        (index, Either::Left(iter))
+        Some((
+          impl_.indexer.pos_from_index(index as u32),
+          Either::Left(iter),
+        ))
       }
       ImplContainer::Large(impl_) => {
         let (index, iter) = impl_.next_with_neighbors()?;
-        (index, Either::Right(iter))
+        Some((
+          impl_.indexer.pos_from_index(index as u32),
+          Either::Right(iter),
+        ))
       }
-    };
-    Some((self.indexer().pos_from_index(index as u32), iter))
+    }
   }
 }
 
