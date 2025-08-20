@@ -119,12 +119,7 @@ impl<const N: usize> P2MoveGenerator<N> {
       pos,
       neighbors.fold(0, |neighbor_mask, neighbor_index| {
         let neighbor_pos = indexer.pos_from_index(neighbor_index);
-        let neighbor_index = pawn_poses
-          .iter()
-          .enumerate()
-          .find(|&(_, &pos)| pos == neighbor_pos)
-          .unwrap()
-          .0;
+        let neighbor_index = OnoroImpl::pawn_idx_from_pawn_poses(pawn_poses, neighbor_pos);
         neighbor_mask | (1 << neighbor_index)
       }),
     ))
