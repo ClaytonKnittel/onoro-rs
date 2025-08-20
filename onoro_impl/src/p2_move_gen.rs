@@ -253,18 +253,17 @@ impl<const N: usize> P2MoveGenerator<N> {
         enter_time,
         exit_time,
       } => {
-        let mut contains_subtree = false;
-        let mut contains_supertree = false;
+        let mut v = 0;
         for neighbor_index in dst_neighbors.iter_ones() {
           let neighbor_meta = self.pawn_meta[neighbor_index as usize];
           if (enter_time..exit_time).contains(&(neighbor_meta.discovery_time as u32)) {
-            contains_subtree = true;
+            v |= 1;
           } else {
-            contains_supertree = true;
+            v |= 2;
           }
         }
 
-        if !contains_subtree || !contains_supertree {
+        if v != 3 {
           return false;
         }
       }
