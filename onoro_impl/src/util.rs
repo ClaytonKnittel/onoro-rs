@@ -62,18 +62,25 @@ define_cmp!(max_i32, min_i32, i32);
 define_cmp!(max_i64, min_i64, i64);
 
 pub trait IterOnes {
+  /// Given an integer, returns an iterator over one-hot bitmasks for each set
+  /// bit.
+  fn iter_bits(self) -> impl Iterator<Item = Self>;
+
   /// Given an integer, returns an iterator over the bit indices with ones.
   fn iter_ones(self) -> impl Iterator<Item = u32>;
 }
 
 impl<I: PrimInt> IterOnes for I {
-  fn iter_ones(self) -> impl Iterator<Item = u32> {
+  fn iter_bits(self) -> impl Iterator<Item = Self> {
     let if_ne_zero = |value: I| (value != I::zero()).then_some(value);
     std::iter::successors(if_ne_zero(self), move |&value| {
       let value = value & (value - I::one());
       if_ne_zero(value)
     })
-    .map(|value| value.trailing_zeros())
+  }
+
+  fn iter_ones(self) -> impl Iterator<Item = u32> {
+    self.iter_bits().map(|mask| mask.trailing_zeros())
   }
 }
 

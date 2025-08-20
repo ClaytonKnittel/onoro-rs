@@ -194,6 +194,12 @@ fn find_moves_p2(c: &mut Criterion) {
 
   let mut rng = StdRng::seed_from_u64(392421);
 
+  // let guard = pprof::ProfilerGuardBuilder::default()
+  //   .frequency(1000)
+  //   .blocklist(&["libc", "libgcc", "pthread", "vdso"])
+  //   .build()
+  //   .unwrap();
+
   benchmark_each_move(
     &mut group,
     "find moves phase 2 after 13 moves",
@@ -220,6 +226,11 @@ fn find_moves_p2(c: &mut Criterion) {
     &mut rng,
   )
   .unwrap();
+
+  // if let Ok(report) = guard.report().build() {
+  //   let file = std::fs::File::create("onoro.svg").unwrap();
+  //   report.flamegraph(file).unwrap();
+  // };
 
   group.finish();
 }

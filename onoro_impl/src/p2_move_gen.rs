@@ -55,8 +55,9 @@ struct PawnMeta {
   discovery_time: u16,
 
   /// A mask of the neighbors of this pawn in the pawn metadata/pawn_poses
-  /// lists. Each bit corresponds to an index in these lists in the same order.
-  neighbor_index_mask: u16,
+  /// lists. The list only contains pawns which have two neighbors. Each bit
+  /// corresponds to an index in these lists in the same order.
+  two_neighbors_index_mask: u16,
 
   // Below only relevant to current player's pawns:
   /// The time we have returned from exploring the subtree of this pawn.
@@ -66,12 +67,6 @@ struct PawnMeta {
   /// which disconnects the board into 3 groups and reconnects them in another
   /// location with 16 or fewer total pawns.
   connected_mobility: PawnConnectedMobility,
-}
-
-impl PawnMeta {
-  fn has_two_neighbors(&self) -> bool {
-    self.neighbor_index_mask.count_ones() == 2
-  }
 }
 
 pub struct P2MoveGenerator<const N: usize> {
@@ -150,7 +145,7 @@ impl<const N: usize> P2MoveGenerator<N> {
     *time += 1;
 
     for neighbor_index in Self::neighbors(pawn_index, pawn_poses, p1_move_gen) {
-      pawn_meta[pawn_index].neighbor_index_mask |= 1 << neighbor_index;
+      pawn_meta[pawn_index].two_neighbors_index_mask |= 1 << neighbor_index;
       if neighbor_index == parent_index {
         continue;
       }
@@ -202,7 +197,7 @@ impl<const N: usize> P2MoveGenerator<N> {
 
     let mut connect_mobility = None;
     for neighbor_index in Self::neighbors(0, pawn_poses, p1_move_gen) {
-      pawn_meta[0].neighbor_index_mask |= 1 << neighbor_index;
+      pawn_meta[0].two_neighbors_index_mask |= 1 << neighbor_index;
       if pawn_meta[neighbor_index].discovery_time != 0 {
         continue;
       }
@@ -230,6 +225,19 @@ impl<const N: usize> P2MoveGenerator<N> {
     }
 
     pawn_meta[0].connected_mobility = connect_mobility.unwrap_or_default();
+
+    // Construct a mask of all of the tiles with two neighbors.
+    let two_neighbor_mask = pawn_meta
+      .iter()
+      .enumerate()
+      .filter_map(|(i, meta)| (meta.two_neighbors_index_mask.count_ones() == 2).then_some(i))
+      .fold(0, |mask, i| mask | (1 << i));
+
+    // Clear all pawns from the neighbor index masks which have more than two
+    // neighbors.
+    for meta in &mut pawn_meta {
+      meta.two_neighbors_index_mask &= two_neighbor_mask;
+    }
 
     pawn_meta
   }
@@ -270,10 +278,9 @@ impl<const N: usize> P2MoveGenerator<N> {
     }
 
     // Check that all dangling neighbors are satisfied.
-    for neighbor_index in meta.neighbor_index_mask.iter_ones() {
+    for neighbor_index in meta.two_neighbors_index_mask.iter_ones() {
       let neighbor_pos = onoro.pawn_poses()[neighbor_index as usize];
-      let neighbor_meta = self.pawn_meta[neighbor_index as usize];
-      if neighbor_meta.has_two_neighbors() && !neighbor_pos.adjacent(self.cur_tile) {
+      if !neighbor_pos.adjacent(self.cur_tile) {
         return false;
       }
     }
@@ -622,7 +629,7 @@ mod tests {
     );
   }
 
-  const NEIGHBOR_INDEX_MASK_INPUTS: (
+  const TWO_NEIGHBORS_INDEX_MASK_INPUTS: (
     [PackedIdx; 3],
     [PackedIdx; 5],
     [PackedIdx; 7],
@@ -665,31 +672,34 @@ mod tests {
 
   #[template]
   #[rstest]
-  fn test_neighbor_index_mask_inputs<const N: usize>(
+  fn test_two_neighbors_index_mask_inputs<const N: usize>(
     #[values(
-      &NEIGHBOR_INDEX_MASK_INPUTS.0,
-      &NEIGHBOR_INDEX_MASK_INPUTS.1,
-      &NEIGHBOR_INDEX_MASK_INPUTS.2,
-      &NEIGHBOR_INDEX_MASK_INPUTS.3,
+      &TWO_NEIGHBORS_INDEX_MASK_INPUTS.0,
+      &TWO_NEIGHBORS_INDEX_MASK_INPUTS.1,
+      &TWO_NEIGHBORS_INDEX_MASK_INPUTS.2,
+      &TWO_NEIGHBORS_INDEX_MASK_INPUTS.3,
     )]
     pawn_poses: &[PackedIdx; N],
   ) {
   }
 
-  #[apply(test_neighbor_index_mask_inputs)]
+  #[apply(test_two_neighbors_index_mask_inputs)]
   #[gtest]
-  fn test_neighbor_index_mask<const N: usize>(pawn_poses: &[PackedIdx; N]) {
+  fn test_two_neighbors_index_mask<const N: usize>(pawn_poses: &[PackedIdx; N]) {
     let p2_move_gen = P2MoveGenerator::from_pawn_poses(pawn_poses, true);
     for (index, pos) in pawn_poses.iter().enumerate() {
       let expected_neighbors: HashSet<_> = pos
         .neighbors()
-        .filter(|neighbor| pawn_poses.iter().any(|pos| pos == neighbor))
+        .filter(|neighbor| {
+          pawn_poses.iter().any(|pos| pos == neighbor)
+            && pawn_poses.iter().filter(|p| p.adjacent(*neighbor)).count() == 3
+        })
         .map(HexPos::from)
         .collect();
 
       let meta = p2_move_gen.pawn_meta[index];
       let neighbor_pos_from_mask: HashSet<HexPos> = meta
-        .neighbor_index_mask
+        .two_neighbors_index_mask
         .iter_ones()
         .map(|index| pawn_poses[index as usize].into())
         .collect();
