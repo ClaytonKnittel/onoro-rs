@@ -242,13 +242,10 @@ impl<const N: usize> P2MoveGenerator<N> {
     pawn_meta
   }
 
-  fn is_valid_move(&self, onoro: &OnoroImpl<N>) -> bool {
-    let dst_neighbors = self.neighbor_mask & !(1 << self.pawn_index);
-
-    let meta = self.pawn_meta[self.pawn_index];
-    // Check that board connectedness is satisfied.
+  /// Returns true if the current move does not disconnect the board.
+  fn move_is_connected(&self, meta: &PawnMeta, dst_neighbors: u16) -> bool {
     match meta.connected_mobility {
-      PawnConnectedMobility::Free => {}
+      PawnConnectedMobility::Free => true,
       PawnConnectedMobility::CuttingPoint {
         enter_time,
         exit_time,
@@ -263,11 +260,30 @@ impl<const N: usize> P2MoveGenerator<N> {
           }
         }
 
-        if v != 3 {
-          return false;
-        }
+        v == 3
       }
-      PawnConnectedMobility::Immobile => return false,
+      PawnConnectedMobility::Immobile => false,
+    }
+  }
+
+  /// Returns true if the move does not leave any pawns dangling (i.e. with
+  /// only 1 neighbor).
+  fn resolved_dangling_neighbors(&self, pawn_poses: &[PackedIdx; N], meta: &PawnMeta) -> bool {
+    meta
+      .dangling_neighbors_index_mask
+      .iter_ones()
+      .all(|neighbor_index| {
+        let neighbor_pos = pawn_poses[neighbor_index as usize];
+        neighbor_pos.adjacent(self.cur_tile)
+      })
+  }
+
+  fn is_valid_move(&self, onoro: &OnoroImpl<N>) -> bool {
+    let dst_neighbors = self.neighbor_mask & !(1 << self.pawn_index);
+
+    let meta = &self.pawn_meta[self.pawn_index];
+    if !self.move_is_connected(meta, dst_neighbors) {
+      return false;
     }
 
     // Check that this pawn has enough neighbors to move here after excluding
@@ -276,12 +292,8 @@ impl<const N: usize> P2MoveGenerator<N> {
       return false;
     }
 
-    // Check that all dangling neighbors are satisfied.
-    for neighbor_index in meta.dangling_neighbors_index_mask.iter_ones() {
-      let neighbor_pos = onoro.pawn_poses()[neighbor_index as usize];
-      if !neighbor_pos.adjacent(self.cur_tile) {
-        return false;
-      }
+    if !self.resolved_dangling_neighbors(onoro.pawn_poses(), meta) {
+      return false;
     }
 
     true
