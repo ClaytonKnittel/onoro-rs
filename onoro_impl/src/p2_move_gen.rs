@@ -1,5 +1,5 @@
 use abstract_game::GameMoveIterator;
-use onoro::{Onoro, OnoroIndex, PawnColor};
+use onoro::{Onoro, PawnColor};
 
 use crate::{
   Move, OnoroImpl, PackedIdx,
@@ -268,17 +268,12 @@ impl<const N: usize> P2MoveGenerator<N> {
 
   /// Returns true if the move does not leave any pawns dangling (i.e. with
   /// only 1 neighbor).
-  fn resolved_dangling_neighbors(&self, pawn_poses: &[PackedIdx; N], meta: &PawnMeta) -> bool {
-    meta
-      .dangling_neighbors_index_mask
-      .iter_ones()
-      .all(|neighbor_index| {
-        let neighbor_pos = pawn_poses[neighbor_index as usize];
-        neighbor_pos.adjacent(self.cur_tile)
-      })
+  fn resolved_dangling_neighbors(&self, meta: &PawnMeta, dst_neighbors: u16) -> bool {
+    let dangling_neighbors = meta.dangling_neighbors_index_mask;
+    dangling_neighbors == (dangling_neighbors & dst_neighbors)
   }
 
-  fn is_valid_move(&self, onoro: &OnoroImpl<N>) -> bool {
+  fn is_valid_move(&self) -> bool {
     let dst_neighbors = self.neighbor_mask & !(1 << self.pawn_index);
 
     let meta = &self.pawn_meta[self.pawn_index];
@@ -292,7 +287,7 @@ impl<const N: usize> P2MoveGenerator<N> {
       return false;
     }
 
-    if !self.resolved_dangling_neighbors(onoro.pawn_poses(), meta) {
+    if !self.resolved_dangling_neighbors(meta, dst_neighbors) {
       return false;
     }
 
@@ -315,7 +310,7 @@ impl<const N: usize> GameMoveIterator for P2MoveGenerator<N> {
         self.pawn_index += 2;
       }
 
-      if self.is_valid_move(onoro) {
+      if self.is_valid_move() {
         break;
       }
     }
