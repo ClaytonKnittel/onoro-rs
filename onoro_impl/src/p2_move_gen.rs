@@ -536,9 +536,7 @@ mod tests {
     }
   }
 
-  fn find_articulation_points_simple<const N: usize>(
-    pawn_poses: &[PackedIdx; N],
-  ) -> Vec<PackedIdx> {
+  fn find_articulation_points_test<const N: usize>(pawn_poses: &[PackedIdx; N]) -> Vec<PackedIdx> {
     let mut poses: HashMap<_, _> = pawn_poses
       .iter()
       .map(|&pos| (HexPos::from(pos), Meta::new()))
@@ -601,7 +599,7 @@ mod tests {
   #[template]
   #[rstest]
   fn test_find_articulation_points<const N: usize>(
-    #[values(find_articulation_points, find_articulation_points_simple)]
+    #[values(find_articulation_points, find_articulation_points_test)]
     find_articulation_points: impl FnOnce(&[PackedIdx; N]) -> Vec<PackedIdx>,
   ) {
   }
