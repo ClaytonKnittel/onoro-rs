@@ -1,10 +1,12 @@
 use abstract_game::GameMoveIterator;
+use itertools::Either;
 use num_traits::{PrimInt, Unsigned};
 use onoro::hex_pos::HexPos;
 
 use crate::{
   Move, OnoroImpl, PackedIdx,
   board_vec_indexer::{Basis, BoardVecIndexer, DetermineBasisOutput, determine_basis},
+  num_iter::IterOnes,
   util::{likely, packed_positions_coord_limits},
 };
 
@@ -38,25 +40,51 @@ impl<I: Unsigned + PrimInt> Impl<I> {
     }
   }
 
-  /// Finds the next move we can make, or `None` if all moves have been found.
-  fn next_impl(&mut self) -> Option<Move> {
+  fn next_internal(&mut self) -> Option<(usize, I)> {
     let mut neighbor_candidates = self.neighbor_candidates;
     while neighbor_candidates != I::zero() {
       let index = neighbor_candidates.trailing_zeros() as usize;
       neighbor_candidates = neighbor_candidates & (neighbor_candidates - I::one());
 
       let neighbors_mask: I = self.indexer.neighbors_mask(index);
-      if (neighbors_mask & self.board_vec).count_ones() >= 2 {
+      let neighbors_mask = neighbors_mask & self.board_vec;
+      if neighbors_mask.count_ones() >= 2 {
         self.neighbor_candidates = neighbor_candidates;
-        return Some(Move::Phase1Move {
-          to: self.indexer.pos_from_index(index as u32),
-        });
+        return Some((index, neighbors_mask));
       }
     }
 
     // No need to store neighbor_candidates again, since we typically don't
     // call next() again after None is returned.
     None
+  }
+
+  /// Finds the position of the next move we can make, or `None` if all moves
+  /// have been found. Returns the `PackedIdx` for the next move, and an
+  /// iterator over the tile indices of that move's neighbors.
+  fn next_pos_with_neighbors_impl(
+    &mut self,
+  ) -> Option<(PackedIdx, impl Iterator<Item = u32> + use<I>)> {
+    self.next_internal().map(|(index, neighbors_mask)| {
+      (
+        self.indexer.pos_from_index(index as u32),
+        neighbors_mask.iter_ones(),
+      )
+    })
+  }
+
+  /// Finds the next move we can make, or `None` if all moves have been found.
+  fn next_move_impl(&mut self) -> Option<Move> {
+    self.next_internal().map(|(index, _)| Move::Phase1Move {
+      to: self.indexer.pos_from_index(index as u32),
+    })
+  }
+
+  /// Returns an iterator over the indices of the neighbors of the pawn at the
+  /// given index.
+  fn neighbors(&self, index: usize) -> impl Iterator<Item = u32> {
+    let neighbors_mask: I = self.indexer.neighbors_mask(index);
+    (neighbors_mask & self.board_vec).iter_ones()
   }
 }
 
@@ -70,8 +98,12 @@ impl Impl<u64> {
     Self::new_impl(basis, corner, width, pawn_poses)
   }
 
-  fn next(&mut self) -> Option<Move> {
-    self.next_impl()
+  fn next_pos_with_neighbors(&mut self) -> Option<(PackedIdx, impl Iterator<Item = u32> + use<>)> {
+    self.next_pos_with_neighbors_impl()
+  }
+
+  fn next_move(&mut self) -> Option<Move> {
+    self.next_move_impl()
   }
 }
 
@@ -87,8 +119,13 @@ impl Impl<u128> {
   }
 
   #[cold]
-  fn next(&mut self) -> Option<Move> {
-    self.next_impl()
+  fn next_pos_with_neighbors(&mut self) -> Option<(PackedIdx, impl Iterator<Item = u32> + use<>)> {
+    self.next_pos_with_neighbors_impl()
+  }
+
+  #[cold]
+  fn next_move(&mut self) -> Option<Move> {
+    self.next_move_impl()
   }
 }
 
@@ -106,15 +143,12 @@ enum ImplContainer {
 /// The phase 1 move generator, where not all pawns have been placed and a move
 /// consists of adding a new pawn to the board adjacent to at least 2 other
 /// pawns.
-pub struct P1MoveGenerator<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> {
+pub struct P1MoveGenerator<const N: usize> {
   impl_container: ImplContainer,
 }
 
-impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize>
-  P1MoveGenerator<N, N2, ADJ_CNT_SIZE>
-{
-  #[cfg(test)]
-  fn indexer(&self) -> &BoardVecIndexer {
+impl<const N: usize> P1MoveGenerator<N> {
+  pub fn indexer(&self) -> &BoardVecIndexer {
     match &self.impl_container {
       ImplContainer::Small(impl_) => &impl_.indexer,
       ImplContainer::Large(impl_) => &impl_.indexer,
@@ -122,13 +156,15 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize>
   }
 }
 
-impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize>
-  P1MoveGenerator<N, N2, ADJ_CNT_SIZE>
-{
-  pub fn new(onoro: &OnoroImpl<N, N2, ADJ_CNT_SIZE>) -> Self {
+impl<const N: usize> P1MoveGenerator<N> {
+  pub fn new(onoro: &OnoroImpl<N>) -> Self {
+    Self::from_pawn_poses(onoro.pawn_poses())
+  }
+
+  pub fn from_pawn_poses(pawn_poses: &[PackedIdx; N]) -> Self {
     // Compute the bounding parallelogram of the pawns that have been placed,
     // which is min/max x/y in coordinate space.
-    let coord_limits = packed_positions_coord_limits(onoro.pawn_poses());
+    let coord_limits = packed_positions_coord_limits(pawn_poses);
     let DetermineBasisOutput {
       basis,
       corner,
@@ -141,34 +177,55 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize>
     // than 64 bits.
     if likely(!use_u128) {
       P1MoveGenerator {
-        impl_container: ImplContainer::Small(Impl::<u64>::new(
-          basis,
-          corner,
-          width,
-          onoro.pawn_poses(),
-        )),
+        impl_container: ImplContainer::Small(Impl::<u64>::new(basis, corner, width, pawn_poses)),
       }
     } else {
       P1MoveGenerator {
         impl_container: ImplContainer::Large(
-          Impl::<u128>::new(basis, corner, width, onoro.pawn_poses()).into(),
+          Impl::<u128>::new(basis, corner, width, pawn_poses).into(),
         ),
+      }
+    }
+  }
+
+  /// Returns a tuple of (neighbor index iterator, neighbor count), where the
+  /// iterator is guaranteed to yield "neighbor count" elements.
+  pub fn neighbors(&self, index: usize) -> impl Iterator<Item = u32> {
+    match &self.impl_container {
+      ImplContainer::Small(impl_) => Either::Left(impl_.neighbors(index)),
+      ImplContainer::Large(impl_) => Either::Right(impl_.neighbors(index)),
+    }
+  }
+
+  pub fn next_move(&mut self) -> Option<Move> {
+    match &mut self.impl_container {
+      ImplContainer::Small(impl_) => impl_.next_move(),
+      ImplContainer::Large(impl_) => impl_.next_move(),
+    }
+  }
+
+  pub fn next_move_pos_with_neighbors(
+    &mut self,
+  ) -> Option<(PackedIdx, impl Iterator<Item = u32> + use<N>)> {
+    match &mut self.impl_container {
+      ImplContainer::Small(impl_) => {
+        let (pos, iter) = impl_.next_pos_with_neighbors()?;
+        Some((pos, Either::Left(iter)))
+      }
+      ImplContainer::Large(impl_) => {
+        let (pos, iter) = impl_.next_pos_with_neighbors()?;
+        Some((pos, Either::Right(iter)))
       }
     }
   }
 }
 
-impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> GameMoveIterator
-  for P1MoveGenerator<N, N2, ADJ_CNT_SIZE>
-{
+impl<const N: usize> GameMoveIterator for P1MoveGenerator<N> {
   type Item = Move;
-  type Game = OnoroImpl<N, N2, ADJ_CNT_SIZE>;
+  type Game = OnoroImpl<N>;
 
   fn next(&mut self, _onoro: &Self::Game) -> Option<Self::Item> {
-    match &mut self.impl_container {
-      ImplContainer::Small(impl_) => impl_.next(),
-      ImplContainer::Large(impl_) => impl_.next(),
-    }
+    self.next_move()
   }
 }
 
@@ -184,18 +241,14 @@ mod tests {
     p1_move_gen::{BoardVecIndexer, ImplContainer, P1MoveGenerator},
   };
 
-  fn get_board_vec<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize>(
-    move_gen: &P1MoveGenerator<N, N2, ADJ_CNT_SIZE>,
-  ) -> u128 {
+  fn get_board_vec<const N: usize>(move_gen: &P1MoveGenerator<N>) -> u128 {
     match &move_gen.impl_container {
       ImplContainer::Small(impl_) => impl_.board_vec as u128,
       ImplContainer::Large(impl_) => impl_.board_vec,
     }
   }
 
-  fn get_neighbor_candidates<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize>(
-    move_gen: &P1MoveGenerator<N, N2, ADJ_CNT_SIZE>,
-  ) -> u128 {
+  fn get_neighbor_candidates<const N: usize>(move_gen: &P1MoveGenerator<N>) -> u128 {
     match &move_gen.impl_container {
       ImplContainer::Small(impl_) => impl_.neighbor_candidates as u128,
       ImplContainer::Large(impl_) => impl_.neighbor_candidates,

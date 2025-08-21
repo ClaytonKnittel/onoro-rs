@@ -31,7 +31,7 @@ use crate::{
 
 /// Always generate hash tables for the full game. Only a part of the tables
 /// will be used for smaller games.
-type ViewHashTable<G> = HashTable<16, 256, G>;
+type ViewHashTable<G> = HashTable<16, G>;
 
 #[derive(Clone, Debug)]
 struct CanonicalView {
@@ -72,21 +72,21 @@ impl CanonicalView {
 /// equality comparison between different Onoro game states which may be in
 /// different orientations.
 #[derive(Debug)]
-pub struct OnoroView<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> {
-  onoro: OnoroImpl<N, N2, ADJ_CNT_SIZE>,
+pub struct OnoroView<const N: usize> {
+  onoro: OnoroImpl<N>,
   view: UnsafeCell<CanonicalView>,
 }
 
-impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroView<N, N2, ADJ_CNT_SIZE> {
+impl<const N: usize> OnoroView<N> {
   /// TODO: Make new lazy
-  pub fn new(onoro: OnoroImpl<N, N2, ADJ_CNT_SIZE>) -> Self {
+  pub fn new(onoro: OnoroImpl<N>) -> Self {
     Self {
       onoro,
       view: CanonicalView::new().into(),
     }
   }
 
-  pub fn onoro(&self) -> &OnoroImpl<N, N2, ADJ_CNT_SIZE> {
+  pub fn onoro(&self) -> &OnoroImpl<N> {
     &self.onoro
   }
 
@@ -121,7 +121,7 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroView<N, N2
   }
 
   fn find_canonical_orientation_d6(
-    onoro: &OnoroImpl<N, N2, ADJ_CNT_SIZE>,
+    onoro: &OnoroImpl<N>,
     symm_state: &BoardSymmetryState,
   ) -> (u64, u8) {
     static D6T: ViewHashTable<D6> = HashTable::new_c();
@@ -136,7 +136,7 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroView<N, N2
   }
 
   fn find_canonical_orientation_d3(
-    onoro: &OnoroImpl<N, N2, ADJ_CNT_SIZE>,
+    onoro: &OnoroImpl<N>,
     symm_state: &BoardSymmetryState,
   ) -> (u64, u8) {
     static D3T: ViewHashTable<D3> = HashTable::new_v();
@@ -151,7 +151,7 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroView<N, N2
   }
 
   fn find_canonical_orientation_k4(
-    onoro: &OnoroImpl<N, N2, ADJ_CNT_SIZE>,
+    onoro: &OnoroImpl<N>,
     symm_state: &BoardSymmetryState,
   ) -> (u64, u8) {
     static K4T: ViewHashTable<K4> = HashTable::new_e();
@@ -166,7 +166,7 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroView<N, N2
   }
 
   fn find_canonical_orientation_c2_cv(
-    onoro: &OnoroImpl<N, N2, ADJ_CNT_SIZE>,
+    onoro: &OnoroImpl<N>,
     symm_state: &BoardSymmetryState,
   ) -> (u64, u8) {
     static C2CVT: ViewHashTable<C2> = HashTable::new_cv();
@@ -181,7 +181,7 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroView<N, N2
   }
 
   fn find_canonical_orientation_c2_ce(
-    onoro: &OnoroImpl<N, N2, ADJ_CNT_SIZE>,
+    onoro: &OnoroImpl<N>,
     symm_state: &BoardSymmetryState,
   ) -> (u64, u8) {
     static C2CET: ViewHashTable<C2> = HashTable::new_ce();
@@ -196,7 +196,7 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroView<N, N2
   }
 
   fn find_canonical_orientation_c2_ev(
-    onoro: &OnoroImpl<N, N2, ADJ_CNT_SIZE>,
+    onoro: &OnoroImpl<N>,
     symm_state: &BoardSymmetryState,
   ) -> (u64, u8) {
     static C2EVT: ViewHashTable<C2> = HashTable::new_ev();
@@ -211,7 +211,7 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroView<N, N2
   }
 
   fn find_canonical_orientation_trivial(
-    onoro: &OnoroImpl<N, N2, ADJ_CNT_SIZE>,
+    onoro: &OnoroImpl<N>,
     symm_state: &BoardSymmetryState,
   ) -> (u64, u8) {
     static TT: ViewHashTable<Trivial> = HashTable::new_trivial();
@@ -260,8 +260,8 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroView<N, N2
   }
 
   fn cmp_views<G: Group + Ordinal + Display, F>(
-    view1: &OnoroView<N, N2, ADJ_CNT_SIZE>,
-    view2: &OnoroView<N, N2, ADJ_CNT_SIZE>,
+    view1: &OnoroView<N>,
+    view2: &OnoroView<N>,
     mut apply_view_transform: F,
   ) -> bool
   where
@@ -313,9 +313,7 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> OnoroView<N, N2
   }
 }
 
-impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> PartialEq
-  for OnoroView<N, N2, ADJ_CNT_SIZE>
-{
+impl<const N: usize> PartialEq for OnoroView<N> {
   fn eq(&self, other: &Self) -> bool {
     self.maybe_initialize_canonical_view();
     other.maybe_initialize_canonical_view();
@@ -338,14 +336,9 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> PartialEq
   }
 }
 
-impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Eq
-  for OnoroView<N, N2, ADJ_CNT_SIZE>
-{
-}
+impl<const N: usize> Eq for OnoroView<N> {}
 
-impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Hash
-  for OnoroView<N, N2, ADJ_CNT_SIZE>
-{
+impl<const N: usize> Hash for OnoroView<N> {
   fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
     self.maybe_initialize_canonical_view();
     state.write_u64(self.canon_view().get_hash());
@@ -359,18 +352,10 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Hash
 /// Technically, since the CanonicalView is deterministically computed, it
 /// doesn't matter if there is a race to write it to the UnsafeCell, since all
 /// threads would be writing the same data to the same locations.
-unsafe impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Send
-  for OnoroView<N, N2, ADJ_CNT_SIZE>
-{
-}
-unsafe impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Sync
-  for OnoroView<N, N2, ADJ_CNT_SIZE>
-{
-}
+unsafe impl<const N: usize> Send for OnoroView<N> {}
+unsafe impl<const N: usize> Sync for OnoroView<N> {}
 
-impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Display
-  for OnoroView<N, N2, ADJ_CNT_SIZE>
-{
+impl<const N: usize> Display for OnoroView<N> {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     self.maybe_initialize_canonical_view();
 
@@ -418,26 +403,22 @@ impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Display
   }
 }
 
-pub struct ViewMoveGenerator<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> {
-  move_gen: MoveGenerator<N, N2, ADJ_CNT_SIZE>,
+pub struct ViewMoveGenerator<const N: usize> {
+  move_gen: MoveGenerator<N>,
 }
 
-impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> GameMoveIterator
-  for ViewMoveGenerator<N, N2, ADJ_CNT_SIZE>
-{
+impl<const N: usize> GameMoveIterator for ViewMoveGenerator<N> {
   type Item = Move;
-  type Game = OnoroView<N, N2, ADJ_CNT_SIZE>;
+  type Game = OnoroView<N>;
 
   fn next(&mut self, view: &Self::Game) -> Option<Self::Item> {
     self.move_gen.next(view.onoro())
   }
 }
 
-impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Game
-  for OnoroView<N, N2, ADJ_CNT_SIZE>
-{
+impl<const N: usize> Game for OnoroView<N> {
   type Move = Move;
-  type MoveGenerator = ViewMoveGenerator<N, N2, ADJ_CNT_SIZE>;
+  type MoveGenerator = ViewMoveGenerator<N>;
   type PlayerIdentifier = PawnColor;
 
   fn move_generator(&self) -> Self::MoveGenerator {
@@ -600,9 +581,7 @@ impl Compress for Onoro16View {
   }
 }
 
-impl<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize> Clone
-  for OnoroView<N, N2, ADJ_CNT_SIZE>
-{
+impl<const N: usize> Clone for OnoroView<N> {
   fn clone(&self) -> Self {
     Self {
       onoro: self.onoro.clone(),
@@ -631,10 +610,7 @@ mod tests {
     view
   }
 
-  fn verify_pawn_iter<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize>(
-    view1: &OnoroView<N, N2, ADJ_CNT_SIZE>,
-    view2: &OnoroView<N, N2, ADJ_CNT_SIZE>,
-  ) {
+  fn verify_pawn_iter<const N: usize>(view1: &OnoroView<N>, view2: &OnoroView<N>) {
     let (mut b1, mut w1): (Vec<_>, Vec<_>) =
       view1.pawns().partition_map(|(pos, color)| match color {
         PawnColor::Black => Either::Left(pos),
@@ -657,18 +633,12 @@ mod tests {
     assert_that!(w1, container_eq(w2));
   }
 
-  fn expect_view_eq<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize>(
-    view1: &OnoroView<N, N2, ADJ_CNT_SIZE>,
-    view2: &OnoroView<N, N2, ADJ_CNT_SIZE>,
-  ) {
+  fn expect_view_eq<const N: usize>(view1: &OnoroView<N>, view2: &OnoroView<N>) {
     assert_eq!(view1, view2);
     verify_pawn_iter(view1, view2);
   }
 
-  fn expect_view_ne<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize>(
-    view1: &OnoroView<N, N2, ADJ_CNT_SIZE>,
-    view2: &OnoroView<N, N2, ADJ_CNT_SIZE>,
-  ) {
+  fn expect_view_ne<const N: usize>(view1: &OnoroView<N>, view2: &OnoroView<N>) {
     assert_ne!(view1, view2);
   }
 

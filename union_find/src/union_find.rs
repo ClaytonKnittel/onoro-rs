@@ -4,24 +4,26 @@ struct Node {
   parent: u8,
 }
 
-pub struct ConstUnionFind<const N: usize> {
+pub struct UnionFind {
   unique_sets: usize,
-  elements: [Node; N],
+  elements: Vec<Node>,
 }
 
-impl<const N: usize> ConstUnionFind<N> {
-  pub fn new() -> Self {
-    debug_assert!(N <= 256);
-    let mut elements = [Node { parent: 0 }; N];
-    elements
-      .iter_mut()
+impl UnionFind {
+  pub fn new(capacity: usize) -> Self {
+    let elements = (0..capacity)
       .enumerate()
-      .for_each(|(idx, node)| *node = Node { parent: idx as u8 });
+      .map(|(idx, _)| Node { parent: idx as u8 })
+      .collect();
 
     Self {
-      unique_sets: N,
+      unique_sets: capacity,
       elements,
     }
+  }
+
+  pub fn capacity(&self) -> usize {
+    self.elements.len()
   }
 
   pub fn unique_sets(&self) -> usize {
@@ -29,13 +31,13 @@ impl<const N: usize> ConstUnionFind<N> {
   }
 
   fn get_node(&self, node_id: usize) -> Node {
-    debug_assert!(node_id < N);
+    debug_assert!(node_id < self.capacity());
     unsafe { *self.elements.get_unchecked(node_id) }
   }
 
   /// Gives id of the root of tree that node is in.
   pub fn find(&mut self, mut node_id: usize) -> usize {
-    debug_assert!(node_id < N);
+    debug_assert!(node_id < self.capacity());
     let mut node = self.get_node(node_id);
 
     while node.parent as usize != node_id {

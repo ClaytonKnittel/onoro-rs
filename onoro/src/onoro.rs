@@ -313,11 +313,6 @@ pub trait Onoro: Sized {
   }
 
   fn display(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    match self.turn() {
-      PawnColor::Black => writeln!(f, "black:")?,
-      PawnColor::White => writeln!(f, "white:")?,
-    }
-
     let ((min_x, min_y), (max_x, max_y)) = self.pawns().fold(
       ((Self::board_width(), Self::board_width()), (0, 0)),
       |((min_x, min_y), (max_x, max_y)), pawn| {
@@ -338,6 +333,16 @@ pub trait Onoro: Sized {
     let min_y = min_y.saturating_sub(1);
     let max_x = (max_x + 1).min(Self::board_width() - 1);
     let max_y = (max_y + 1).min(Self::board_width() - 1);
+
+    writeln!(
+      f,
+      "{}: {:?} is bottom left",
+      match self.turn() {
+        PawnColor::Black => "black",
+        PawnColor::White => "white",
+      },
+      (min_x, min_y)
+    )?;
 
     for y in (min_y..=max_y).rev() {
       write!(f, "{: <width$}", "", width = max_y - y)?;

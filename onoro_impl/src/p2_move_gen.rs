@@ -1,0 +1,1059 @@
+use abstract_game::GameMoveIterator;
+use onoro::{Onoro, PawnColor};
+
+use crate::{
+  Move, OnoroImpl, PackedIdx,
+  num_iter::IterOnes,
+  p1_move_gen::P1MoveGenerator,
+  util::{unlikely, unreachable},
+};
+
+#[derive(Clone, Copy, Debug)]
+enum PawnConnectedMobility {
+  /// The pawn is free to move anywhere that is available. This means this pawn
+  /// is not a cutting point.
+  Free,
+  /// The pawn is a cutting point and currently connects two disjoint groups.
+  ///
+  /// When considering positions to move this pawn to, in order to maintain the
+  /// connectedness of the game, at least one adjacent pawn at the new location
+  /// must have discovery times between this pawn's discovery time and
+  /// `exit_time` (exclusive), and at least one must be outside this range.
+  CuttingPoint {
+    /// The time we started exploring the disconnected subtree of this pawn.
+    /// May differ from this pawn's generation count if another subtree of this
+    /// pawn was explored first and connected back to an ancestor of this pawn.
+    enter_time: u32,
+    /// The time we returned from exploring the subtree of this pawn.
+    exit_time: u32,
+  },
+  /// The pawn connects 3 disjoint groups and is thus immobile.
+  ///
+  /// Any pawn that connects 3 disjoint groups is immobile, as there is no
+  /// configuration of pawns with two points that join 3 disjoint groups.
+  ///
+  /// Here is an example which uses 20 pawns, moving the pawn at `*` to `_`:
+  /// ```text
+  /// . . P P P P P
+  ///  . P . . . P .
+  ///   P . P P _ . .
+  ///    P . P . P . .
+  ///     P . * P P . .
+  ///      P P . . . . .
+  ///       P . . . . . .
+  /// ```
+  Immobile,
+}
+
+impl Default for PawnConnectedMobility {
+  fn default() -> Self {
+    Self::Free
+  }
+}
+
+#[derive(Clone, Copy, Default)]
+struct PawnMeta {
+  /// Contains the pawns generation count, discovered bit, connected mobility
+  /// state, and enter/exit time if a `CuttingPoint`.
+  ///
+  /// Here is the layout in binary:
+  /// ```text
+  ///  16  .  .  .  12 11   .    .   8    7    6      5    4   .   .   1
+  /// +---------------+----------------+----------+------+---------------+
+  /// | exit_time - 1 | enter_time - 1 | cm_state | disc | gen_count - 1 |
+  /// +---------------+----------------+----------+------+---------------+
+  /// ```
+  ///
+  /// cm_state ranges from 0b00 - 0b10, corresponding to
+  /// `PawnConnectedMobility::Free`, `PawnConnectedMobility::CuttingPoint`, and
+  /// `PawnConnectedMobility::Immobile` respectively.
+  packed_data: u16,
+
+  /// A mask of the neighbors of this pawn in the pawn metadata/pawn_poses
+  /// lists. The list only contains pawns which have two neighbors. Each bit
+  /// corresponds to an index in these lists in the same order.
+  dangling_neighbors_index_mask: u16,
+}
+
+impl PawnMeta {
+  const GENERATION_COUNT_MASK: u16 = 0xf;
+  const MAX_GENERATION_COUNT: u32 = Self::GENERATION_COUNT_MASK as u32 + 1;
+  const DISCOVERED_BIT: u16 = 0x10;
+
+  const CONNECTED_MOBILITY_MASK: u16 = 0x60;
+  const ADVANCE_CONNECTED_MOBILITY: u16 = 0x20;
+  const FREE: u16 = 0x00;
+  const CUTTING_POINT: u16 = 0x20;
+  const IMMOBILE: u16 = 0x40;
+
+  const ENTER_TIME_SHIFT: u32 = 7;
+  const ENTER_TIME_MASK: u16 = 0xf;
+  const MAX_ENTER_TIME: u32 = Self::ENTER_TIME_MASK as u32 + 1;
+  const EXIT_TIME_SHIFT: u32 = 11;
+  const EXIT_TIME_MASK: u16 = 0x1f;
+  const MAX_EXIT_TIME: u32 = Self::EXIT_TIME_MASK as u32 + 1;
+
+  /// Returns true if this pawn has been discovered already in the DFS.
+  fn discovered(&self) -> bool {
+    (self.packed_data & Self::DISCOVERED_BIT) != 0
+  }
+
+  /// Returns the generation count of this pawn. Requires `self.discovered()`.
+  fn discovery_time(&self) -> u32 {
+    debug_assert!(self.discovered());
+    (self.packed_data & Self::GENERATION_COUNT_MASK) as u32 + 1
+  }
+
+  /// Sets the discovery time, to be called when a pawn is first discovered.
+  /// Requires `!self.discovered()`.
+  fn set_discovery_time(&mut self, time: u32) {
+    debug_assert!(!self.discovered());
+    debug_assert!((1..=Self::MAX_GENERATION_COUNT).contains(&time));
+    self.packed_data += Self::DISCOVERED_BIT + (time - 1) as u16;
+  }
+
+  fn connected_mobility(&self) -> PawnConnectedMobility {
+    match self.packed_data & Self::CONNECTED_MOBILITY_MASK {
+      Self::FREE => PawnConnectedMobility::Free,
+      Self::CUTTING_POINT => PawnConnectedMobility::CuttingPoint {
+        enter_time: ((self.packed_data >> Self::ENTER_TIME_SHIFT) & Self::ENTER_TIME_MASK) as u32
+          + 1,
+        exit_time: ((self.packed_data >> Self::EXIT_TIME_SHIFT) & Self::EXIT_TIME_MASK) as u32 + 1,
+      },
+      Self::IMMOBILE => PawnConnectedMobility::Immobile,
+      _ => unreachable(),
+    }
+  }
+
+  /// Advances the connected mobility status of this pawn. This starts off as
+  /// `ConnectedMobility::Free`, and advances to `CuttingPoint`, then to
+  /// `Immobile`. This should be called on a node in the DFS after returning
+  /// from exploring a child which did not connect back to any previously
+  /// discovered pawns.
+  fn advance_connected_mobility(&mut self, enter_time: u32, exit_time: u32) {
+    debug_assert!(!matches!(
+      self.connected_mobility(),
+      PawnConnectedMobility::Immobile
+    ));
+    debug_assert!((1..=Self::MAX_ENTER_TIME).contains(&enter_time));
+    debug_assert!((1..=Self::MAX_EXIT_TIME).contains(&exit_time));
+    self.packed_data += Self::ADVANCE_CONNECTED_MOBILITY;
+    if unlikely((self.packed_data & Self::CONNECTED_MOBILITY_MASK) == Self::CUTTING_POINT) {
+      self.packed_data += (((enter_time - 1) << Self::ENTER_TIME_SHIFT)
+        + ((exit_time - 1) << Self::EXIT_TIME_SHIFT)) as u16;
+    }
+  }
+}
+
+struct DFSParams<'a, const N: usize> {
+  /// The pawn metadata array being constructed, which will be moved to the
+  /// move generator object after the DFS is completed. This is indexed in the
+  /// same order as `onoro.pawn_poses()`.
+  pawn_meta: &'a mut [PawnMeta; N],
+  /// The array of earliest connected ancestors of each pawn, indexed in the
+  /// same order as `onoro.pawn_poses()`.
+  ecas: &'a mut [u32; N],
+  /// The current generation count, starting at 1 and incrementing for each
+  /// newly discovered pawn.
+  time: &'a mut u32,
+}
+
+/// An iterator-like struct for enumerating all valid moves from an Onoro
+/// position.
+pub struct P2MoveGenerator<const N: usize> {
+  pawn_meta: [PawnMeta; N],
+  p1_move_gen: P1MoveGenerator<N>,
+  cur_tile: PackedIdx,
+  neighbor_mask: u16,
+  pawn_index: usize,
+}
+
+impl<const N: usize> P2MoveGenerator<N> {
+  /// Constructs a `P2MoveGenerator` from an Onoro state.
+  pub fn new(onoro: &OnoroImpl<N>) -> Self {
+    debug_assert!(!onoro.in_phase1());
+    Self::from_pawn_poses(onoro.pawn_poses(), matches!(onoro.turn(), PawnColor::Black))
+  }
+
+  /// Constructs a `P2MoveGenerator` from an array of pawn positions.
+  pub fn from_pawn_poses(pawn_poses: &[PackedIdx; N], black_turn: bool) -> Self {
+    let p1_move_gen = P1MoveGenerator::from_pawn_poses(pawn_poses);
+    let pawn_meta = Self::build_pawn_meta(pawn_poses, &p1_move_gen);
+
+    Self {
+      pawn_meta,
+      p1_move_gen,
+      pawn_index: N - 2 + !black_turn as usize,
+      neighbor_mask: 0,
+      cur_tile: PackedIdx::null(),
+    }
+  }
+
+  /// Returns an iterator over the indices of each neighbor of the pawn at
+  /// index `pawn_index` in the `pawn_poses` array.
+  fn neighbors(
+    pawn_index: usize,
+    pawn_poses: &[PackedIdx; N],
+    p1_move_gen: &P1MoveGenerator<N>,
+  ) -> impl Iterator<Item = usize> {
+    let indexer = p1_move_gen.indexer();
+
+    let pawn_index = indexer.index(pawn_poses[pawn_index]);
+    p1_move_gen
+      .neighbors(pawn_index as usize)
+      .map(|neighbor_index| {
+        let neighbor_pos = indexer.pos_from_index(neighbor_index);
+        OnoroImpl::pawn_idx_from_pawn_poses(pawn_poses, neighbor_pos) as usize
+      })
+  }
+
+  /// Returns a tuple of (phase 1 move, neighbors mask) of the next phase 1
+  /// move that can be played in this position, along with a mask of the
+  /// neighbors of that position.
+  fn next_p1_move_with_neighbors(
+    &mut self,
+    pawn_poses: &[PackedIdx; N],
+  ) -> Option<(PackedIdx, u16)> {
+    let (pos, neighbors) = self.p1_move_gen.next_move_pos_with_neighbors()?;
+    let indexer = self.p1_move_gen.indexer();
+    Some((
+      pos,
+      neighbors.fold(0, |neighbor_mask, neighbor_board_bitvec_index| {
+        let neighbor_pos = indexer.pos_from_index(neighbor_board_bitvec_index);
+        let neighbor_index = OnoroImpl::pawn_idx_from_pawn_poses(pawn_poses, neighbor_pos);
+        neighbor_mask | (1 << neighbor_index)
+      }),
+    ))
+  }
+
+  /// Recursively explores the Onoro board in DFS, populating the metadata for
+  /// the pawn at index `pawn_index`.
+  fn recursor(
+    pawn_index: usize,
+    parent_index: usize,
+    params: DFSParams<N>,
+    pawn_poses: &[PackedIdx; N],
+    p1_move_gen: &P1MoveGenerator<N>,
+  ) {
+    let DFSParams {
+      pawn_meta,
+      ecas,
+      time,
+    } = params;
+
+    // Set the discovery time of this pawn to the current time, and advance the time.
+    let meta = &mut pawn_meta[pawn_index];
+    meta.set_discovery_time(*time);
+    ecas[pawn_index] = *time;
+    *time += 1;
+
+    for neighbor_index in Self::neighbors(pawn_index, pawn_poses, p1_move_gen) {
+      // Record all neighbors of the pawn, to later be filtered down to
+      // neighbors with 2 neighbors themselves.
+      pawn_meta[pawn_index].dangling_neighbors_index_mask |= 1 << neighbor_index;
+      // Skip our parent: we don't allow backwards traversal.
+      if neighbor_index == parent_index {
+        continue;
+      }
+
+      let neighbor_meta = pawn_meta[neighbor_index];
+      if neighbor_meta.discovered() {
+        // For already-discovered neighbors, check if their discovered time is
+        // less than our earliest-connected-ancestor time, and if so update it.
+        ecas[pawn_index] = ecas[pawn_index].min(neighbor_meta.discovery_time());
+        continue;
+      }
+
+      // Record the time we started exploring this undiscovered child, in case
+      // we realize later that `pawn_index` is a cutting point.
+      let enter_time = *time;
+      Self::recursor(
+        neighbor_index,
+        pawn_index,
+        DFSParams {
+          pawn_meta,
+          ecas,
+          time,
+        },
+        pawn_poses,
+        p1_move_gen,
+      );
+
+      // Set our earliest-connected-ancestor to this neighbor's, if it is lower
+      // than ours, since by transitivity we can reach any node that this child
+      // can reach without backtracking.
+      let neighbor_eca = ecas[neighbor_index];
+      ecas[pawn_index] = ecas[pawn_index].min(neighbor_eca);
+
+      // If this neighbor did not connect back to some previously discovered
+      // node, then it is an isolated subtree, and we need to advance our
+      // connected mobility tracker.
+      let meta = &mut pawn_meta[pawn_index];
+      if neighbor_eca >= meta.discovery_time() {
+        meta.advance_connected_mobility(enter_time, *time);
+      }
+    }
+  }
+
+  /// Populates the pawn metadata array by exploring the Onoro board in DFS.
+  fn build_pawn_meta(
+    pawn_poses: &[PackedIdx; N],
+    p1_move_gen: &P1MoveGenerator<N>,
+  ) -> [PawnMeta; N] {
+    let mut pawn_meta = [PawnMeta::default(); N];
+    let mut ecas = [0u32; N];
+    let mut time = 1;
+
+    // We may choose any pawn to start exploring from.
+    pawn_meta[0].set_discovery_time(time);
+    ecas[0] = time;
+    time += 1;
+
+    let mut first_iteration = true;
+    for neighbor_index in Self::neighbors(0, pawn_poses, p1_move_gen) {
+      // Record all neighbors of the pawn, to later be filtered down to
+      // neighbors with 2 neighbors themselves.
+      pawn_meta[0].dangling_neighbors_index_mask |= 1 << neighbor_index;
+
+      // Skip any already-discovered children.
+      if pawn_meta[neighbor_index].discovered() {
+        continue;
+      }
+
+      // Record the time we started exploring this undiscovered child, in case
+      // we realize later that `pawn_index` is a cutting point.
+      let enter_time = time;
+      Self::recursor(
+        neighbor_index,
+        0,
+        DFSParams {
+          pawn_meta: &mut pawn_meta,
+          ecas: &mut ecas,
+          time: &mut time,
+        },
+        pawn_poses,
+        p1_move_gen,
+      );
+
+      if first_iteration {
+        // If this is the first subtree we have explored, we should not advance
+        // the connected mobility state, since we are not yet a cutting point
+        // (as we have no parent).
+        first_iteration = false;
+      } else {
+        // Otherwise, if this is the second or third child we have explored, we
+        // know it to be disconnected from the rest of the graph explored so
+        // far, so we can advance our connected mobility state.
+        pawn_meta[0].advance_connected_mobility(enter_time, time);
+      }
+    }
+
+    // Construct a mask of all of the tiles with two neighbors. At this point,
+    // `dangling_neighbors_index_mask` is a mask of all neighbors of each pawn.
+    let two_neighbor_mask = pawn_meta
+      .iter()
+      .enumerate()
+      .filter_map(|(i, meta)| (meta.dangling_neighbors_index_mask.count_ones() == 2).then_some(i))
+      .fold(0, |mask, i| mask | (1 << i));
+
+    // Clear all pawns which have more than two neighbors from every neighbor
+    // index mask. After this, `dangling_neighbors_index_mask` will contain
+    // only neighbors of each pawn which have exactly two neighbors.
+    for meta in &mut pawn_meta {
+      meta.dangling_neighbors_index_mask &= two_neighbor_mask;
+    }
+
+    pawn_meta
+  }
+
+  /// Returns true if the current move does not disconnect the board.
+  fn move_is_connected(&self, meta: &PawnMeta, dst_neighbors: u16) -> bool {
+    match meta.connected_mobility() {
+      PawnConnectedMobility::Free => true,
+      PawnConnectedMobility::CuttingPoint {
+        enter_time,
+        exit_time,
+      } => {
+        // If this pawn is a cutting point, we need to check that among its
+        // neighbors, at least one has a generation count within
+        // `enter_time..exit_time` (e.g. is in the isolated subtree rooted by
+        // the child of this node), and at least one has a generation count
+        // outside that range.
+        let mut v = 0;
+        for neighbor_index in dst_neighbors.iter_ones() {
+          let neighbor_meta = self.pawn_meta[neighbor_index as usize];
+          if (enter_time..exit_time).contains(&neighbor_meta.discovery_time()) {
+            v |= 1;
+          } else {
+            v |= 2;
+          }
+        }
+
+        // If both bits were set, then we have successfully reconnected the
+        // isolated subtree rooted at our child with the rest of the graph from
+        // this position.
+        v == 3
+      }
+      PawnConnectedMobility::Immobile => false,
+    }
+  }
+
+  /// Returns true if the move does not leave any pawns dangling (i.e. with
+  /// only 1 neighbor).
+  fn resolved_dangling_neighbors(meta: &PawnMeta, dst_neighbors: u16) -> bool {
+    let dangling_neighbors = meta.dangling_neighbors_index_mask;
+    // The move does not leave any pawns dangling if all of our current
+    // neighbors with exactly 2 neighbors themselves are adjacent to the
+    // destination.
+    dangling_neighbors == (dangling_neighbors & dst_neighbors)
+  }
+
+  /// Returns true if the pawn at `self.pawn_index` can legally move from its
+  /// current position to `self.cur_tile`.
+  fn is_valid_move(&self) -> bool {
+    let dst_neighbors = self.neighbor_mask & !(1 << self.pawn_index);
+
+    // Check that this pawn has enough neighbors to move here after excluding
+    // itself from the neighbors list.
+    if dst_neighbors.count_ones() < 2 {
+      return false;
+    }
+
+    let meta = &self.pawn_meta[self.pawn_index];
+    if !self.move_is_connected(meta, dst_neighbors) {
+      return false;
+    }
+
+    if !Self::resolved_dangling_neighbors(meta, dst_neighbors) {
+      return false;
+    }
+
+    true
+  }
+}
+
+impl<const N: usize> GameMoveIterator for P2MoveGenerator<N> {
+  type Item = Move;
+  type Game = OnoroImpl<N>;
+
+  fn next(&mut self, onoro: &Self::Game) -> Option<Self::Item> {
+    loop {
+      if self.pawn_index >= N - 2 {
+        // If we have finished checking all of our pawns, it's time to move on
+        // to the next candidate destination.
+        let (pos, neighbor_mask) = self.next_p1_move_with_neighbors(onoro.pawn_poses())?;
+        self.cur_tile = pos;
+        self.neighbor_mask = neighbor_mask;
+        // Reset the pawn index. Note that this trick allows us to avoid
+        // checking which player's turn it is, as it preserves the parity of
+        // `self.pawn_index`.
+        self.pawn_index -= N - 2;
+      } else {
+        // If we have not finished checking all of our pawns, check the next
+        // pawn in `onoro.pawn_poses()`.
+        self.pawn_index += 2;
+      }
+
+      // If this move is valid, we can break and emit
+      // `self.pawn_index` -> `self.cur_tile` as a legal move.
+      if self.is_valid_move() {
+        break;
+      }
+    }
+
+    Some(Move::Phase2Move {
+      to: self.cur_tile,
+      from_idx: self.pawn_index as u32,
+    })
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use std::collections::{HashMap, HashSet};
+
+  use abstract_game::GameMoveIterator;
+  use googletest::{gtest, prelude::*};
+  use itertools::Itertools;
+  use onoro::{
+    Onoro, OnoroIndex,
+    error::OnoroResult,
+    hex_pos::{HexPos, HexPosOffset},
+  };
+  use rstest::rstest;
+  use rstest_reuse::{apply, template};
+
+  use crate::{
+    Move, Onoro8, Onoro16, OnoroImpl, PackedIdx,
+    num_iter::IterOnes,
+    p2_move_gen::{P2MoveGenerator, PawnConnectedMobility},
+  };
+
+  struct Meta {
+    discovery_time: i32,
+    earliest_connected_ancestor: i32,
+    is_cut: bool,
+  }
+  impl Meta {
+    fn new() -> Self {
+      Self {
+        discovery_time: -1,
+        earliest_connected_ancestor: -1,
+        is_cut: false,
+      }
+    }
+  }
+
+  fn recursor(pos: HexPos, parent: HexPos, time: &mut u32, poses: &mut HashMap<HexPos, Meta>) {
+    let meta = poses.get_mut(&pos).unwrap();
+    meta.discovery_time = *time as i32;
+    meta.earliest_connected_ancestor = *time as i32;
+    *time += 1;
+
+    for neighbor in pos.each_neighbor().filter(|&pos| pos != parent) {
+      let Some(neighbor_meta) = poses.get_mut(&neighbor) else {
+        continue;
+      };
+      let neighbor_t = neighbor_meta.discovery_time;
+
+      if neighbor_t != -1 {
+        let meta = poses.get_mut(&pos).unwrap();
+        meta.earliest_connected_ancestor = meta.earliest_connected_ancestor.min(neighbor_t);
+        continue;
+      }
+
+      recursor(neighbor, pos, time, poses);
+
+      let neighbor_meta = poses.get_mut(&neighbor).unwrap();
+      let neighbor_eca = neighbor_meta.earliest_connected_ancestor;
+
+      let meta = poses.get_mut(&pos).unwrap();
+      meta.earliest_connected_ancestor = meta.earliest_connected_ancestor.min(neighbor_eca);
+
+      if neighbor_eca >= meta.discovery_time {
+        meta.is_cut = true;
+      }
+    }
+  }
+
+  fn find_articulation_points_test<const N: usize>(pawn_poses: &[PackedIdx; N]) -> Vec<PackedIdx> {
+    let mut poses: HashMap<_, _> = pawn_poses
+      .iter()
+      .map(|&pos| (HexPos::from(pos), Meta::new()))
+      .collect();
+
+    let pos: HexPos = pawn_poses[0].into();
+    let meta = poses.get_mut(&pos).unwrap();
+    meta.discovery_time = 0;
+    meta.earliest_connected_ancestor = 0;
+    let mut time = 1;
+
+    #[allow(clippy::filter_map_bool_then)]
+    let neighbor_count = pos
+      .each_neighbor()
+      .filter_map(|neighbor| {
+        poses
+          .get(&neighbor)
+          .is_some_and(|meta| meta.discovery_time == -1)
+          .then(|| recursor(neighbor, pos, &mut time, &mut poses))
+      })
+      .count();
+
+    (neighbor_count > 1)
+      .then_some(pos.into())
+      .into_iter()
+      .chain(
+        poses
+          .into_iter()
+          .filter_map(|(pos, meta)| meta.is_cut.then_some(pos.into())),
+      )
+      .collect()
+  }
+
+  fn find_articulation_points<const N: usize>(pawn_poses: &[PackedIdx; N]) -> Vec<PackedIdx> {
+    let move_gen = P2MoveGenerator::from_pawn_poses(pawn_poses, true);
+    move_gen
+      .pawn_meta
+      .into_iter()
+      .enumerate()
+      .filter_map(|(idx, meta)| {
+        (!matches!(meta.connected_mobility(), PawnConnectedMobility::Free))
+          .then_some(pawn_poses[idx])
+      })
+      .collect()
+  }
+
+  fn find_immobile_points<const N: usize>(pawn_poses: &[PackedIdx; N]) -> Vec<PackedIdx> {
+    let move_gen = P2MoveGenerator::from_pawn_poses(pawn_poses, true);
+    move_gen
+      .pawn_meta
+      .into_iter()
+      .enumerate()
+      .filter_map(|(idx, meta)| {
+        matches!(meta.connected_mobility(), PawnConnectedMobility::Immobile)
+          .then_some(pawn_poses[idx])
+      })
+      .collect()
+  }
+
+  #[template]
+  #[rstest]
+  fn test_find_articulation_points<const N: usize>(
+    #[values(find_articulation_points, find_articulation_points_test)]
+    find_articulation_points: impl FnOnce(&[PackedIdx; N]) -> Vec<PackedIdx>,
+  ) {
+  }
+
+  #[apply(test_find_articulation_points)]
+  #[gtest]
+  fn test_no_articulation_points(
+    find_articulation_points: impl FnOnce(&[PackedIdx; 3]) -> Vec<PackedIdx>,
+  ) {
+    let poses = [
+      PackedIdx::new(3, 3),
+      PackedIdx::new(4, 3),
+      PackedIdx::new(4, 4),
+    ];
+
+    expect_that!(find_articulation_points(&poses), is_empty());
+  }
+
+  #[apply(test_find_articulation_points)]
+  #[gtest]
+  fn test_one_articulation_point(
+    find_articulation_points: impl FnOnce(&[PackedIdx; 5]) -> Vec<PackedIdx>,
+  ) {
+    let poses = [
+      PackedIdx::new(3, 3),
+      PackedIdx::new(4, 3),
+      PackedIdx::new(3, 2),
+      PackedIdx::new(3, 4),
+      PackedIdx::new(2, 3),
+    ];
+
+    expect_that!(
+      find_articulation_points(&poses),
+      unordered_elements_are![&PackedIdx::new(3, 3)]
+    );
+  }
+
+  #[apply(test_find_articulation_points)]
+  #[gtest]
+  fn test_articulation_points_fidget_spinner(
+    find_articulation_points: impl FnOnce(&[PackedIdx; 10]) -> Vec<PackedIdx>,
+  ) {
+    let poses = [
+      // Bottom left blade
+      PackedIdx::new(4, 4),
+      PackedIdx::new(3, 3),
+      PackedIdx::new(4, 3),
+      // Center
+      PackedIdx::new(5, 5),
+      // Right blade
+      PackedIdx::new(6, 5),
+      PackedIdx::new(7, 5),
+      PackedIdx::new(7, 6),
+      // Top blade
+      PackedIdx::new(5, 6),
+      PackedIdx::new(5, 7),
+      PackedIdx::new(4, 6),
+    ];
+
+    expect_that!(
+      find_articulation_points(&poses),
+      unordered_elements_are![
+        &PackedIdx::new(5, 5),
+        &PackedIdx::new(4, 4),
+        &PackedIdx::new(5, 6),
+        &PackedIdx::new(6, 5)
+      ]
+    );
+  }
+
+  #[apply(test_find_articulation_points)]
+  #[gtest]
+  fn test_articulation_points_filled_hex(
+    find_articulation_points: impl FnOnce(&[PackedIdx; 7]) -> Vec<PackedIdx>,
+  ) {
+    let poses = [
+      PackedIdx::new(2, 2),
+      PackedIdx::new(2, 3),
+      PackedIdx::new(3, 4),
+      PackedIdx::new(4, 4),
+      PackedIdx::new(4, 3),
+      PackedIdx::new(3, 2),
+      PackedIdx::new(3, 3),
+    ];
+
+    expect_that!(find_articulation_points(&poses), is_empty());
+  }
+
+  #[apply(test_find_articulation_points)]
+  #[gtest]
+  fn test_articulation_points_ring(
+    find_articulation_points: impl FnOnce(&[PackedIdx; 6]) -> Vec<PackedIdx>,
+  ) {
+    let poses = [
+      PackedIdx::new(2, 2),
+      PackedIdx::new(2, 3),
+      PackedIdx::new(3, 4),
+      PackedIdx::new(4, 4),
+      PackedIdx::new(4, 3),
+      PackedIdx::new(3, 2),
+    ];
+
+    expect_that!(find_articulation_points(&poses), is_empty());
+  }
+
+  #[apply(test_find_articulation_points)]
+  #[gtest]
+  fn test_articulation_points_c_shape(
+    find_articulation_points: impl FnOnce(&[PackedIdx; 7]) -> Vec<PackedIdx>,
+  ) {
+    let poses = [
+      PackedIdx::new(2, 2),
+      PackedIdx::new(1, 2),
+      PackedIdx::new(2, 3),
+      PackedIdx::new(3, 4),
+      PackedIdx::new(4, 4),
+      PackedIdx::new(4, 3),
+      PackedIdx::new(5, 4),
+    ];
+
+    expect_that!(
+      find_articulation_points(&poses),
+      unordered_elements_are![
+        &PackedIdx::new(2, 3),
+        &PackedIdx::new(3, 4),
+        &PackedIdx::new(4, 4),
+      ]
+    );
+  }
+
+  #[gtest]
+  fn test_immobile_fidget_spinner() {
+    let poses = [
+      // Bottom left blade
+      PackedIdx::new(4, 4),
+      PackedIdx::new(3, 3),
+      PackedIdx::new(4, 3),
+      // Center
+      PackedIdx::new(5, 5),
+      // Right blade
+      PackedIdx::new(6, 5),
+      PackedIdx::new(7, 5),
+      PackedIdx::new(7, 6),
+      // Top blade
+      PackedIdx::new(5, 6),
+      PackedIdx::new(5, 7),
+      PackedIdx::new(4, 6),
+    ];
+
+    expect_that!(
+      find_immobile_points(&poses),
+      unordered_elements_are![&PackedIdx::new(5, 5)]
+    );
+  }
+
+  #[gtest]
+  fn test_immobile_starting_point_fidget_spinner() {
+    let poses = [
+      // Center
+      PackedIdx::new(5, 5),
+      // Bottom left blade
+      PackedIdx::new(4, 4),
+      PackedIdx::new(3, 3),
+      PackedIdx::new(4, 3),
+      // Right blade
+      PackedIdx::new(6, 5),
+      PackedIdx::new(7, 5),
+      PackedIdx::new(7, 6),
+      // Top blade
+      PackedIdx::new(5, 6),
+      PackedIdx::new(5, 7),
+      PackedIdx::new(4, 6),
+    ];
+
+    expect_that!(
+      find_immobile_points(&poses),
+      unordered_elements_are![&PackedIdx::new(5, 5)]
+    );
+  }
+
+  const TWO_NEIGHBORS_INDEX_MASK_INPUTS: (
+    [PackedIdx; 3],
+    [PackedIdx; 5],
+    [PackedIdx; 7],
+    [PackedIdx; 10],
+  ) = (
+    [
+      PackedIdx::new(3, 3),
+      PackedIdx::new(4, 3),
+      PackedIdx::new(4, 4),
+    ],
+    [
+      PackedIdx::new(3, 3),
+      PackedIdx::new(4, 3),
+      PackedIdx::new(3, 2),
+      PackedIdx::new(3, 4),
+      PackedIdx::new(2, 3),
+    ],
+    [
+      PackedIdx::new(2, 2),
+      PackedIdx::new(1, 2),
+      PackedIdx::new(2, 3),
+      PackedIdx::new(3, 4),
+      PackedIdx::new(4, 4),
+      PackedIdx::new(4, 3),
+      PackedIdx::new(5, 4),
+    ],
+    [
+      PackedIdx::new(4, 4),
+      PackedIdx::new(3, 3),
+      PackedIdx::new(4, 3),
+      PackedIdx::new(5, 5),
+      PackedIdx::new(6, 5),
+      PackedIdx::new(7, 5),
+      PackedIdx::new(7, 6),
+      PackedIdx::new(5, 6),
+      PackedIdx::new(5, 7),
+      PackedIdx::new(4, 6),
+    ],
+  );
+
+  #[template]
+  #[rstest]
+  fn test_two_neighbors_index_mask_inputs<const N: usize>(
+    #[values(
+      &TWO_NEIGHBORS_INDEX_MASK_INPUTS.0,
+      &TWO_NEIGHBORS_INDEX_MASK_INPUTS.1,
+      &TWO_NEIGHBORS_INDEX_MASK_INPUTS.2,
+      &TWO_NEIGHBORS_INDEX_MASK_INPUTS.3,
+    )]
+    pawn_poses: &[PackedIdx; N],
+  ) {
+  }
+
+  #[apply(test_two_neighbors_index_mask_inputs)]
+  #[gtest]
+  fn test_two_neighbors_index_mask<const N: usize>(pawn_poses: &[PackedIdx; N]) {
+    let p2_move_gen = P2MoveGenerator::from_pawn_poses(pawn_poses, true);
+    for (index, pos) in pawn_poses.iter().enumerate() {
+      let expected_neighbors: HashSet<_> = pos
+        .neighbors()
+        .filter(|neighbor| {
+          pawn_poses.iter().any(|pos| pos == neighbor)
+            && pawn_poses.iter().filter(|p| p.adjacent(*neighbor)).count() == 3
+        })
+        .map(HexPos::from)
+        .collect();
+
+      let meta = p2_move_gen.pawn_meta[index];
+      let neighbor_pos_from_mask: HashSet<HexPos> = meta
+        .dangling_neighbors_index_mask
+        .iter_ones()
+        .map(|index| pawn_poses[index as usize].into())
+        .collect();
+
+      assert_that!(neighbor_pos_from_mask, container_eq(expected_neighbors));
+    }
+  }
+
+  fn lower_left<const N: usize>(onoro: &OnoroImpl<N>) -> HexPos {
+    let (min_x, min_y) = onoro
+      .pawn_poses()
+      .iter()
+      .fold((u32::MAX, u32::MAX), |(min_x, min_y), pawn_pos| {
+        (min_x.min(pawn_pos.x()), min_y.min(pawn_pos.y()))
+      });
+    HexPos::new(min_x, min_y)
+  }
+
+  fn pawn_idx_at<const N: usize>(pos: HexPos, onoro: &OnoroImpl<N>) -> u32 {
+    onoro
+      .pawn_poses()
+      .iter()
+      .enumerate()
+      .find_map(|(i, &pawn_pos)| (pawn_pos == pos.into()).then_some(i))
+      .unwrap() as u32
+  }
+
+  fn phase2_moves_for(pawn_index: u32, moves: &[Move]) -> impl Iterator<Item = &Move> {
+    moves.iter().filter(move |m| match m {
+      Move::Phase2Move { from_idx, .. } => *from_idx == pawn_index,
+      _ => unreachable!(),
+    })
+  }
+
+  #[gtest]
+  fn test_find_moves_simple() -> OnoroResult {
+    let onoro = Onoro8::from_board_string(
+      ". W W
+        B B B
+         W W .
+          B . .",
+    )?;
+
+    let lower_left = lower_left(&onoro);
+
+    let b1 = pawn_idx_at(lower_left, &onoro);
+    let b2 = pawn_idx_at(lower_left + HexPosOffset::new(0, 2), &onoro);
+    let b3 = pawn_idx_at(lower_left + HexPosOffset::new(1, 2), &onoro);
+    let b4 = pawn_idx_at(lower_left + HexPosOffset::new(2, 2), &onoro);
+
+    let move_gen = P2MoveGenerator::new(&onoro);
+    let moves = move_gen.to_iter(&onoro).collect_vec();
+
+    expect_eq!(phase2_moves_for(b1, &moves).count(), 5);
+    expect_eq!(phase2_moves_for(b2, &moves).count(), 5);
+    expect_eq!(phase2_moves_for(b3, &moves).count(), 7);
+    expect_eq!(phase2_moves_for(b4, &moves).count(), 5);
+
+    Ok(())
+  }
+
+  #[gtest]
+  fn test_find_moves_dangling() -> OnoroResult {
+    let onoro = Onoro8::from_board_string(
+      ". W W B
+        . B W .
+         B B . .
+          W . . .",
+    )?;
+
+    let lower_left = lower_left(&onoro);
+
+    let b1 = pawn_idx_at(lower_left + HexPosOffset::new(0, 1), &onoro);
+    let b2 = pawn_idx_at(lower_left + HexPosOffset::new(1, 1), &onoro);
+    let b3 = pawn_idx_at(lower_left + HexPosOffset::new(1, 2), &onoro);
+    let b4 = pawn_idx_at(lower_left + HexPosOffset::new(3, 3), &onoro);
+
+    let move_gen = P2MoveGenerator::new(&onoro);
+    let moves = move_gen.to_iter(&onoro).collect_vec();
+
+    expect_eq!(phase2_moves_for(b1, &moves).count(), 1);
+    expect_eq!(phase2_moves_for(b2, &moves).count(), 1);
+    expect_eq!(phase2_moves_for(b3, &moves).count(), 2);
+    expect_eq!(phase2_moves_for(b4, &moves).count(), 5);
+
+    Ok(())
+  }
+
+  #[gtest]
+  fn test_find_moves_disconnected() -> OnoroResult {
+    let onoro = Onoro8::from_board_string(
+      ". W W
+        W B .
+         . B .
+          B B .
+           W . .",
+    )?;
+
+    let lower_left = lower_left(&onoro);
+
+    let b1 = pawn_idx_at(lower_left + HexPosOffset::new(0, 1), &onoro);
+    let b2 = pawn_idx_at(lower_left + HexPosOffset::new(1, 1), &onoro);
+    let b3 = pawn_idx_at(lower_left + HexPosOffset::new(1, 2), &onoro);
+    let b4 = pawn_idx_at(lower_left + HexPosOffset::new(1, 3), &onoro);
+
+    let move_gen = P2MoveGenerator::new(&onoro);
+    let moves = move_gen.to_iter(&onoro).collect_vec();
+
+    expect_eq!(phase2_moves_for(b1, &moves).count(), 1);
+    expect_eq!(phase2_moves_for(b2, &moves).count(), 1);
+    expect_eq!(phase2_moves_for(b3, &moves).count(), 1);
+    expect_eq!(phase2_moves_for(b4, &moves).count(), 0);
+
+    Ok(())
+  }
+
+  #[gtest]
+  fn test_find_moves_immobile() -> OnoroResult {
+    let onoro = Onoro16::from_board_string(
+      ". . W . . . . .
+        . W B . W B B W
+         . . B W B W B B
+          W W . . . . . .
+           B . . . . . . .",
+    )?;
+
+    let lower_left = lower_left(&onoro);
+
+    let immobile_pawn = pawn_idx_at(lower_left + HexPosOffset::new(2, 2), &onoro);
+
+    let move_gen = P2MoveGenerator::new(&onoro);
+    let moves = move_gen.to_iter(&onoro).collect_vec();
+    expect_eq!(phase2_moves_for(immobile_pawn, &moves).count(), 0);
+
+    Ok(())
+  }
+
+  fn make_tile_first<const N: usize>(pos: HexPosOffset, onoro: OnoroImpl<N>) -> OnoroImpl<N> {
+    let lower_left_pos = lower_left(&onoro);
+    let mut pawn_indexes = *onoro.pawn_poses();
+    let pawn_index = pawn_indexes
+      .iter()
+      .enumerate()
+      .find(|&(_, &pawn_pos)| pawn_pos == (lower_left_pos + pos).into())
+      .unwrap()
+      .0;
+    pawn_indexes.swap(pawn_index, 0);
+
+    let onoro = OnoroImpl::from_indexes(pawn_indexes);
+    assert_eq!(pawn_idx_at(lower_left(&onoro) + pos, &onoro), 0);
+
+    onoro
+  }
+
+  #[gtest]
+  fn test_find_moves_cutting_point_first() -> OnoroResult {
+    let onoro = Onoro16::from_board_string(
+      ". . . B B .
+        . B W . B W
+         . W . . W W
+          W B . . W .
+           B B . . . .
+            W B . . . .",
+    )?;
+
+    let onoro = make_tile_first(HexPosOffset::new(4, 5), onoro);
+
+    let move_gen = P2MoveGenerator::new(&onoro);
+    expect_that!(
+      move_gen.pawn_meta[0].connected_mobility(),
+      pat!(PawnConnectedMobility::CuttingPoint {
+        enter_time: any![7, 12],
+        exit_time: 17
+      })
+    );
+
+    let moves = move_gen.to_iter(&onoro).collect_vec();
+    expect_eq!(phase2_moves_for(0, &moves).count(), 1);
+
+    Ok(())
+  }
+
+  #[gtest]
+  fn test_find_moves_immobile_first() -> OnoroResult {
+    let onoro = Onoro16::from_board_string(
+      ". . W . . . . .
+        . W B . W B B W
+         . . B W B W B B
+          W W . . . . . .
+           B . . . . . . .",
+    )?;
+
+    let onoro = make_tile_first(HexPosOffset::new(2, 2), onoro);
+
+    let move_gen = P2MoveGenerator::new(&onoro);
+    expect_that!(
+      move_gen.pawn_meta[0].connected_mobility(),
+      pat!(PawnConnectedMobility::Immobile)
+    );
+
+    let moves = move_gen.to_iter(&onoro).collect_vec();
+    expect_eq!(phase2_moves_for(0, &moves).count(), 0);
+
+    Ok(())
+  }
+}

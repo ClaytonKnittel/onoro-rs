@@ -3,7 +3,8 @@ name = "onoro-rs"
 version = "0.1.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[features]
+profiled = []
 
 [dependencies]
 abstract_game = { path = "./abstract_game" }
@@ -29,9 +30,12 @@ lto = "fat"
 name = "onoro"
 harness = false
 
-# [profile.bench]
-# debug = 2
-# strip = "none"
+[profile.profiled]
+inherits = "release"
+opt-level = 1
+lto = "none"
+debug = 2
+strip = "none"
 
 [dev-dependencies]
 googletest = "0.14.2"

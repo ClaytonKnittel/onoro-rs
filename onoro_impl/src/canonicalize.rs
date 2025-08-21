@@ -181,11 +181,11 @@ pub const fn symm_state_class(x: u32, y: u32, n_pawns: u32) -> SymmetryClass {
 
 /// The purpose of the symmetry table is to provide a quick way to canonicalize
 /// boards when computing and checking for symmetries.
-pub const fn gen_symm_state_table<const N: usize, const N2: usize>() -> [BoardSymmetryState; N2] {
+pub const fn gen_symm_state_table<const N: usize>() -> [[BoardSymmetryState; N]; N] {
   // Populate the table with dummy values for `BoardSymmetryState`, which will
   // be overwritten below. This is because const initialization of arrays is
   // clunky in rust.
-  let mut table: [BoardSymmetryState; N2] = [BoardSymmetryState::blank(); N2];
+  let mut table: [[BoardSymmetryState; N]; N] = [[BoardSymmetryState::blank(); N]; N];
 
   let mut y = 0;
   while y < N {
@@ -193,7 +193,7 @@ pub const fn gen_symm_state_table<const N: usize, const N2: usize>() -> [BoardSy
     while x < N {
       let op = symm_state_op(x as u32, y as u32, N as u32);
       let offset = board_symm_state_op_to_com_offset(op);
-      table[x + y * N] = BoardSymmetryState {
+      table[y][x] = BoardSymmetryState {
         op,
         symm_class: symm_state_class(x as u32, y as u32, N as u32),
         center_offset: com_offset_to_hex_pos(offset),
@@ -306,9 +306,7 @@ pub const fn gen_symm_state_table<const N: usize, const N2: usize>() -> [BoardSy
 /// that it does not matter which of the 4 group operations we choose to apply
 /// to the game state when canonicalizing if the center of mass lies on an e,
 /// since they are symmetries of each other in this K4 group.
-pub fn board_symm_state<const N: usize, const N2: usize, const ADJ_CNT_SIZE: usize>(
-  onoro: &OnoroImpl<N, N2, ADJ_CNT_SIZE>,
-) -> BoardSymmetryState {
+pub fn board_symm_state<const N: usize>(onoro: &OnoroImpl<N>) -> BoardSymmetryState {
   let sum_of_mass = onoro.sum_of_mass();
   let pawns_in_play = onoro.pawns_in_play();
 

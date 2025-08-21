@@ -101,14 +101,6 @@ impl<I: PrimInt> Default for MinAndMax<I> {
   }
 }
 
-/// Given a `u8`, returns a `u64` with each byte of the `u64` equal to the
-/// passed `u8`.
-#[inline(always)]
-pub const fn broadcast_u8_to_u64(v: u8) -> u64 {
-  const BYTE_ANCHOR: u64 = 0x0101_0101_0101_0101;
-  (v as u64) * BYTE_ANCHOR
-}
-
 #[inline]
 #[target_feature(enable = "ssse3")]
 unsafe fn packed_positions_to_mask_sse3(packed_positions: u64) -> u64 {
@@ -353,34 +345,12 @@ mod tests {
 
   use crate::{
     PackedIdx,
+    test_util::PawnPoses,
     util::{
-      CoordLimits, MinAndMax, broadcast_u8_to_u64, equal_mask_epi8, equal_mask_epi8_slow,
-      packed_positions_coord_limits, packed_positions_coord_limits_slow, packed_positions_to_mask,
-      packed_positions_to_mask_slow,
+      CoordLimits, MinAndMax, equal_mask_epi8, equal_mask_epi8_slow, packed_positions_coord_limits,
+      packed_positions_coord_limits_slow, packed_positions_to_mask, packed_positions_to_mask_slow,
     },
   };
-
-  #[repr(align(8))]
-  struct PawnPoses([PackedIdx; 16]);
-
-  #[template]
-  #[rstest]
-  fn broadcast_u8_to_u64(
-    #[values(
-      (0x12, 0x12_12_12_12_12_12_12_12),
-      (0x00, 0x00_00_00_00_00_00_00_00),
-      (0xff, 0xff_ff_ff_ff_ff_ff_ff_ff),
-    )]
-    args: (u8, u64),
-  ) {
-  }
-
-  #[apply(broadcast_u8_to_u64)]
-  #[test]
-  fn test_broadcast_u8_to_u64(args: (u8, u64)) {
-    let (input, expected) = args;
-    assert_eq!(broadcast_u8_to_u64(input), expected);
-  }
 
   #[template]
   #[rstest]
