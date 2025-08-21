@@ -38,6 +38,12 @@ jobs:
       - name: Test cooperate
         working-directory: cooperate
         run: cargo test
+      - name: Test union find
+        working-directory: union_find
+        run: cargo test
+      - name: Test onoro impl
+        working-directory: onoro_impl
+        run: cargo test
       - name: Test onoro
         working-directory: onoro
         run: cargo test

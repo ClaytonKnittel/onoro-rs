@@ -78,11 +78,11 @@ impl UnionFind {
 
 #[cfg(test)]
 mod tests {
-  use crate::ConstUnionFind;
+  use crate::UnionFind;
 
   #[test]
   fn test_basic() {
-    let mut uf = ConstUnionFind::<10>::new();
+    let mut uf = UnionFind::new(10);
 
     for i in 0..10 {
       assert_eq!(uf.find(i), i);
@@ -105,7 +105,7 @@ mod tests {
 
   #[test]
   fn test_long_chain() {
-    let mut uf = ConstUnionFind::<256>::new();
+    let mut uf = UnionFind::new(256);
 
     for i in 0..255 {
       uf.union(i, i + 1);
