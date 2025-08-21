@@ -2,7 +2,10 @@ use abstract_game::GameMoveIterator;
 use onoro::{Onoro, PawnColor};
 
 use crate::{
-  Move, OnoroImpl, PackedIdx, num_iter::IterOnes, p1_move_gen::P1MoveGenerator, util::unreachable,
+  Move, OnoroImpl, PackedIdx,
+  num_iter::IterOnes,
+  p1_move_gen::P1MoveGenerator,
+  util::{unlikely, unreachable},
 };
 
 #[derive(Clone, Copy, Debug)]
@@ -96,8 +99,8 @@ impl PawnMeta {
     debug_assert!((1..=16).contains(&enter_time));
     debug_assert!((1..=17).contains(&exit_time));
     self.packed_data += 0x20;
-    if (self.packed_data & 0x60) == 0x20 {
-      self.packed_data += (((enter_time - 1) << 7) | ((exit_time - 1) << 11)) as u16;
+    if unlikely((self.packed_data & 0x60) == 0x20) {
+      self.packed_data += (((enter_time - 1) << 7) + ((exit_time - 1) << 11)) as u16;
     }
   }
 }
