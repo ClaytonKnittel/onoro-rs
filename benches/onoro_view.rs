@@ -21,7 +21,7 @@ fn construct_views(c: &mut Criterion) {
     .build()
     .unwrap();
 
-  group.bench_function("make move", |b| {
+  group.bench_function("construct after 18 moves", |b| {
     b.iter(|| {
       for onoro in &states {
         let view = OnoroView::find_canonical_view(onoro);
