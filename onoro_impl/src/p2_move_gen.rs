@@ -53,8 +53,20 @@ impl Default for PawnConnectedMobility {
 
 #[derive(Clone, Copy, Default)]
 struct PawnMeta {
-  /// The discovery index of this pawn when doing the depth-first exploration
-  /// of the pawn graph.
+  /// Contains the pawns generation count, discovered bit, connected mobility
+  /// state, and enter/exit time if a `CuttingPoint`.
+  ///
+  /// Here is the layout in binary:
+  /// ```text
+  ///  16  .  .  .  12 11   .    .   8    7    6      5    4   .   .   1
+  /// +---------------+----------------+----------+------+---------------+
+  /// | exit_time - 1 | enter_time - 1 | cm_state | disc | gen_count - 1 |
+  /// +---------------+----------------+----------+------+---------------+
+  /// ```
+  ///
+  /// cm_state ranges from 0b00 - 0b10, corresponding to
+  /// `PawnConnectedMobility::Free`, `PawnConnectedMobility::CuttingPoint`, and
+  /// `PawnConnectedMobility::Immobile` respectively.
   packed_data: u16,
 
   /// A mask of the neighbors of this pawn in the pawn metadata/pawn_poses
@@ -64,53 +76,90 @@ struct PawnMeta {
 }
 
 impl PawnMeta {
+  const GENERATION_COUNT_MASK: u16 = 0xf;
+  const MAX_GENERATION_COUNT: u32 = Self::GENERATION_COUNT_MASK as u32 + 1;
+  const DISCOVERED_BIT: u16 = 0x10;
+
+  const CONNECTED_MOBILITY_MASK: u16 = 0x60;
+  const ADVANCE_CONNECTED_MOBILITY: u16 = 0x20;
+  const FREE: u16 = 0x00;
+  const CUTTING_POINT: u16 = 0x20;
+  const IMMOBILE: u16 = 0x40;
+
+  const ENTER_TIME_SHIFT: u32 = 7;
+  const ENTER_TIME_MASK: u16 = 0xf;
+  const MAX_ENTER_TIME: u32 = Self::ENTER_TIME_MASK as u32 + 1;
+  const EXIT_TIME_SHIFT: u32 = 11;
+  const EXIT_TIME_MASK: u16 = 0x1f;
+  const MAX_EXIT_TIME: u32 = Self::EXIT_TIME_MASK as u32 + 1;
+
+  /// Returns true if this pawn has been discovered already in the DFS.
   fn discovered(&self) -> bool {
-    (self.packed_data & 0x10) != 0
+    (self.packed_data & Self::DISCOVERED_BIT) != 0
   }
 
+  /// Returns the generation count of this pawn. Requires `self.discovered()`.
   fn discovery_time(&self) -> u32 {
     debug_assert!(self.discovered());
-    (self.packed_data & 0xf) as u32 + 1
+    (self.packed_data & Self::GENERATION_COUNT_MASK) as u32 + 1
   }
 
+  /// Sets the discovery time, to be called when a pawn is first discovered.
+  /// Requires `!self.discovered()`.
   fn set_discovery_time(&mut self, time: u32) {
     debug_assert!(!self.discovered());
-    debug_assert!((1..=16).contains(&time));
-    self.packed_data += 0x10 + (time - 1) as u16;
+    debug_assert!((1..=Self::MAX_GENERATION_COUNT).contains(&time));
+    self.packed_data += Self::DISCOVERED_BIT + (time - 1) as u16;
   }
 
   fn connected_mobility(&self) -> PawnConnectedMobility {
-    match self.packed_data & 0x60 {
-      0x00 => PawnConnectedMobility::Free,
-      0x20 => PawnConnectedMobility::CuttingPoint {
-        enter_time: ((self.packed_data >> 7) & 0xf) as u32 + 1,
-        exit_time: (self.packed_data >> 11) as u32 + 1,
+    match self.packed_data & Self::CONNECTED_MOBILITY_MASK {
+      Self::FREE => PawnConnectedMobility::Free,
+      Self::CUTTING_POINT => PawnConnectedMobility::CuttingPoint {
+        enter_time: ((self.packed_data >> Self::ENTER_TIME_SHIFT) & Self::ENTER_TIME_MASK) as u32
+          + 1,
+        exit_time: ((self.packed_data >> Self::EXIT_TIME_SHIFT) & Self::EXIT_TIME_MASK) as u32 + 1,
       },
-      0x40 => PawnConnectedMobility::Immobile,
+      Self::IMMOBILE => PawnConnectedMobility::Immobile,
       _ => unreachable(),
     }
   }
 
+  /// Advances the connected mobility status of this pawn. This starts off as
+  /// `ConnectedMobility::Free`, and advances to `CuttingPoint`, then to
+  /// `Immobile`. This should be called on a node in the DFS after returning
+  /// from exploring a child which did not connect back to any previously
+  /// discovered pawns.
   fn advance_connected_mobility(&mut self, enter_time: u32, exit_time: u32) {
     debug_assert!(!matches!(
       self.connected_mobility(),
       PawnConnectedMobility::Immobile
     ));
-    debug_assert!((1..=16).contains(&enter_time));
-    debug_assert!((1..=17).contains(&exit_time));
-    self.packed_data += 0x20;
-    if unlikely((self.packed_data & 0x60) == 0x20) {
-      self.packed_data += (((enter_time - 1) << 7) + ((exit_time - 1) << 11)) as u16;
+    debug_assert!((1..=Self::MAX_ENTER_TIME).contains(&enter_time));
+    debug_assert!((1..=Self::MAX_EXIT_TIME).contains(&exit_time));
+    self.packed_data += Self::ADVANCE_CONNECTED_MOBILITY;
+    if unlikely((self.packed_data & Self::CONNECTED_MOBILITY_MASK) == Self::CUTTING_POINT) {
+      self.packed_data += (((enter_time - 1) << Self::ENTER_TIME_SHIFT)
+        + ((exit_time - 1) << Self::EXIT_TIME_SHIFT)) as u16;
     }
   }
 }
 
 struct DFSParams<'a, const N: usize> {
+  /// The pawn metadata array being constructed, which will be moved to the
+  /// move generator object after the DFS is completed. This is indexed in the
+  /// same order as `onoro.pawn_poses()`.
   pawn_meta: &'a mut [PawnMeta; N],
+  /// The array of earliest connected ancestors of each pawn, indexed in the
+  /// same order as `onoro.pawn_poses()`.
   ecas: &'a mut [u32; N],
+  /// The current generation count, starting at 1 and incrementing for each
+  /// newly discovered pawn.
   time: &'a mut u32,
 }
 
+/// An iterator-like struct for enumerating all valid moves from an Onoro
+/// position.
 pub struct P2MoveGenerator<const N: usize> {
   pawn_meta: [PawnMeta; N],
   p1_move_gen: P1MoveGenerator<N>,
@@ -120,11 +169,13 @@ pub struct P2MoveGenerator<const N: usize> {
 }
 
 impl<const N: usize> P2MoveGenerator<N> {
+  /// Constructs a `P2MoveGenerator` from an Onoro state.
   pub fn new(onoro: &OnoroImpl<N>) -> Self {
     debug_assert!(!onoro.in_phase1());
     Self::from_pawn_poses(onoro.pawn_poses(), matches!(onoro.turn(), PawnColor::Black))
   }
 
+  /// Constructs a `P2MoveGenerator` from an array of pawn positions.
   pub fn from_pawn_poses(pawn_poses: &[PackedIdx; N], black_turn: bool) -> Self {
     let p1_move_gen = P1MoveGenerator::from_pawn_poses(pawn_poses);
     let pawn_meta = Self::build_pawn_meta(pawn_poses, &p1_move_gen);
@@ -138,6 +189,8 @@ impl<const N: usize> P2MoveGenerator<N> {
     }
   }
 
+  /// Returns an iterator over the indices of each neighbor of the pawn at
+  /// index `pawn_index` in the `pawn_poses` array.
   fn neighbors(
     pawn_index: usize,
     pawn_poses: &[PackedIdx; N],
@@ -154,7 +207,13 @@ impl<const N: usize> P2MoveGenerator<N> {
       })
   }
 
-  fn next_move_with_neighbors(&mut self, pawn_poses: &[PackedIdx; N]) -> Option<(PackedIdx, u16)> {
+  /// Returns a tuple of (phase 1 move, neighbors mask) of the next phase 1
+  /// move that can be played in this position, along with a mask of the
+  /// neighbors of that position.
+  fn next_p1_move_with_neighbors(
+    &mut self,
+    pawn_poses: &[PackedIdx; N],
+  ) -> Option<(PackedIdx, u16)> {
     let (pos, neighbors) = self.p1_move_gen.next_move_pos_with_neighbors()?;
     let indexer = self.p1_move_gen.indexer();
     Some((
@@ -167,6 +226,8 @@ impl<const N: usize> P2MoveGenerator<N> {
     ))
   }
 
+  /// Recursively explores the Onoro board in DFS, populating the metadata for
+  /// the pawn at index `pawn_index`.
   fn recursor(
     pawn_index: usize,
     parent_index: usize,
@@ -180,6 +241,7 @@ impl<const N: usize> P2MoveGenerator<N> {
       time,
     } = params;
 
+    // Set the discovery time of this pawn to the current time, and advance the time.
     let meta = &mut pawn_meta[pawn_index];
     meta.set_discovery_time(*time);
     ecas[pawn_index] = *time;
@@ -189,16 +251,21 @@ impl<const N: usize> P2MoveGenerator<N> {
       // Record all neighbors of the pawn, to later be filtered down to
       // neighbors with 2 neighbors themselves.
       pawn_meta[pawn_index].dangling_neighbors_index_mask |= 1 << neighbor_index;
+      // Skip our parent: we don't allow backwards traversal.
       if neighbor_index == parent_index {
         continue;
       }
 
       let neighbor_meta = pawn_meta[neighbor_index];
       if neighbor_meta.discovered() {
+        // For already-discovered neighbors, check if their discovered time is
+        // less than our earliest-connected-ancestor time, and if so update it.
         ecas[pawn_index] = ecas[pawn_index].min(neighbor_meta.discovery_time());
         continue;
       }
 
+      // Record the time we started exploring this undiscovered child, in case
+      // we realize later that `pawn_index` is a cutting point.
       let enter_time = *time;
       Self::recursor(
         neighbor_index,
@@ -212,9 +279,15 @@ impl<const N: usize> P2MoveGenerator<N> {
         p1_move_gen,
       );
 
+      // Set our earliest-connected-ancestor to this neighbor's, if it is lower
+      // than ours, since by transitivity we can reach any node that this child
+      // can reach without backtracking.
       let neighbor_eca = ecas[neighbor_index];
       ecas[pawn_index] = ecas[pawn_index].min(neighbor_eca);
 
+      // If this neighbor did not connect back to some previously discovered
+      // node, then it is an isolated subtree, and we need to advance our
+      // connected mobility tracker.
       let meta = &mut pawn_meta[pawn_index];
       if neighbor_eca >= meta.discovery_time() {
         meta.advance_connected_mobility(enter_time, *time);
@@ -222,6 +295,7 @@ impl<const N: usize> P2MoveGenerator<N> {
     }
   }
 
+  /// Populates the pawn metadata array by exploring the Onoro board in DFS.
   fn build_pawn_meta(
     pawn_poses: &[PackedIdx; N],
     p1_move_gen: &P1MoveGenerator<N>,
@@ -229,6 +303,8 @@ impl<const N: usize> P2MoveGenerator<N> {
     let mut pawn_meta = [PawnMeta::default(); N];
     let mut ecas = [0u32; N];
     let mut time = 1;
+
+    // We may choose any pawn to start exploring from.
     pawn_meta[0].set_discovery_time(time);
     ecas[0] = time;
     time += 1;
@@ -238,10 +314,14 @@ impl<const N: usize> P2MoveGenerator<N> {
       // Record all neighbors of the pawn, to later be filtered down to
       // neighbors with 2 neighbors themselves.
       pawn_meta[0].dangling_neighbors_index_mask |= 1 << neighbor_index;
+
+      // Skip any already-discovered children.
       if pawn_meta[neighbor_index].discovered() {
         continue;
       }
 
+      // Record the time we started exploring this undiscovered child, in case
+      // we realize later that `pawn_index` is a cutting point.
       let enter_time = time;
       Self::recursor(
         neighbor_index,
@@ -256,8 +336,14 @@ impl<const N: usize> P2MoveGenerator<N> {
       );
 
       if first_iteration {
+        // If this is the first subtree we have explored, we should not advance
+        // the connected mobility state, since we are not yet a cutting point
+        // (as we have no parent).
         first_iteration = false;
       } else {
+        // Otherwise, if this is the second or third child we have explored, we
+        // know it to be disconnected from the rest of the graph explored so
+        // far, so we can advance our connected mobility state.
         pawn_meta[0].advance_connected_mobility(enter_time, time);
       }
     }
@@ -270,8 +356,9 @@ impl<const N: usize> P2MoveGenerator<N> {
       .filter_map(|(i, meta)| (meta.dangling_neighbors_index_mask.count_ones() == 2).then_some(i))
       .fold(0, |mask, i| mask | (1 << i));
 
-    // Clear all pawns from the neighbor index masks which have more than two
-    // neighbors.
+    // Clear all pawns which have more than two neighbors from every neighbor
+    // index mask. After this, `dangling_neighbors_index_mask` will contain
+    // only neighbors of each pawn which have exactly two neighbors.
     for meta in &mut pawn_meta {
       meta.dangling_neighbors_index_mask &= two_neighbor_mask;
     }
@@ -287,6 +374,11 @@ impl<const N: usize> P2MoveGenerator<N> {
         enter_time,
         exit_time,
       } => {
+        // If this pawn is a cutting point, we need to check that among its
+        // neighbors, at least one has a generation count within
+        // `enter_time..exit_time` (e.g. is in the isolated subtree rooted by
+        // the child of this node), and at least one has a generation count
+        // outside that range.
         let mut v = 0;
         for neighbor_index in dst_neighbors.iter_ones() {
           let neighbor_meta = self.pawn_meta[neighbor_index as usize];
@@ -297,6 +389,9 @@ impl<const N: usize> P2MoveGenerator<N> {
           }
         }
 
+        // If both bits were set, then we have successfully reconnected the
+        // isolated subtree rooted at our child with the rest of the graph from
+        // this position.
         v == 3
       }
       PawnConnectedMobility::Immobile => false,
@@ -307,20 +402,25 @@ impl<const N: usize> P2MoveGenerator<N> {
   /// only 1 neighbor).
   fn resolved_dangling_neighbors(meta: &PawnMeta, dst_neighbors: u16) -> bool {
     let dangling_neighbors = meta.dangling_neighbors_index_mask;
+    // The move does not leave any pawns dangling if all of our current
+    // neighbors with exactly 2 neighbors themselves are adjacent to the
+    // destination.
     dangling_neighbors == (dangling_neighbors & dst_neighbors)
   }
 
+  /// Returns true if the pawn at `self.pawn_index` can legally move from its
+  /// current position to `self.cur_tile`.
   fn is_valid_move(&self) -> bool {
     let dst_neighbors = self.neighbor_mask & !(1 << self.pawn_index);
-
-    let meta = &self.pawn_meta[self.pawn_index];
-    if !self.move_is_connected(meta, dst_neighbors) {
-      return false;
-    }
 
     // Check that this pawn has enough neighbors to move here after excluding
     // itself from the neighbors list.
     if dst_neighbors.count_ones() < 2 {
+      return false;
+    }
+
+    let meta = &self.pawn_meta[self.pawn_index];
+    if !self.move_is_connected(meta, dst_neighbors) {
       return false;
     }
 
@@ -339,14 +439,23 @@ impl<const N: usize> GameMoveIterator for P2MoveGenerator<N> {
   fn next(&mut self, onoro: &Self::Game) -> Option<Self::Item> {
     loop {
       if self.pawn_index >= N - 2 {
-        let (pos, neighbor_mask) = self.next_move_with_neighbors(onoro.pawn_poses())?;
+        // If we have finished checking all of our pawns, it's time to move on
+        // to the next candidate destination.
+        let (pos, neighbor_mask) = self.next_p1_move_with_neighbors(onoro.pawn_poses())?;
         self.cur_tile = pos;
         self.neighbor_mask = neighbor_mask;
+        // Reset the pawn index. Note that this trick allows us to avoid
+        // checking which player's turn it is, as it preserves the parity of
+        // `self.pawn_index`.
         self.pawn_index -= N - 2;
       } else {
+        // If we have not finished checking all of our pawns, check the next
+        // pawn in `onoro.pawn_poses()`.
         self.pawn_index += 2;
       }
 
+      // If this move is valid, we can break and emit
+      // `self.pawn_index` -> `self.cur_tile` as a legal move.
       if self.is_valid_move() {
         break;
       }
