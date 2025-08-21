@@ -180,11 +180,10 @@ dependencies = [
  "abstract_game",
  "algebra",
  "const-random",
- "googletest",
  "itertools",
+ "num-traits",
  "onoro",
  "rand 0.8.5",
- "union_find",
 ]
 
 [[package]]

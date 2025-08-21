@@ -134,6 +134,24 @@ fn phase2_move_adjacencies<T: Onoro>(
 #[apply(onoro_factory)]
 #[gtest]
 fn test_each_move_default_start<T: OnoroFactory>(_factory: T) -> OnoroResult {
+  let onoro = T::T::default_start();
+  let adj = phase1_move_adjacencies(&onoro)?;
+
+  expect_that!(
+    adj,
+    unordered_elements_are![
+      unordered_elements_are![BLACK, WHITE],
+      unordered_elements_are![BLACK, WHITE],
+      unordered_elements_are![BLACK, BLACK],
+    ]
+  );
+
+  Ok(())
+}
+
+#[apply(onoro_factory)]
+#[gtest]
+fn test_each_move_default_start_string<T: OnoroFactory>(_factory: T) -> OnoroResult {
   let onoro = T::from_board_string(
     ". W
       B B",

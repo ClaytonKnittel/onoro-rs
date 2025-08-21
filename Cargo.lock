@@ -811,11 +811,10 @@ dependencies = [
  "abstract_game",
  "algebra",
  "const-random",
- "googletest",
  "itertools 0.11.0",
+ "num-traits",
  "onoro",
  "rand 0.8.5",
- "union_find",
 ]
 
 [[package]]
@@ -872,7 +871,7 @@ dependencies = [
  "cfg-if",
  "libc",
  "redox_syscall 0.3.5",
- "smallvec 1.11.0",
+ "smallvec 1.15.1",
  "windows-targets",
 ]
 
@@ -931,7 +930,7 @@ dependencies = [
  "nix",
  "once_cell",
  "parking_lot 0.12.1",
- "smallvec 1.11.0",
+ "smallvec 1.15.1",
  "symbolic-demangle",
  "tempfile",
  "thiserror",
@@ -1296,9 +1295,9 @@ dependencies = [
 
 [[package]]
 name = "smallvec"
-version = "1.11.0"
+version = "1.15.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "62bb4feee49fdd9f707ef802e22365a35de4b7b299de4763d44bfea899442ff9"
+checksum = "67b1b7a3b5fe4f1376887184045fcf45c69e92af734b7aaddc05fb777b6fbd03"
 
 [[package]]
 name = "stable_deref_trait"

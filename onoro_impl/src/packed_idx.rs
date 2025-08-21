@@ -1,19 +1,30 @@
-use std::{fmt::Display, num::Wrapping};
+use std::{
+  borrow::Borrow,
+  fmt::{Debug, Display},
+  num::Wrapping,
+};
 
 use onoro::{
   OnoroIndex,
   hex_pos::{HexPos, HexPosOffset},
 };
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub struct PackedIdx {
   bytes: Wrapping<u8>,
 }
 
 impl PackedIdx {
+  const MAX_VAL: u32 = 0x10;
+
+  /// An offset to apply to (y - x) so it is never negative.
+  pub const fn xy_offset<const N: usize>() -> u32 {
+    N as u32
+  }
+
   pub const fn new(x: u32, y: u32) -> Self {
-    debug_assert!(x < 0x10);
-    debug_assert!(y < 0x10);
+    debug_assert!(x < Self::MAX_VAL);
+    debug_assert!(y < Self::MAX_VAL);
 
     Self {
       bytes: Wrapping((x | (y << 4)) as u8),
@@ -35,6 +46,24 @@ impl PackedIdx {
     ((self.bytes.0 as u32) >> 4) & 0x0fu32
   }
 
+  /// Returns the coordinate along the xy-axis, the angular bisector between
+  /// the x- and y-axes. This is normalized such that any PackedIdx will return
+  /// a positive value.
+  ///
+  ///```text
+  /// (0,3)   (1,3)   (2,3)   (3,3)
+  ///   3       2       1       0
+  ///     (0,2)   (1,2)   (2,2)   (3,2)
+  ///       2       1       0      -1
+  ///         (0,1)   (1,1)   (2,1)   (3,1)
+  ///           1       0      -1      -2
+  ///             (0,0)   (1,0)   (2,0)   (3,0)
+  ///               0      -1      -2      -3
+  ///```
+  pub const fn xy<const N: usize>(&self) -> u32 {
+    self.y() + Self::xy_offset::<N>() - self.x()
+  }
+
   /// Returns the underlying representation of the `PackedIdx` as a `u8`.
   ///
   /// # Safety
@@ -54,6 +83,20 @@ impl PackedIdx {
     PackedIdx {
       bytes: Wrapping(self.bytes.0.wrapping_add(other.bytes.0)),
     }
+  }
+
+  /// # Safety
+  ///
+  /// This breaks the type safety of relative/absolute coordinates.
+  pub const unsafe fn from_idx_offset(offset: IdxOffset) -> Self {
+    PackedIdx {
+      bytes: Wrapping(offset.bytes.0),
+    }
+  }
+
+  #[allow(dead_code)]
+  const fn on_perimeter(&self) -> bool {
+    self.x() == 0 || self.x() == Self::MAX_VAL - 1 || self.y() == 0 || self.y() == Self::MAX_VAL - 1
   }
 }
 
@@ -105,9 +148,27 @@ impl std::ops::AddAssign<IdxOffset> for PackedIdx {
   }
 }
 
+impl std::ops::Sub for PackedIdx {
+  type Output = IdxOffset;
+
+  fn sub(self, rhs: Self) -> Self::Output {
+    debug_assert!(
+      self.x() >= rhs.x() && self.y() >= rhs.y(),
+      "Cannot subtract larger PackedIdx from smaller one: {self} - {rhs}"
+    );
+    IdxOffset::from_bytes(Wrapping(self.bytes.0.wrapping_sub(rhs.bytes.0)))
+  }
+}
+
 impl Display for PackedIdx {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     write!(f, "({}, {})", self.x(), self.y())
+  }
+}
+
+impl Debug for PackedIdx {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(f, "{self}")
   }
 }
 
@@ -121,6 +182,10 @@ impl IdxOffset {
     Self {
       bytes: Wrapping(Self::by_x(x).bytes.0.wrapping_add(Self::by_y(y).bytes.0)),
     }
+  }
+
+  const fn from_bytes(bytes: Wrapping<u8>) -> Self {
+    Self { bytes }
   }
 
   /// Constructs an `IdxOffset` that shifts a `PackedIdx` by `dx` along the
@@ -180,8 +245,25 @@ impl std::ops::AddAssign for IdxOffset {
   }
 }
 
+pub trait FilterNullPackedIdx<B: Borrow<PackedIdx>>: Iterator<Item = B> {
+  /// Filters null `PackedIdx`'s from the iterator.
+  fn filter_null(self) -> impl Iterator<Item = B>;
+}
+
+impl<B, I> FilterNullPackedIdx<B> for I
+where
+  B: Borrow<PackedIdx>,
+  I: Iterator<Item = B>,
+{
+  fn filter_null(self) -> impl Iterator<Item = B> {
+    self.filter(|packed_idx| *packed_idx.borrow() != PackedIdx::null())
+  }
+}
+
 #[cfg(test)]
 mod tests {
+  use onoro::{OnoroIndex, hex_pos::HexPos};
+
   use super::{IdxOffset, PackedIdx};
 
   #[test]
@@ -229,5 +311,22 @@ mod tests {
     let pos = PackedIdx::new(3, 7);
     let offset = IdxOffset::new(-2, -1);
     assert_eq!(pos + offset, PackedIdx::new(1, 6));
+  }
+
+  #[test]
+  fn test_adjacent() {
+    for y1 in 0..16 {
+      for x1 in 0..16 {
+        for y2 in 1..15 {
+          for x2 in 1..15 {
+            assert_eq!(
+              PackedIdx::new(x1, y1).adjacent(PackedIdx::new(x2, y2)),
+              HexPos::new(x1, y1).adjacent(&HexPos::new(x2, y2)),
+              "({x1}, {y1}) adjacent to ({x2}, {y2})"
+            );
+          }
+        }
+      }
+    }
   }
 }

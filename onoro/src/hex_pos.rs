@@ -4,7 +4,7 @@ use algebra::group::{Cyclic, Trivial};
 
 use crate::groups::{C2, D3, D6, K4};
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct HexPos {
   x: u32,
   y: u32,
@@ -25,6 +25,18 @@ impl HexPos {
 
   pub const fn y(&self) -> u32 {
     self.y
+  }
+
+  pub fn neighbor_offsets() -> std::array::IntoIter<HexPosOffset, 6> {
+    [
+      HexPosOffset::new(-1, -1),
+      HexPosOffset::new(0, -1),
+      HexPosOffset::new(-1, 0),
+      HexPosOffset::new(1, 0),
+      HexPosOffset::new(0, 1),
+      HexPosOffset::new(1, 1),
+    ]
+    .into_iter()
   }
 
   /// Returns an iterator over all neighbors of this `HexPos`.
@@ -52,6 +64,13 @@ impl HexPos {
       self + &HexPosOffset::new(-1, 0),
     ]
     .into_iter()
+  }
+
+  /// Returns true if `self` and `other` are adjacent.
+  pub fn adjacent(&self, other: &HexPos) -> bool {
+    let dx = self.x() as i32 - other.x() as i32;
+    let dy = self.y() as i32 - other.y() as i32;
+    (-1..=1).contains(&dx) && (-1..=1).contains(&dy) && dx * dy != -1
   }
 
   pub const fn clone_const(&self) -> Self {

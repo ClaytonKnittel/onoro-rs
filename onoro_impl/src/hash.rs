@@ -1,4 +1,4 @@
-use std::ops::Index;
+use std::ops::{Index, IndexMut};
 
 use algebra::{
   finite::Finite,
@@ -20,15 +20,53 @@ use crate::{
 };
 
 #[derive(Debug)]
-pub struct HashTable<const N: usize, const N2: usize, G: Group> {
-  table: [TileHash<G>; N2],
+struct ConstTable<T, const N: usize> {
+  table: [[T; N]; N],
 }
 
-impl<const N: usize, const N2: usize, G: Group> HashTable<N, N2, G> {
+impl<T, const N: usize> ConstTable<T, N> {
+  const fn filled(default: T) -> Self
+  where
+    T: Copy,
+  {
+    Self {
+      table: [[default; N]; N],
+    }
+  }
+
+  const fn get(&self, index: usize) -> &T {
+    &self.table[index / N][index % N]
+  }
+
+  const fn get_mut(&mut self, index: usize) -> &mut T {
+    &mut self.table[index / N][index % N]
+  }
+}
+
+impl<T, const N: usize> Index<usize> for ConstTable<T, N> {
+  type Output = T;
+
+  fn index(&self, index: usize) -> &Self::Output {
+    self.get(index)
+  }
+}
+
+impl<T, const N: usize> IndexMut<usize> for ConstTable<T, N> {
+  fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+    self.get_mut(index)
+  }
+}
+
+#[derive(Debug)]
+pub struct HashTable<const N: usize, G: Group> {
+  table: ConstTable<TileHash<G>, N>,
+}
+
+impl<const N: usize, G: Group> HashTable<N, G> {
   /// Computes the hash of a game state on a given hash table.
-  pub fn hash<const ONORO_N: usize, const ONORO_N2: usize, const ADJ_CNT_SIZE: usize>(
+  pub fn hash<const ONORO_N: usize>(
     &self,
-    onoro: &OnoroImpl<ONORO_N, ONORO_N2, ADJ_CNT_SIZE>,
+    onoro: &OnoroImpl<ONORO_N>,
     symm_state: &BoardSymmetryState,
   ) -> u64 {
     let origin = onoro.origin(symm_state);
@@ -62,7 +100,7 @@ impl<const N: usize, const N2: usize, G: Group> HashTable<N, N2, G> {
   }
 
   /// Converts a `HexPos` to an ordinal, which is a unique mapping from valid
-  /// `HexPos`s on the board to the range 0..N2.
+  /// `HexPos`s on the board to the range 0..N*N.
   const fn hex_pos_ord(pos: &HexPos) -> usize {
     pos.x() as usize + (pos.y() as usize) * N
   }
@@ -83,14 +121,14 @@ impl<const N: usize, const N2: usize, G: Group> HashTable<N, N2, G> {
   }
 }
 
-impl<const N: usize, const N2: usize> HashTable<N, N2, D6> {
+impl<const N: usize> HashTable<N, D6> {
   /// Generates a hash table for boards with symmetry class C.
   pub const fn new_c() -> Self {
-    let mut table = [TileHash::<D6>::uninitialized(); N2];
+    let mut table = ConstTable::filled(TileHash::<D6>::uninitialized());
     let mut rng = Xoroshiro128::from_seed(&[const_random!(u64), const_random!(u64)]);
 
     let mut i = 0usize;
-    'tile_loop: while i < N2 {
+    'tile_loop: while i < N * N {
       let pos = Self::ord_to_hex_pos(i);
 
       // Normalize coordinates to the center.
@@ -102,7 +140,7 @@ impl<const N: usize, const N2: usize> HashTable<N, N2, D6> {
       let d6b = TileHash::<D6>::new(h_cur & C_MASK, h_oth & C_MASK);
 
       if pos.eq_cnst(&HexPosOffset::origin()) {
-        table[i] = d6b.make_invariant(&D6::Rot(1)).make_invariant(&D6::Rfl(0));
+        *table.get_mut(i) = d6b.make_invariant(&D6::Rot(1)).make_invariant(&D6::Rfl(0));
         i += 1;
         continue;
       }
@@ -119,9 +157,9 @@ impl<const N: usize, const N2: usize> HashTable<N, N2, D6> {
         let symm_pos = s.add_hex(&Self::center());
         if Self::has_been_computed(&symm_pos, i) {
           let ord = Self::hex_pos_ord(&symm_pos);
-          let hash = table[ord];
+          let hash = table.get(ord);
           // Apply the accumulated group op to transform `s` back to `pos`.
-          table[i] = hash.apply(&op);
+          *table.get_mut(i) = hash.apply(&op);
           i += 1;
           continue 'tile_loop;
         }
@@ -136,7 +174,7 @@ impl<const N: usize, const N2: usize> HashTable<N, N2, D6> {
       while r < 6 {
         if s.eq_cnst(&pos) {
           // This tile is symmetric to itself under some reflection
-          table[i] = d6b.make_invariant(&op);
+          *table.get_mut(i) = d6b.make_invariant(&op);
           i += 1;
           continue 'tile_loop;
         }
@@ -144,9 +182,9 @@ impl<const N: usize, const N2: usize> HashTable<N, N2, D6> {
         let symm_pos = s.add_hex(&Self::center());
         if Self::has_been_computed(&symm_pos, i) {
           let ord = Self::hex_pos_ord(&symm_pos);
-          let hash = table[ord];
+          let hash = table.get(ord);
           // Apply the accumulated group op to transform `s` back to `pos`.
-          table[i] = hash.apply(&op);
+          *table.get_mut(i) = hash.apply(&op);
           i += 1;
           continue 'tile_loop;
         }
@@ -159,7 +197,7 @@ impl<const N: usize, const N2: usize> HashTable<N, N2, D6> {
 
       // Otherwise, if the tile is not self-symmetric and has no symmetries that
       // have already been computed, use the randomly generated hash.
-      table[i] = d6b;
+      *table.get_mut(i) = d6b;
       i += 1;
     }
 
@@ -167,14 +205,14 @@ impl<const N: usize, const N2: usize> HashTable<N, N2, D6> {
   }
 }
 
-impl<const N: usize, const N2: usize> HashTable<N, N2, D3> {
+impl<const N: usize> HashTable<N, D3> {
   /// Generates a hash table for boards with symmetry class V.
   pub const fn new_v() -> Self {
-    let mut table = [TileHash::<D3>::uninitialized(); N2];
+    let mut table = ConstTable::filled(TileHash::<D3>::uninitialized());
     let mut rng = Xoroshiro128::from_seed(&[const_random!(u64), const_random!(u64)]);
 
     let mut i = 0usize;
-    'tile_loop: while i < N2 {
+    'tile_loop: while i < N * N {
       let pos = Self::ord_to_hex_pos(i);
 
       // Normalize coordinates to the center.
@@ -197,9 +235,9 @@ impl<const N: usize, const N2: usize> HashTable<N, N2, D3> {
         let symm_pos = s.add_hex(&Self::center());
         if Self::has_been_computed(&symm_pos, i) {
           let ord = Self::hex_pos_ord(&symm_pos);
-          let hash = table[ord];
+          let hash = table.get(ord);
           // Apply the accumulated group op to transform `s` back to `pos`.
-          table[i] = hash.apply(&op);
+          *table.get_mut(i) = hash.apply(&op);
           i += 1;
           continue 'tile_loop;
         }
@@ -214,7 +252,7 @@ impl<const N: usize, const N2: usize> HashTable<N, N2, D3> {
       while r < 3 {
         if s.eq_cnst(&pos) {
           // This tile is symmetric to itself under some reflection
-          table[i] = d3b.make_invariant(&op);
+          *table.get_mut(i) = d3b.make_invariant(&op);
           i += 1;
           continue 'tile_loop;
         }
@@ -222,9 +260,9 @@ impl<const N: usize, const N2: usize> HashTable<N, N2, D3> {
         let symm_pos = s.add_hex(&Self::center());
         if Self::has_been_computed(&symm_pos, i) {
           let ord = Self::hex_pos_ord(&symm_pos);
-          let hash = table[ord];
+          let hash = table.get(ord);
           // Apply the accumulated group op to transform `s` back to `pos`.
-          table[i] = hash.apply(&op);
+          *table.get_mut(i) = hash.apply(&op);
           i += 1;
           continue 'tile_loop;
         }
@@ -237,7 +275,7 @@ impl<const N: usize, const N2: usize> HashTable<N, N2, D3> {
 
       // Otherwise, if the tile is not self-symmetric and has no symmetries that
       // have already been computed, use the randomly generated hash.
-      table[i] = d3b;
+      *table.get_mut(i) = d3b;
       i += 1;
     }
 
@@ -245,14 +283,14 @@ impl<const N: usize, const N2: usize> HashTable<N, N2, D3> {
   }
 }
 
-impl<const N: usize, const N2: usize> HashTable<N, N2, K4> {
+impl<const N: usize> HashTable<N, K4> {
   /// Generates a hash table for boards with symmetry class E.
   pub const fn new_e() -> Self {
-    let mut table = [TileHash::<K4>::uninitialized(); N2];
+    let mut table = ConstTable::filled(TileHash::<K4>::uninitialized());
     let mut rng = Xoroshiro128::from_seed(&[const_random!(u64), const_random!(u64)]);
 
     let mut i = 0usize;
-    'tile_loop: while i < N2 {
+    'tile_loop: while i < N * N {
       let pos = Self::ord_to_hex_pos(i);
 
       // Normalize coordinates to the center.
@@ -272,9 +310,9 @@ impl<const N: usize, const N2: usize> HashTable<N, N2, K4> {
         let symm_pos = pos.apply_k4_e(&op).add_hex(&Self::center());
         if Self::has_been_computed(&symm_pos, i) {
           let ord = Self::hex_pos_ord(&symm_pos);
-          let hash = table[ord];
+          let hash = table.get(ord);
           // Apply the accumulated group op to transform `s` back to `pos`.
-          table[i] = hash.apply(&op);
+          *table.get_mut(i) = hash.apply(&op);
           i += 1;
           continue 'tile_loop;
         }
@@ -289,7 +327,7 @@ impl<const N: usize, const N2: usize> HashTable<N, N2, K4> {
         let s = pos.apply_k4_e(&op);
         if s.eq_cnst(&pos) {
           // This tile is symmetric to itself under some reflection
-          table[i] = k4b.make_invariant(&op);
+          *table.get_mut(i) = k4b.make_invariant(&op);
           i += 1;
           continue 'tile_loop;
         }
@@ -297,7 +335,7 @@ impl<const N: usize, const N2: usize> HashTable<N, N2, K4> {
 
       // Otherwise, if the tile is not self-symmetric and has no symmetries that
       // have already been computed, use the randomly generated hash.
-      table[i] = k4b;
+      *table.get_mut(i) = k4b;
       i += 1;
     }
 
@@ -305,12 +343,12 @@ impl<const N: usize, const N2: usize> HashTable<N, N2, K4> {
   }
 }
 
-impl<const N: usize, const N2: usize> HashTable<N, N2, C2> {
+impl<const N: usize> HashTable<N, C2> {
   const fn new_c2(symm_class: SymmetryClass, mut rng: Xoroshiro128) -> Self {
-    let mut table = [TileHash::<C2>::uninitialized(); N2];
+    let mut table = ConstTable::filled(TileHash::<C2>::uninitialized());
 
     let mut i = 0usize;
-    while i < N2 {
+    while i < N * N {
       let pos = Self::ord_to_hex_pos(i);
 
       // Normalize coordinates to the center.
@@ -330,14 +368,14 @@ impl<const N: usize, const N2: usize> HashTable<N, N2, C2> {
       };
       let symm_pos = s.add_hex(&Self::center());
       if s.eq_cnst(&pos) {
-        table[i] = c2b.make_invariant(&Cyclic(1));
+        *table.get_mut(i) = c2b.make_invariant(&Cyclic(1));
       } else if Self::has_been_computed(&symm_pos, i) {
         let ord = Self::hex_pos_ord(&symm_pos);
-        let hash = table[ord];
+        let hash = table.get(ord);
         // Apply the accumulated group op to transform `s` back to `pos`.
-        table[i] = hash.apply(&Cyclic(1));
+        *table.get_mut(i) = hash.apply(&Cyclic(1));
       } else {
-        table[i] = c2b;
+        *table.get_mut(i) = c2b;
       }
 
       i += 1;
@@ -362,18 +400,18 @@ impl<const N: usize, const N2: usize> HashTable<N, N2, C2> {
   }
 }
 
-impl<const N: usize, const N2: usize> HashTable<N, N2, Trivial> {
+impl<const N: usize> HashTable<N, Trivial> {
   /// Generates a hash table for boards with symmetry class E.
   pub const fn new_trivial() -> Self {
-    let mut table = [TileHash::<Trivial>::uninitialized(); N2];
+    let mut table = ConstTable::filled(TileHash::<Trivial>::uninitialized());
     let mut rng = Xoroshiro128::from_seed(&[const_random!(u64), const_random!(u64)]);
 
     let mut i = 0usize;
-    while i < N2 {
+    while i < N * N {
       let (new_rng, h_cur) = rng.next_u64();
       let (new_rng, h_oth) = new_rng.next_u64();
       rng = new_rng;
-      table[i] = TileHash::<Trivial>::new(h_cur, h_oth);
+      *table.get_mut(i) = TileHash::<Trivial>::new(h_cur, h_oth);
       i += 1;
     }
 
@@ -381,7 +419,7 @@ impl<const N: usize, const N2: usize> HashTable<N, N2, Trivial> {
   }
 }
 
-impl<const N: usize, const N2: usize, G: Group> Index<usize> for HashTable<N, N2, G> {
+impl<const N: usize, G: Group> Index<usize> for HashTable<N, G> {
   type Output = TileHash<G>;
 
   fn index(&self, index: usize) -> &Self::Output {
@@ -396,10 +434,10 @@ mod test {
 
   use crate::hash::HashTable;
 
-  type HD6 = HashTable<16, 256, D6>;
-  type HD3 = HashTable<16, 256, D3>;
-  type HK4 = HashTable<16, 256, K4>;
-  type HC2 = HashTable<16, 256, C2>;
+  type HD6 = HashTable<16, D6>;
+  type HD3 = HashTable<16, D3>;
+  type HK4 = HashTable<16, K4>;
+  type HC2 = HashTable<16, C2>;
 
   #[test]
   fn test_d6_table() {

@@ -1,4 +1,7 @@
-use googletest::{assert_that, gtest, prelude::container_eq};
+use googletest::{
+  assert_that, gtest,
+  prelude::{container_eq, ok},
+};
 use onoro::{
   Onoro,
   error::{OnoroError, OnoroResult},
@@ -83,9 +86,23 @@ fn test_random_exploration<T: OnoroFactory, U: OnoroFactory>(
   let mut rng = StdRng::seed_from_u64(seed);
 
   for _ in 0..MAX_ITERS {
-    assert_eq!(onoro1.in_phase1(), onoro2.in_phase1());
-    assert_eq!(onoro1.finished(), onoro2.finished());
-    assert_eq!(onoro1.pawns_in_play(), onoro2.pawns_in_play());
+    assert_that!(onoro1.validate(), ok(()));
+    assert_that!(onoro2.validate(), ok(()));
+    assert_eq!(
+      onoro1.in_phase1(),
+      onoro2.in_phase1(),
+      "In position:\n{onoro1:?}"
+    );
+    assert_eq!(
+      onoro1.finished(),
+      onoro2.finished(),
+      "In position:\n{onoro1:?}"
+    );
+    assert_eq!(
+      onoro1.pawns_in_play(),
+      onoro2.pawns_in_play(),
+      "In position:\n{onoro1:?}"
+    );
 
     if onoro1.finished().is_some() {
       return Ok(());

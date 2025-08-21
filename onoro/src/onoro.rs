@@ -3,7 +3,7 @@ use std::fmt::Debug;
 use itertools::interleave;
 
 use crate::{
-  error::OnoroError,
+  error::{OnoroError, OnoroResult},
   hex_pos::HexPosOffset,
   onoro_util::{pawns_from_board_string, BoardLayoutPawns},
 };
@@ -67,6 +67,24 @@ pub trait OnoroIndex: Clone + Copy + Eq + Debug {
       Self::from_coords((self.x() + 1) as u32, (self.y() + 1) as u32),
     ]
     .into_iter()
+  }
+
+  /// The distance between two hex tiles on the infinite hexagonal plane,
+  /// measured by the minimum number of tiles you would need to cross to get
+  /// from one to the other.
+  fn axial_distance(&self, other: Self) -> u32 {
+    let dx = self.x() - other.x();
+    let dy = self.y() - other.y();
+    (dx.abs() + dy.abs() + (dx - dy).abs()) as u32 / 2
+  }
+
+  /// Returns the area of the minimum bounding parallelogram containing both of
+  /// these points.
+  fn minimum_bounding_parallelogram_area(&self, other: Self) -> u64 {
+    let dx = (self.x() - other.x()).unsigned_abs() as u64 + 1;
+    let dy = (self.y() - other.y()).unsigned_abs() as u64 + 1;
+    let dxy = ((self.y() - self.x()) - (other.y() - other.x())).unsigned_abs() as u64 + 1;
+    dx * dy * dxy / dx.max(dy).max(dxy)
   }
 }
 
@@ -288,12 +306,13 @@ pub trait Onoro: Sized {
     .unwrap()
   }
 
-  fn display(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    match self.turn() {
-      PawnColor::Black => writeln!(f, "black:")?,
-      PawnColor::White => writeln!(f, "white:")?,
-    }
+  /// Validates the game state, returning an error if the state is invalid.
+  /// This is used in tests to ensure that the game state is consistent.
+  fn validate(&self) -> OnoroResult {
+    Ok(())
+  }
 
+  fn display(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     let ((min_x, min_y), (max_x, max_y)) = self.pawns().fold(
       ((Self::board_width(), Self::board_width()), (0, 0)),
       |((min_x, min_y), (max_x, max_y)), pawn| {
@@ -314,6 +333,16 @@ pub trait Onoro: Sized {
     let min_y = min_y.saturating_sub(1);
     let max_x = (max_x + 1).min(Self::board_width() - 1);
     let max_y = (max_y + 1).min(Self::board_width() - 1);
+
+    writeln!(
+      f,
+      "{}: {:?} is bottom left",
+      match self.turn() {
+        PawnColor::Black => "black",
+        PawnColor::White => "white",
+      },
+      (min_x, min_y)
+    )?;
 
     for y in (min_y..=max_y).rev() {
       write!(f, "{: <width$}", "", width = max_y - y)?;
