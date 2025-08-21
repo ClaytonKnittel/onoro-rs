@@ -61,22 +61,6 @@ define_cmp!(max_i16, min_i16, i16);
 define_cmp!(max_i32, min_i32, i32);
 define_cmp!(max_i64, min_i64, i64);
 
-pub trait IterOnes {
-  /// Given an integer, returns an iterator over the bit indices with ones.
-  fn iter_ones(self) -> impl Iterator<Item = u32>;
-}
-
-impl<I: PrimInt> IterOnes for I {
-  fn iter_ones(self) -> impl Iterator<Item = u32> {
-    let if_ne_zero = |value: I| (value != I::zero()).then_some(value);
-    std::iter::successors(if_ne_zero(self), move |&value| {
-      let value = value & (value - I::one());
-      if_ne_zero(value)
-    })
-    .map(|mask| mask.trailing_zeros())
-  }
-}
-
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct MinAndMax<I: PrimInt> {
   min: I,

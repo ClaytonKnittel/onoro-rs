@@ -4,6 +4,7 @@ mod canonicalize;
 mod const_rand;
 mod hash;
 mod r#move;
+mod num_iter;
 mod onoro;
 mod onoro_defs;
 mod onoro_state;

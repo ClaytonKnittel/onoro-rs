@@ -2,9 +2,7 @@ use abstract_game::GameMoveIterator;
 use onoro::{Onoro, PawnColor};
 
 use crate::{
-  Move, OnoroImpl, PackedIdx,
-  p1_move_gen::P1MoveGenerator,
-  util::{IterOnes, unreachable},
+  Move, OnoroImpl, PackedIdx, num_iter::IterOnes, p1_move_gen::P1MoveGenerator, util::unreachable,
 };
 
 #[derive(Clone, Copy, Debug)]
@@ -353,8 +351,8 @@ mod tests {
 
   use crate::{
     Move, Onoro8, Onoro16, OnoroImpl, PackedIdx,
+    num_iter::IterOnes,
     p2_move_gen::{P2MoveGenerator, PawnConnectedMobility},
-    util::IterOnes,
   };
 
   struct Meta {

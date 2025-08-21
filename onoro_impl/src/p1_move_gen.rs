@@ -6,7 +6,8 @@ use onoro::hex_pos::HexPos;
 use crate::{
   Move, OnoroImpl, PackedIdx,
   board_vec_indexer::{Basis, BoardVecIndexer, DetermineBasisOutput, determine_basis},
-  util::{IterOnes, likely, packed_positions_coord_limits},
+  num_iter::IterOnes,
+  util::{likely, packed_positions_coord_limits},
 };
 
 struct Impl<I> {
