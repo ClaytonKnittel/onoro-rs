@@ -8,16 +8,18 @@ use crate::{
 #[derive(Clone, Copy, Debug)]
 enum PawnConnectedMobility {
   /// The pawn is free to move anywhere that is available. This means this pawn
-  /// is not an articulation point.
+  /// is not a cutting point.
   Free,
   /// The pawn is a cutting point and currently connects two disjoint groups.
   ///
   /// When considering positions to move this pawn to, in order to maintain the
-  /// connectedness of the game, one adjacent pawn at the new location must
-  /// have discovery times between this pawn's discovery time and `exit_time`
-  /// (exclusive), and another must be outside this range.
+  /// connectedness of the game, at least one adjacent pawn at the new location
+  /// must have discovery times between this pawn's discovery time and
+  /// `exit_time` (exclusive), and at least one must be outside this range.
   CuttingPoint {
-    /// The time we started exploring the subtree of this pawn.
+    /// The time we started exploring the disconnected subtree of this pawn.
+    /// May differ from this pawn's generation count if another subtree of this
+    /// pawn was explored first and connected back to an ancestor of this pawn.
     enter_time: u32,
     /// The time we returned from exploring the subtree of this pawn.
     exit_time: u32,
@@ -50,21 +52,54 @@ impl Default for PawnConnectedMobility {
 struct PawnMeta {
   /// The discovery index of this pawn when doing the depth-first exploration
   /// of the pawn graph.
-  discovery_time: u16,
+  packed_data: u16,
 
   /// A mask of the neighbors of this pawn in the pawn metadata/pawn_poses
   /// lists. The list only contains pawns which have two neighbors. Each bit
   /// corresponds to an index in these lists in the same order.
   dangling_neighbors_index_mask: u16,
+}
 
-  // Below only relevant to current player's pawns:
-  /// The time we have returned from exploring the subtree of this pawn.
-  ///
-  /// Note that this can happen at most twice, since we can have at most three
-  /// disconnected coming out of a single tile. However, there is no legal move
-  /// which disconnects the board into 3 groups and reconnects them in another
-  /// location with 16 or fewer total pawns.
-  connected_mobility: PawnConnectedMobility,
+impl PawnMeta {
+  fn discovered(&self) -> bool {
+    (self.packed_data & 0x10) != 0
+  }
+
+  fn discovery_time(&self) -> u32 {
+    debug_assert!(self.discovered());
+    (self.packed_data & 0xf) as u32 + 1
+  }
+
+  fn set_discovery_time(&mut self, time: u32) {
+    debug_assert!(!self.discovered());
+    debug_assert!((1..=16).contains(&time));
+    self.packed_data += 0x10 + (time - 1) as u16;
+  }
+
+  fn connected_mobility(&self) -> PawnConnectedMobility {
+    match self.packed_data & 0x60 {
+      0x00 => PawnConnectedMobility::Free,
+      0x20 => PawnConnectedMobility::CuttingPoint {
+        enter_time: ((self.packed_data >> 7) & 0xf) as u32 + 1,
+        exit_time: (self.packed_data >> 11) as u32 + 1,
+      },
+      0x40 => PawnConnectedMobility::Immobile,
+      _ => unreachable(),
+    }
+  }
+
+  fn advance_connected_mobility(&mut self, enter_time: u32, exit_time: u32) {
+    debug_assert!(!matches!(
+      self.connected_mobility(),
+      PawnConnectedMobility::Immobile
+    ));
+    debug_assert!((1..=16).contains(&enter_time));
+    debug_assert!((1..=17).contains(&exit_time));
+    self.packed_data += 0x20;
+    if (self.packed_data & 0x60) == 0x20 {
+      self.packed_data += (((enter_time - 1) << 7) | ((exit_time - 1) << 11)) as u16;
+    }
+  }
 }
 
 struct DFSParams<'a, const N: usize> {
@@ -121,8 +156,8 @@ impl<const N: usize> P2MoveGenerator<N> {
     let indexer = self.p1_move_gen.indexer();
     Some((
       pos,
-      neighbors.fold(0, |neighbor_mask, neighbor_index| {
-        let neighbor_pos = indexer.pos_from_index(neighbor_index);
+      neighbors.fold(0, |neighbor_mask, neighbor_board_bitvec_index| {
+        let neighbor_pos = indexer.pos_from_index(neighbor_board_bitvec_index);
         let neighbor_index = OnoroImpl::pawn_idx_from_pawn_poses(pawn_poses, neighbor_pos);
         neighbor_mask | (1 << neighbor_index)
       }),
@@ -143,7 +178,7 @@ impl<const N: usize> P2MoveGenerator<N> {
     } = params;
 
     let meta = &mut pawn_meta[pawn_index];
-    meta.discovery_time = *time as u16;
+    meta.set_discovery_time(*time);
     ecas[pawn_index] = *time;
     *time += 1;
 
@@ -155,9 +190,9 @@ impl<const N: usize> P2MoveGenerator<N> {
         continue;
       }
 
-      let neighbor_t = pawn_meta[neighbor_index].discovery_time as u32;
-      if neighbor_t != 0 {
-        ecas[pawn_index] = ecas[pawn_index].min(neighbor_t);
+      let neighbor_meta = pawn_meta[neighbor_index];
+      if neighbor_meta.discovered() {
+        ecas[pawn_index] = ecas[pawn_index].min(neighbor_meta.discovery_time());
         continue;
       }
 
@@ -178,15 +213,8 @@ impl<const N: usize> P2MoveGenerator<N> {
       ecas[pawn_index] = ecas[pawn_index].min(neighbor_eca);
 
       let meta = &mut pawn_meta[pawn_index];
-      if neighbor_eca >= meta.discovery_time as u32 {
-        meta.connected_mobility = match meta.connected_mobility {
-          PawnConnectedMobility::Free => PawnConnectedMobility::CuttingPoint {
-            enter_time,
-            exit_time: *time,
-          },
-          PawnConnectedMobility::CuttingPoint { .. } => PawnConnectedMobility::Immobile,
-          PawnConnectedMobility::Immobile => unreachable(),
-        }
+      if neighbor_eca >= meta.discovery_time() {
+        meta.advance_connected_mobility(enter_time, *time);
       }
     }
   }
@@ -198,16 +226,16 @@ impl<const N: usize> P2MoveGenerator<N> {
     let mut pawn_meta = [PawnMeta::default(); N];
     let mut ecas = [0u32; N];
     let mut time = 1;
-    pawn_meta[0].discovery_time = time as u16;
+    pawn_meta[0].set_discovery_time(time);
     ecas[0] = time;
     time += 1;
 
-    let mut connect_mobility = None;
+    let mut first_iteration = true;
     for neighbor_index in Self::neighbors(0, pawn_poses, p1_move_gen) {
       // Record all neighbors of the pawn, to later be filtered down to
       // neighbors with 2 neighbors themselves.
       pawn_meta[0].dangling_neighbors_index_mask |= 1 << neighbor_index;
-      if pawn_meta[neighbor_index].discovery_time != 0 {
+      if pawn_meta[neighbor_index].discovered() {
         continue;
       }
 
@@ -224,18 +252,12 @@ impl<const N: usize> P2MoveGenerator<N> {
         p1_move_gen,
       );
 
-      connect_mobility = Some(match connect_mobility {
-        None => PawnConnectedMobility::Free,
-        Some(PawnConnectedMobility::Free) => PawnConnectedMobility::CuttingPoint {
-          enter_time,
-          exit_time: time,
-        },
-        Some(PawnConnectedMobility::CuttingPoint { .. }) => PawnConnectedMobility::Immobile,
-        Some(PawnConnectedMobility::Immobile) => unreachable(),
-      });
+      if first_iteration {
+        first_iteration = false;
+      } else {
+        pawn_meta[0].advance_connected_mobility(enter_time, time);
+      }
     }
-
-    pawn_meta[0].connected_mobility = connect_mobility.unwrap_or_default();
 
     // Construct a mask of all of the tiles with two neighbors. At this point,
     // `dangling_neighbors_index_mask` is a mask of all neighbors of each pawn.
@@ -256,7 +278,7 @@ impl<const N: usize> P2MoveGenerator<N> {
 
   /// Returns true if the current move does not disconnect the board.
   fn move_is_connected(&self, meta: &PawnMeta, dst_neighbors: u16) -> bool {
-    match meta.connected_mobility {
+    match meta.connected_mobility() {
       PawnConnectedMobility::Free => true,
       PawnConnectedMobility::CuttingPoint {
         enter_time,
@@ -265,7 +287,7 @@ impl<const N: usize> P2MoveGenerator<N> {
         let mut v = 0;
         for neighbor_index in dst_neighbors.iter_ones() {
           let neighbor_meta = self.pawn_meta[neighbor_index as usize];
-          if (enter_time..exit_time).contains(&(neighbor_meta.discovery_time as u32)) {
+          if (enter_time..exit_time).contains(&neighbor_meta.discovery_time()) {
             v |= 1;
           } else {
             v |= 2;
@@ -445,7 +467,8 @@ mod tests {
       .into_iter()
       .enumerate()
       .filter_map(|(idx, meta)| {
-        (!matches!(meta.connected_mobility, PawnConnectedMobility::Free)).then_some(pawn_poses[idx])
+        (!matches!(meta.connected_mobility(), PawnConnectedMobility::Free))
+          .then_some(pawn_poses[idx])
       })
       .collect()
   }
@@ -457,7 +480,7 @@ mod tests {
       .into_iter()
       .enumerate()
       .filter_map(|(idx, meta)| {
-        matches!(meta.connected_mobility, PawnConnectedMobility::Immobile)
+        matches!(meta.connected_mobility(), PawnConnectedMobility::Immobile)
           .then_some(pawn_poses[idx])
       })
       .collect()
@@ -887,7 +910,7 @@ mod tests {
 
     let move_gen = P2MoveGenerator::new(&onoro);
     expect_that!(
-      move_gen.pawn_meta[0].connected_mobility,
+      move_gen.pawn_meta[0].connected_mobility(),
       pat!(PawnConnectedMobility::CuttingPoint {
         enter_time: any![7, 12],
         exit_time: 17
@@ -914,7 +937,7 @@ mod tests {
 
     let move_gen = P2MoveGenerator::new(&onoro);
     expect_that!(
-      move_gen.pawn_meta[0].connected_mobility,
+      move_gen.pawn_meta[0].connected_mobility(),
       pat!(PawnConnectedMobility::Immobile)
     );
 
