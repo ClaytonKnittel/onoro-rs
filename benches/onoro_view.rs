@@ -1,7 +1,10 @@
 use std::{hint::black_box, time::Duration};
 
 use criterion::{criterion_group, criterion_main, Criterion, Throughput};
-use onoro_impl::{benchmark_util::generate_random_unfinished_states, OnoroView};
+use onoro_impl::{
+  benchmark_util::{generate_random_unfinished_states, OnoroViewBenchmark},
+  OnoroView,
+};
 use rand::{rngs::StdRng, SeedableRng};
 
 fn construct_views(c: &mut Criterion) {
@@ -24,7 +27,7 @@ fn construct_views(c: &mut Criterion) {
   group.bench_function("construct after 18 moves", |b| {
     b.iter(|| {
       for onoro in &states {
-        let view = OnoroView::find_canonical_view(onoro);
+        let view = OnoroView::bench_find_canonical_view(onoro);
         black_box(view);
       }
     })

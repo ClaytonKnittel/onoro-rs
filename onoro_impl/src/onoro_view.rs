@@ -78,7 +78,7 @@ impl<const N: usize> OnoroView<N> {
     &self.view
   }
 
-  pub fn find_canonical_view(onoro: &OnoroImpl<N>) -> CanonicalView {
+  pub(crate) fn find_canonical_view(onoro: &OnoroImpl<N>) -> CanonicalView {
     let symm_state = board_symm_state(onoro);
     let (hash, op_ord) = match symm_state.symm_class {
       SymmetryClass::C => Self::find_canonical_orientation_d6(onoro, &symm_state),
