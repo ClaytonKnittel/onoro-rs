@@ -112,13 +112,6 @@ impl OnoroIndex for PackedIdx {
   fn y(&self) -> i32 {
     self.y() as i32
   }
-
-  // TODO: try something like this
-  // fn adjacent(&self, other: Self) -> bool {
-  //   debug_assert!(!self.on_perimeter() || !other.on_perimeter());
-  //   let delta = (Wrapping(0x11) + self.bytes - other.bytes).0;
-  //   (delta & 0xcc) == 0 && (delta & (delta >> 1)) == 0 && delta != 0x02 && delta != 0x20
-  // }
 }
 
 impl From<HexPos> for PackedIdx {
