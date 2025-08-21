@@ -125,7 +125,7 @@ impl<const N: usize> HashTable<N, D6> {
   /// Generates a hash table for boards with symmetry class C.
   pub const fn new_c() -> Self {
     let mut table = ConstTable::filled(TileHash::<D6>::uninitialized());
-    let mut rng = Xoroshiro128::from_seed(&[const_random!(u64), const_random!(u64)]);
+    let mut rng = Xoroshiro128::from_seed([const_random!(u64), const_random!(u64)]);
 
     let mut i = 0usize;
     'tile_loop: while i < N * N {
@@ -209,7 +209,7 @@ impl<const N: usize> HashTable<N, D3> {
   /// Generates a hash table for boards with symmetry class V.
   pub const fn new_v() -> Self {
     let mut table = ConstTable::filled(TileHash::<D3>::uninitialized());
-    let mut rng = Xoroshiro128::from_seed(&[const_random!(u64), const_random!(u64)]);
+    let mut rng = Xoroshiro128::from_seed([const_random!(u64), const_random!(u64)]);
 
     let mut i = 0usize;
     'tile_loop: while i < N * N {
@@ -287,7 +287,7 @@ impl<const N: usize> HashTable<N, K4> {
   /// Generates a hash table for boards with symmetry class E.
   pub const fn new_e() -> Self {
     let mut table = ConstTable::filled(TileHash::<K4>::uninitialized());
-    let mut rng = Xoroshiro128::from_seed(&[const_random!(u64), const_random!(u64)]);
+    let mut rng = Xoroshiro128::from_seed([const_random!(u64), const_random!(u64)]);
 
     let mut i = 0usize;
     'tile_loop: while i < N * N {
@@ -385,17 +385,17 @@ impl<const N: usize> HashTable<N, C2> {
   }
 
   pub const fn new_cv() -> Self {
-    let rng = Xoroshiro128::from_seed(&[const_random!(u64), const_random!(u64)]);
+    let rng = Xoroshiro128::from_seed([const_random!(u64), const_random!(u64)]);
     Self::new_c2(SymmetryClass::CV, rng)
   }
 
   pub const fn new_ce() -> Self {
-    let rng = Xoroshiro128::from_seed(&[const_random!(u64), const_random!(u64)]);
+    let rng = Xoroshiro128::from_seed([const_random!(u64), const_random!(u64)]);
     Self::new_c2(SymmetryClass::CE, rng)
   }
 
   pub const fn new_ev() -> Self {
-    let rng = Xoroshiro128::from_seed(&[const_random!(u64), const_random!(u64)]);
+    let rng = Xoroshiro128::from_seed([const_random!(u64), const_random!(u64)]);
     Self::new_c2(SymmetryClass::EV, rng)
   }
 }
@@ -404,7 +404,7 @@ impl<const N: usize> HashTable<N, Trivial> {
   /// Generates a hash table for boards with symmetry class E.
   pub const fn new_trivial() -> Self {
     let mut table = ConstTable::filled(TileHash::<Trivial>::uninitialized());
-    let mut rng = Xoroshiro128::from_seed(&[const_random!(u64), const_random!(u64)]);
+    let mut rng = Xoroshiro128::from_seed([const_random!(u64), const_random!(u64)]);
 
     let mut i = 0usize;
     while i < N * N {

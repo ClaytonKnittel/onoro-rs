@@ -1,5 +1,4 @@
 use std::{
-  cell::UnsafeCell,
   collections::{HashMap, HashSet},
   fmt::Display,
   hash::Hash,
@@ -34,35 +33,22 @@ use crate::{
 type ViewHashTable<G> = HashTable<16, G>;
 
 #[derive(Clone, Debug)]
-struct CanonicalView {
-  initialized: bool,
+pub struct CanonicalView {
   symm_class: SymmetryClass,
   op_ord: u8,
   hash: u64,
 }
 
 impl CanonicalView {
-  fn new() -> CanonicalView {
-    CanonicalView {
-      initialized: false,
-      symm_class: SymmetryClass::C,
-      op_ord: 0,
-      hash: 0,
-    }
-  }
-
   fn get_symm_class(&self) -> SymmetryClass {
-    debug_assert!(self.initialized);
     self.symm_class
   }
 
   fn get_op_ord(&self) -> u8 {
-    debug_assert!(self.initialized);
     self.op_ord
   }
 
   fn get_hash(&self) -> u64 {
-    debug_assert!(self.initialized);
     self.hash
   }
 }
@@ -71,19 +57,17 @@ impl CanonicalView {
 /// canonicalizing symmetry operations. These cached values are used for quicker
 /// equality comparison between different Onoro game states which may be in
 /// different orientations.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct OnoroView<const N: usize> {
   onoro: OnoroImpl<N>,
-  view: UnsafeCell<CanonicalView>,
+  view: CanonicalView,
 }
 
 impl<const N: usize> OnoroView<N> {
   /// TODO: Make new lazy
   pub fn new(onoro: OnoroImpl<N>) -> Self {
-    Self {
-      onoro,
-      view: CanonicalView::new().into(),
-    }
+    let view = Self::find_canonical_view(&onoro);
+    Self { onoro, view }
   }
 
   pub fn onoro(&self) -> &OnoroImpl<N> {
@@ -91,32 +75,25 @@ impl<const N: usize> OnoroView<N> {
   }
 
   fn canon_view(&self) -> &CanonicalView {
-    unsafe { &*self.view.get() }
+    &self.view
   }
 
-  fn maybe_initialize_canonical_view(&self) {
-    if self.canon_view().initialized {
-      return;
-    }
-
-    let symm_state = board_symm_state(&self.onoro);
+  pub(crate) fn find_canonical_view(onoro: &OnoroImpl<N>) -> CanonicalView {
+    let symm_state = board_symm_state(onoro);
     let (hash, op_ord) = match symm_state.symm_class {
-      SymmetryClass::C => Self::find_canonical_orientation_d6(&self.onoro, &symm_state),
-      SymmetryClass::V => Self::find_canonical_orientation_d3(&self.onoro, &symm_state),
-      SymmetryClass::E => Self::find_canonical_orientation_k4(&self.onoro, &symm_state),
-      SymmetryClass::CV => Self::find_canonical_orientation_c2_cv(&self.onoro, &symm_state),
-      SymmetryClass::CE => Self::find_canonical_orientation_c2_ce(&self.onoro, &symm_state),
-      SymmetryClass::EV => Self::find_canonical_orientation_c2_ev(&self.onoro, &symm_state),
-      SymmetryClass::Trivial => Self::find_canonical_orientation_trivial(&self.onoro, &symm_state),
+      SymmetryClass::C => Self::find_canonical_orientation_d6(onoro, &symm_state),
+      SymmetryClass::V => Self::find_canonical_orientation_d3(onoro, &symm_state),
+      SymmetryClass::E => Self::find_canonical_orientation_k4(onoro, &symm_state),
+      SymmetryClass::CV => Self::find_canonical_orientation_c2_cv(onoro, &symm_state),
+      SymmetryClass::CE => Self::find_canonical_orientation_c2_ce(onoro, &symm_state),
+      SymmetryClass::EV => Self::find_canonical_orientation_c2_ev(onoro, &symm_state),
+      SymmetryClass::Trivial => Self::find_canonical_orientation_trivial(onoro, &symm_state),
     };
 
-    unsafe {
-      *self.view.get() = CanonicalView {
-        initialized: true,
-        symm_class: symm_state.symm_class,
-        op_ord,
-        hash,
-      };
+    CanonicalView {
+      symm_class: symm_state.symm_class,
+      op_ord,
+      hash,
     }
   }
 
@@ -238,8 +215,6 @@ impl<const N: usize> OnoroView<N> {
   }
 
   pub fn pawns(&self) -> impl Iterator<Item = (HexPosOffset, PawnColor)> + '_ {
-    self.maybe_initialize_canonical_view();
-
     match self.canon_view().get_symm_class() {
       SymmetryClass::C => SymmetryClassContainer::C(self.pawns_iterator(HexPosOffset::apply_d6_c)),
       SymmetryClass::V => SymmetryClassContainer::V(self.pawns_iterator(HexPosOffset::apply_d3_v)),
@@ -315,9 +290,6 @@ impl<const N: usize> OnoroView<N> {
 
 impl<const N: usize> PartialEq for OnoroView<N> {
   fn eq(&self, other: &Self) -> bool {
-    self.maybe_initialize_canonical_view();
-    other.maybe_initialize_canonical_view();
-
     if self.canon_view().get_hash() != other.canon_view().get_hash()
       || self.canon_view().get_symm_class() != other.canon_view().get_symm_class()
     {
@@ -340,7 +312,6 @@ impl<const N: usize> Eq for OnoroView<N> {}
 
 impl<const N: usize> Hash for OnoroView<N> {
   fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-    self.maybe_initialize_canonical_view();
     state.write_u64(self.canon_view().get_hash());
   }
 }
@@ -357,8 +328,6 @@ unsafe impl<const N: usize> Sync for OnoroView<N> {}
 
 impl<const N: usize> Display for OnoroView<N> {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    self.maybe_initialize_canonical_view();
-
     let symm_state = board_symm_state(self.onoro());
     let rotated = self.onoro().rotated_d6_c(symm_state.op);
     let _rotated = match self.canon_view().get_symm_class() {
@@ -581,15 +550,6 @@ impl Compress for Onoro16View {
   }
 }
 
-impl<const N: usize> Clone for OnoroView<N> {
-  fn clone(&self) -> Self {
-    Self {
-      onoro: self.onoro.clone(),
-      view: self.canon_view().clone().into(),
-    }
-  }
-}
-
 #[cfg(test)]
 mod tests {
   use googletest::{
@@ -605,9 +565,7 @@ mod tests {
   use super::{Onoro16, Onoro16View, OnoroView};
 
   fn build_view(board_layout: &str) -> Onoro16View {
-    let view = OnoroView::new(Onoro16::from_board_string(board_layout).unwrap());
-    view.maybe_initialize_canonical_view();
-    view
+    OnoroView::new(Onoro16::from_board_string(board_layout).unwrap())
   }
 
   fn verify_pawn_iter<const N: usize>(view1: &OnoroView<N>, view2: &OnoroView<N>) {

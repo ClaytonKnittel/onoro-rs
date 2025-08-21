@@ -30,6 +30,10 @@ lto = "fat"
 name = "onoro"
 harness = false
 
+[[bench]]
+name = "onoro_view"
+harness = false
+
 [profile.profiled]
 inherits = "release"
 opt-level = 1

@@ -2,11 +2,8 @@
 pub struct Xoroshiro128([u64; 2]);
 
 impl Xoroshiro128 {
-  pub const fn from_seed(seed: &[u64]) -> Self {
-    if seed.len() < 2 {
-      panic!("Xoroshiro128 seed needs at least two u64s for seeding.");
-    }
-    Self([seed[0], seed[1]])
+  pub const fn from_seed(seed: [u64; 2]) -> Self {
+    Self(seed)
   }
 
   #[inline]
