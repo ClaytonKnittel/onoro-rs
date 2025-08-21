@@ -69,7 +69,12 @@ pub fn determine_basis<const N: usize>(coord_limits: CoordLimits) -> DetermineBa
     };
 
   let max = dx.max(dy).max(dxy);
-  if dxy == max {
+
+  // Prefer to use XvY since the indexing arithmetic is the simplest between
+  // the three bases. If the XvY representation does not fit in a u64, then we
+  // will choose the orientation that minimizes the area of the bounding
+  // parallelogram.
+  if dx * dy <= u64::BITS || dxy == max {
     let x_y_corner = HexPos::new(x.min() - 1, y.min() - 1);
     build_output(Basis::XvY, x_y_corner, x, y)
   } else if dy == max {
