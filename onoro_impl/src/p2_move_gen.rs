@@ -268,7 +268,7 @@ impl<const N: usize> P2MoveGenerator<N> {
 
   /// Returns true if the move does not leave any pawns dangling (i.e. with
   /// only 1 neighbor).
-  fn resolved_dangling_neighbors(&self, meta: &PawnMeta, dst_neighbors: u16) -> bool {
+  fn resolved_dangling_neighbors(meta: &PawnMeta, dst_neighbors: u16) -> bool {
     let dangling_neighbors = meta.dangling_neighbors_index_mask;
     dangling_neighbors == (dangling_neighbors & dst_neighbors)
   }
@@ -287,7 +287,7 @@ impl<const N: usize> P2MoveGenerator<N> {
       return false;
     }
 
-    if !self.resolved_dangling_neighbors(meta, dst_neighbors) {
+    if !Self::resolved_dangling_neighbors(meta, dst_neighbors) {
       return false;
     }
 
