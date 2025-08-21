@@ -46,6 +46,11 @@ pub struct DetermineBasisOutput {
 }
 
 pub fn determine_basis<const N: usize>(coord_limits: CoordLimits) -> DetermineBasisOutput {
+  /// The amount of padding to add to max - min pawn positions along any
+  /// coordinate axis. This is 3 = 2 (for 1-tile perimeter) + 1 (since
+  /// max - min gives length, not numer of tiles).
+  const PADDING: u32 = 3;
+
   let x = coord_limits.x();
   let y = coord_limits.y();
   let xy = coord_limits.xy();
@@ -59,17 +64,23 @@ pub fn determine_basis<const N: usize>(coord_limits: CoordLimits) -> DetermineBa
       DetermineBasisOutput {
         basis,
         corner,
-        width: (coord1.delta() + 3) as u8,
+        width: (coord1.delta() + PADDING) as u8,
         // We will represent the board with a bitvector, where each bit corresponds
         // to a tile and is set if there is a pawn there. We want a 1-tile padding
         // around the perimeter so we can also represent the neighbor candidates
         // with a bitvec.
-        use_u128: (coord1.delta() + 3) * (coord2.delta() + 3) > u64::BITS,
+        use_u128: (coord1.delta() + PADDING) * (coord2.delta() + PADDING) > u64::BITS,
       }
     };
 
   let max = dx.max(dy).max(dxy);
-  if dxy == max {
+
+  // Prefer to use XvY since the indexing arithmetic is the simplest between
+  // the three bases. If the XvY representation does not fit in a u64, then we
+  // will choose the orientation that minimizes the area of the bounding
+  // parallelogram.
+  let dx_dy_area = (dx + PADDING) * (dy + PADDING);
+  if dx_dy_area <= u64::BITS || dxy == max {
     let x_y_corner = HexPos::new(x.min() - 1, y.min() - 1);
     build_output(Basis::XvY, x_y_corner, x, y)
   } else if dy == max {
@@ -247,7 +258,13 @@ mod tests {
     let dx = (x1 - x2).unsigned_abs() as u64 + 3;
     let dy = (y1 - y2).unsigned_abs() as u64 + 3;
     let dxy = ((y1 - x1) - (y2 - x2)).unsigned_abs() as u64 + 3;
-    dx * dy * dxy / dx.max(dy).max(dxy)
+
+    let min_bb_area = dx * dy * dxy / dx.max(dy).max(dxy);
+    if dx * dy <= u64::BITS as u64 {
+      dx * dy
+    } else {
+      min_bb_area
+    }
   }
 
   fn check_is_bijection<I: PrimInt + Debug>(
