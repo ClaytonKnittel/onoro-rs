@@ -69,6 +69,12 @@ struct PawnMeta {
   connected_mobility: PawnConnectedMobility,
 }
 
+struct DFSParams<'a, const N: usize> {
+  pawn_meta: &'a mut [PawnMeta; N],
+  ecas: &'a mut [u32; N],
+  time: &'a mut u32,
+}
+
 pub struct P2MoveGenerator<const N: usize> {
   pawn_meta: [PawnMeta; N],
   p1_move_gen: P1MoveGenerator<N>,
@@ -128,12 +134,16 @@ impl<const N: usize> P2MoveGenerator<N> {
   fn recursor(
     pawn_index: usize,
     parent_index: usize,
-    pawn_meta: &mut [PawnMeta; N],
-    ecas: &mut [u32; N],
-    time: &mut u32,
+    params: DFSParams<N>,
     pawn_poses: &[PackedIdx; N],
     p1_move_gen: &P1MoveGenerator<N>,
   ) {
+    let DFSParams {
+      pawn_meta,
+      ecas,
+      time,
+    } = params;
+
     let meta = &mut pawn_meta[pawn_index];
     meta.discovery_time = *time as u16;
     ecas[pawn_index] = *time;
@@ -157,9 +167,11 @@ impl<const N: usize> P2MoveGenerator<N> {
       Self::recursor(
         neighbor_index,
         pawn_index,
-        pawn_meta,
-        ecas,
-        time,
+        DFSParams {
+          pawn_meta,
+          ecas,
+          time,
+        },
         pawn_poses,
         p1_move_gen,
       );
@@ -205,9 +217,11 @@ impl<const N: usize> P2MoveGenerator<N> {
       Self::recursor(
         neighbor_index,
         0,
-        &mut pawn_meta,
-        &mut ecas,
-        &mut time,
+        DFSParams {
+          pawn_meta: &mut pawn_meta,
+          ecas: &mut ecas,
+          time: &mut time,
+        },
         pawn_poses,
         p1_move_gen,
       );
