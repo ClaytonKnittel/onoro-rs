@@ -53,6 +53,22 @@ impl CanonicalView {
   }
 }
 
+macro_rules! define_find_orientation {
+  ($name:ident, $group:ty, $table_constructor:ident) => {
+    fn $name(onoro: &OnoroImpl<N>, symm_state: &BoardSymmetryState) -> (u64, u8) {
+      static TABLE: ViewHashTable<$group> = HashTable::$table_constructor();
+      let hash = HashGroup::<$group>::new(TABLE.hash(onoro, symm_state));
+
+      // Try all symmetries of the board state with invariant center of mass,
+      // choose the symmetry with the numerically smallest hash code.
+      <$group>::for_each()
+        .map(|op| (hash.apply(&op).hash(), op.ord() as u8))
+        .min_by_key(|&(hash, _)| hash)
+        .unwrap()
+    }
+  };
+}
+
 /// A wrapper over Onoro states that caches the hash of the game state and it's
 /// canonicalizing symmetry operations. These cached values are used for quicker
 /// equality comparison between different Onoro game states which may be in
@@ -97,95 +113,12 @@ impl<const N: usize> OnoroView<N> {
     }
   }
 
-  fn find_canonical_orientation_d6(
-    onoro: &OnoroImpl<N>,
-    symm_state: &BoardSymmetryState,
-  ) -> (u64, u8) {
-    static D6T: ViewHashTable<D6> = HashTable::new_c();
-    let hash = HashGroup::<D6>::new(D6T.hash(onoro, symm_state));
-
-    // Try all symmetries of the board state with invariant center of mass,
-    // choose the symmetry with the numerically smallest hash code.
-    D6::for_each()
-      .map(|op| (hash.apply(&op).hash(), op.ord() as u8))
-      .min_by(|(hash1, _op1), (hash2, _op2)| hash1.cmp(hash2))
-      .unwrap()
-  }
-
-  fn find_canonical_orientation_d3(
-    onoro: &OnoroImpl<N>,
-    symm_state: &BoardSymmetryState,
-  ) -> (u64, u8) {
-    static D3T: ViewHashTable<D3> = HashTable::new_v();
-    let hash = HashGroup::<D3>::new(D3T.hash(onoro, symm_state));
-
-    // Try all symmetries of the board state with invariant center of mass,
-    // choose the symmetry with the numerically smallest hash code.
-    D3::for_each()
-      .map(|op| (hash.apply(&op).hash(), op.ord() as u8))
-      .min_by(|(hash1, _op1), (hash2, _op2)| hash1.cmp(hash2))
-      .unwrap()
-  }
-
-  fn find_canonical_orientation_k4(
-    onoro: &OnoroImpl<N>,
-    symm_state: &BoardSymmetryState,
-  ) -> (u64, u8) {
-    static K4T: ViewHashTable<K4> = HashTable::new_e();
-    let hash = HashGroup::<K4>::new(K4T.hash(onoro, symm_state));
-
-    // Try all symmetries of the board state with invariant center of mass,
-    // choose the symmetry with the numerically smallest hash code.
-    K4::for_each()
-      .map(|op| (hash.apply(&op).hash(), op.ord() as u8))
-      .min_by(|(hash1, _op1), (hash2, _op2)| hash1.cmp(hash2))
-      .unwrap()
-  }
-
-  fn find_canonical_orientation_c2_cv(
-    onoro: &OnoroImpl<N>,
-    symm_state: &BoardSymmetryState,
-  ) -> (u64, u8) {
-    static C2CVT: ViewHashTable<C2> = HashTable::new_cv();
-    let hash = HashGroup::<C2>::new(C2CVT.hash(onoro, symm_state));
-
-    // Try all symmetries of the board state with invariant center of mass,
-    // choose the symmetry with the numerically smallest hash code.
-    C2::for_each()
-      .map(|op| (hash.apply(&op).hash(), op.ord() as u8))
-      .min_by(|(hash1, _op1), (hash2, _op2)| hash1.cmp(hash2))
-      .unwrap()
-  }
-
-  fn find_canonical_orientation_c2_ce(
-    onoro: &OnoroImpl<N>,
-    symm_state: &BoardSymmetryState,
-  ) -> (u64, u8) {
-    static C2CET: ViewHashTable<C2> = HashTable::new_ce();
-    let hash = HashGroup::<C2>::new(C2CET.hash(onoro, symm_state));
-
-    // Try all symmetries of the board state with invariant center of mass,
-    // choose the symmetry with the numerically smallest hash code.
-    C2::for_each()
-      .map(|op| (hash.apply(&op).hash(), op.ord() as u8))
-      .min_by(|(hash1, _op1), (hash2, _op2)| hash1.cmp(hash2))
-      .unwrap()
-  }
-
-  fn find_canonical_orientation_c2_ev(
-    onoro: &OnoroImpl<N>,
-    symm_state: &BoardSymmetryState,
-  ) -> (u64, u8) {
-    static C2EVT: ViewHashTable<C2> = HashTable::new_ev();
-    let hash = HashGroup::<C2>::new(C2EVT.hash(onoro, symm_state));
-
-    // Try all symmetries of the board state with invariant center of mass,
-    // choose the symmetry with the numerically smallest hash code.
-    C2::for_each()
-      .map(|op| (hash.apply(&op).hash(), op.ord() as u8))
-      .min_by(|(hash1, _op1), (hash2, _op2)| hash1.cmp(hash2))
-      .unwrap()
-  }
+  define_find_orientation!(find_canonical_orientation_d6, D6, new_c);
+  define_find_orientation!(find_canonical_orientation_d3, D3, new_v);
+  define_find_orientation!(find_canonical_orientation_k4, K4, new_e);
+  define_find_orientation!(find_canonical_orientation_c2_cv, C2, new_cv);
+  define_find_orientation!(find_canonical_orientation_c2_ce, C2, new_ce);
+  define_find_orientation!(find_canonical_orientation_c2_ev, C2, new_ev);
 
   fn find_canonical_orientation_trivial(
     onoro: &OnoroImpl<N>,
@@ -315,16 +248,6 @@ impl<const N: usize> Hash for OnoroView<N> {
     state.write_u64(self.canon_view().get_hash());
   }
 }
-
-/// Send/Sync rely on the OnoroView being initialized before being shared
-/// between threads. This assumption is safe because the view is inserted when
-/// it's inserted into the hash table.
-///
-/// Technically, since the CanonicalView is deterministically computed, it
-/// doesn't matter if there is a race to write it to the UnsafeCell, since all
-/// threads would be writing the same data to the same locations.
-unsafe impl<const N: usize> Send for OnoroView<N> {}
-unsafe impl<const N: usize> Sync for OnoroView<N> {}
 
 impl<const N: usize> Display for OnoroView<N> {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
