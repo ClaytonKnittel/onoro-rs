@@ -9,6 +9,7 @@ profiled = []
 [dependencies]
 abstract_game = { path = "./abstract_game" }
 ai_gen_onoro = { path = "./ai_gen_onoro" }
+algebra = { path = "./algebra" }
 dashmap = "5.5"
 multiqueue = "0.3"
 cooperate = { path = "./cooperate" }

@@ -788,6 +788,7 @@ version = "0.1.0"
 dependencies = [
  "abstract_game",
  "ai_gen_onoro",
+ "algebra",
  "cooperate",
  "criterion",
  "dashmap",
