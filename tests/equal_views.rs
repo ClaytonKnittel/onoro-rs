@@ -1,4 +1,4 @@
-use algebra::{finite::Finite, ordinal::Ordinal};
+use algebra::semigroup::Semigroup;
 use googletest::gtest;
 use onoro::{error::OnoroResult, groups::D6, test_util::BOARD_POSITIONS, Onoro};
 use onoro_impl::{benchmark_util::random_unfinished_state, Onoro16, OnoroView};
@@ -57,20 +57,20 @@ fn test_equal_view(board_string: &str, seed: u64) -> OnoroResult {
     let num_moves = rng.gen_range(1..=30).max(rng.gen_range(1..=30));
     let onoro = random_unfinished_state(&onoro, num_moves, &mut rng)?;
 
-    // Randomly rotate the board.
-    let ord = rng.gen_range(0..D6::SIZE);
-    let op = D6::from_ord(ord);
-    let rotated = onoro.rotated_d6_c(op);
+    // Try comparing all rotations of the board.
+    for op in D6::for_each() {
+      let rotated = onoro.rotated_d6_c(op);
 
-    let view1 = OnoroView::new(onoro);
-    let view2 = OnoroView::new(rotated);
+      let view1 = OnoroView::new(onoro.clone());
+      let view2 = OnoroView::new(rotated);
 
-    assert_eq!(
-      view1.canon_view().hash(),
-      view2.canon_view().hash(),
-      "Failed on iteration {i}"
-    );
-    assert_eq!(view1, view2, "Failed on iteration {i}");
+      assert_eq!(
+        view1.canon_view().hash(),
+        view2.canon_view().hash(),
+        "Failed on iteration {i} for rotation {op}"
+      );
+      assert_eq!(view1, view2, "Failed on iteration {i} for rotation {op}");
+    }
   }
 
   Ok(())
