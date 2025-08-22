@@ -66,7 +66,7 @@ fn cmp_views(c: &mut Criterion) {
   group.throughput(Throughput::Elements(N_GAMES as u64));
   group.measurement_time(Duration::from_secs(20));
 
-  let mut rng = StdRng::seed_from_u64(90383240);
+  let mut rng = StdRng::seed_from_u64(4238903259);
   let states = generate_random_unfinished_states(N_GAMES, 18, &mut rng).unwrap();
   let states = generate_game_pairs(states, &mut rng);
 
