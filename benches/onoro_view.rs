@@ -4,7 +4,7 @@ use algebra::{finite::Finite, ordinal::Ordinal};
 use criterion::{criterion_group, criterion_main, Criterion, Throughput};
 use onoro::groups::D6;
 use onoro_impl::{
-  benchmark_util::{generate_random_unfinished_states, OnoroViewBenchmark},
+  benchmark_util::{generate_random_unfinished_states, BenchCanonicalView},
   OnoroImpl, OnoroView,
 };
 use rand::{rngs::StdRng, Rng, SeedableRng};
@@ -29,7 +29,7 @@ fn construct_views(c: &mut Criterion) {
   group.bench_function("construct after 18 moves", |b| {
     b.iter(|| {
       for onoro in &states {
-        let view = OnoroView::bench_find_canonical_view(onoro);
+        let view = BenchCanonicalView::find_canonical_view(onoro);
         black_box(view);
       }
     })
