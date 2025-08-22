@@ -63,7 +63,7 @@ macro_rules! define_find_orientation {
       // choose the symmetry with the numerically smallest hash code.
       <$group>::for_each()
         .map(|op| (hash.apply(&op).hash(), op.ord() as u8))
-        .min_by_key(|&(hash, _)| hash)
+        .min_by(|(hash1, _), (hash2, _)| hash1.cmp(hash2))
         .unwrap()
     }
   };
