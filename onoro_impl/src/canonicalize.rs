@@ -26,7 +26,7 @@ pub struct BoardSymmetryState {
 
   /// The offset to apply when calculating the integer-coordinate, symmetry
   /// invariant "center of mass"
-  pub center_offset: HexPosOffset,
+  center_offset: COMOffset,
 }
 
 impl BoardSymmetryState {
@@ -34,12 +34,21 @@ impl BoardSymmetryState {
     Self {
       op: D6::const_identity(),
       symm_class: SymmetryClass::C,
-      center_offset: HexPosOffset::origin(),
+      center_offset: COMOffset::X0Y0,
+    }
+  }
+
+  pub const fn center_offset(&self) -> HexPosOffset {
+    match self.center_offset {
+      COMOffset::X0Y0 => HexPosOffset::new(0, 0),
+      COMOffset::X1Y0 => HexPosOffset::new(1, 0),
+      COMOffset::X0Y1 => HexPosOffset::new(0, 1),
+      COMOffset::X1Y1 => HexPosOffset::new(1, 1),
     }
   }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum COMOffset {
   /// Offset by (0, 0)
   X0Y0,
@@ -74,15 +83,6 @@ const fn board_symm_state_op_to_com_offset(op: D6) -> COMOffset {
     D6::Rfl(4) => COMOffset::X1Y1,
     D6::Rfl(5) => COMOffset::X1Y1,
     _ => unreachable(),
-  }
-}
-
-const fn com_offset_to_hex_pos(offset: COMOffset) -> HexPosOffset {
-  match offset {
-    COMOffset::X0Y0 => HexPosOffset::new(0, 0),
-    COMOffset::X1Y0 => HexPosOffset::new(1, 0),
-    COMOffset::X0Y1 => HexPosOffset::new(0, 1),
-    COMOffset::X1Y1 => HexPosOffset::new(1, 1),
   }
 }
 
@@ -192,11 +192,11 @@ pub const fn gen_symm_state_table<const N: usize>() -> [[BoardSymmetryState; N];
     let mut x = 0;
     while x < N {
       let op = symm_state_op(x as u32, y as u32, N as u32);
-      let offset = board_symm_state_op_to_com_offset(op);
+      let center_offset = board_symm_state_op_to_com_offset(op);
       table[y][x] = BoardSymmetryState {
         op,
         symm_class: symm_state_class(x as u32, y as u32, N as u32),
-        center_offset: com_offset_to_hex_pos(offset),
+        center_offset,
       };
 
       x += 1;
@@ -318,7 +318,7 @@ pub fn board_symm_state<const N: usize>(onoro: &OnoroImpl<N>) -> BoardSymmetrySt
 
   let op = symm_state_op(x, y, pawns_in_play);
   let symm_class = symm_state_class(x, y, pawns_in_play);
-  let center_offset = com_offset_to_hex_pos(board_symm_state_op_to_com_offset(op));
+  let center_offset = board_symm_state_op_to_com_offset(op);
 
   BoardSymmetryState {
     op,

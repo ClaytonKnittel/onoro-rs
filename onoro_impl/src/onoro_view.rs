@@ -6,9 +6,7 @@ use std::{
 
 use algebra::{
   group::{Group, Trivial},
-  monoid::Monoid,
   ordinal::Ordinal,
-  semigroup::Semigroup,
 };
 
 use abstract_game::{Game, GameMoveIterator, GameResult};
@@ -21,37 +19,11 @@ use onoro::{
 
 use crate::{
   MoveGenerator, OnoroImpl,
-  canonicalize::{BoardSymmetryState, board_symm_state},
-  hash::HashTable,
+  canonical_view::CanonicalView,
+  canonicalize::board_symm_state,
   r#move::Move,
   onoro_defs::{Onoro16, Onoro16View},
-  tile_hash::HashGroup,
 };
-
-/// Always generate hash tables for the full game. Only a part of the tables
-/// will be used for smaller games.
-type ViewHashTable<G> = HashTable<16, G>;
-
-#[derive(Clone, Debug)]
-pub struct CanonicalView {
-  symm_class: SymmetryClass,
-  op_ord: u8,
-  hash: u64,
-}
-
-impl CanonicalView {
-  fn get_symm_class(&self) -> SymmetryClass {
-    self.symm_class
-  }
-
-  fn get_op_ord(&self) -> u8 {
-    self.op_ord
-  }
-
-  fn get_hash(&self) -> u64 {
-    self.hash
-  }
-}
 
 /// A wrapper over Onoro states that caches the hash of the game state and it's
 /// canonicalizing symmetry operations. These cached values are used for quicker
@@ -66,7 +38,7 @@ pub struct OnoroView<const N: usize> {
 impl<const N: usize> OnoroView<N> {
   /// TODO: Make new lazy
   pub fn new(onoro: OnoroImpl<N>) -> Self {
-    let view = Self::find_canonical_view(&onoro);
+    let view = CanonicalView::find_canonical_view(&onoro);
     Self { onoro, view }
   }
 
@@ -76,123 +48,6 @@ impl<const N: usize> OnoroView<N> {
 
   fn canon_view(&self) -> &CanonicalView {
     &self.view
-  }
-
-  pub(crate) fn find_canonical_view(onoro: &OnoroImpl<N>) -> CanonicalView {
-    let symm_state = board_symm_state(onoro);
-    let (hash, op_ord) = match symm_state.symm_class {
-      SymmetryClass::C => Self::find_canonical_orientation_d6(onoro, &symm_state),
-      SymmetryClass::V => Self::find_canonical_orientation_d3(onoro, &symm_state),
-      SymmetryClass::E => Self::find_canonical_orientation_k4(onoro, &symm_state),
-      SymmetryClass::CV => Self::find_canonical_orientation_c2_cv(onoro, &symm_state),
-      SymmetryClass::CE => Self::find_canonical_orientation_c2_ce(onoro, &symm_state),
-      SymmetryClass::EV => Self::find_canonical_orientation_c2_ev(onoro, &symm_state),
-      SymmetryClass::Trivial => Self::find_canonical_orientation_trivial(onoro, &symm_state),
-    };
-
-    CanonicalView {
-      symm_class: symm_state.symm_class,
-      op_ord,
-      hash,
-    }
-  }
-
-  fn find_canonical_orientation_d6(
-    onoro: &OnoroImpl<N>,
-    symm_state: &BoardSymmetryState,
-  ) -> (u64, u8) {
-    static D6T: ViewHashTable<D6> = HashTable::new_c();
-    let hash = HashGroup::<D6>::new(D6T.hash(onoro, symm_state));
-
-    // Try all symmetries of the board state with invariant center of mass,
-    // choose the symmetry with the numerically smallest hash code.
-    D6::for_each()
-      .map(|op| (hash.apply(&op).hash(), op.ord() as u8))
-      .min_by(|(hash1, _op1), (hash2, _op2)| hash1.cmp(hash2))
-      .unwrap()
-  }
-
-  fn find_canonical_orientation_d3(
-    onoro: &OnoroImpl<N>,
-    symm_state: &BoardSymmetryState,
-  ) -> (u64, u8) {
-    static D3T: ViewHashTable<D3> = HashTable::new_v();
-    let hash = HashGroup::<D3>::new(D3T.hash(onoro, symm_state));
-
-    // Try all symmetries of the board state with invariant center of mass,
-    // choose the symmetry with the numerically smallest hash code.
-    D3::for_each()
-      .map(|op| (hash.apply(&op).hash(), op.ord() as u8))
-      .min_by(|(hash1, _op1), (hash2, _op2)| hash1.cmp(hash2))
-      .unwrap()
-  }
-
-  fn find_canonical_orientation_k4(
-    onoro: &OnoroImpl<N>,
-    symm_state: &BoardSymmetryState,
-  ) -> (u64, u8) {
-    static K4T: ViewHashTable<K4> = HashTable::new_e();
-    let hash = HashGroup::<K4>::new(K4T.hash(onoro, symm_state));
-
-    // Try all symmetries of the board state with invariant center of mass,
-    // choose the symmetry with the numerically smallest hash code.
-    K4::for_each()
-      .map(|op| (hash.apply(&op).hash(), op.ord() as u8))
-      .min_by(|(hash1, _op1), (hash2, _op2)| hash1.cmp(hash2))
-      .unwrap()
-  }
-
-  fn find_canonical_orientation_c2_cv(
-    onoro: &OnoroImpl<N>,
-    symm_state: &BoardSymmetryState,
-  ) -> (u64, u8) {
-    static C2CVT: ViewHashTable<C2> = HashTable::new_cv();
-    let hash = HashGroup::<C2>::new(C2CVT.hash(onoro, symm_state));
-
-    // Try all symmetries of the board state with invariant center of mass,
-    // choose the symmetry with the numerically smallest hash code.
-    C2::for_each()
-      .map(|op| (hash.apply(&op).hash(), op.ord() as u8))
-      .min_by(|(hash1, _op1), (hash2, _op2)| hash1.cmp(hash2))
-      .unwrap()
-  }
-
-  fn find_canonical_orientation_c2_ce(
-    onoro: &OnoroImpl<N>,
-    symm_state: &BoardSymmetryState,
-  ) -> (u64, u8) {
-    static C2CET: ViewHashTable<C2> = HashTable::new_ce();
-    let hash = HashGroup::<C2>::new(C2CET.hash(onoro, symm_state));
-
-    // Try all symmetries of the board state with invariant center of mass,
-    // choose the symmetry with the numerically smallest hash code.
-    C2::for_each()
-      .map(|op| (hash.apply(&op).hash(), op.ord() as u8))
-      .min_by(|(hash1, _op1), (hash2, _op2)| hash1.cmp(hash2))
-      .unwrap()
-  }
-
-  fn find_canonical_orientation_c2_ev(
-    onoro: &OnoroImpl<N>,
-    symm_state: &BoardSymmetryState,
-  ) -> (u64, u8) {
-    static C2EVT: ViewHashTable<C2> = HashTable::new_ev();
-    let hash = HashGroup::<C2>::new(C2EVT.hash(onoro, symm_state));
-
-    // Try all symmetries of the board state with invariant center of mass,
-    // choose the symmetry with the numerically smallest hash code.
-    C2::for_each()
-      .map(|op| (hash.apply(&op).hash(), op.ord() as u8))
-      .min_by(|(hash1, _op1), (hash2, _op2)| hash1.cmp(hash2))
-      .unwrap()
-  }
-
-  fn find_canonical_orientation_trivial(
-    onoro: &OnoroImpl<N>,
-    symm_state: &BoardSymmetryState,
-  ) -> (u64, u8) {
-    static TT: ViewHashTable<Trivial> = HashTable::new_trivial();
-    (TT.hash(onoro, symm_state), Trivial::identity().ord() as u8)
   }
 
   fn pawns_iterator<'a, G, F>(
@@ -205,7 +60,7 @@ impl<const N: usize> OnoroView<N> {
   {
     let symm_state = board_symm_state(&self.onoro);
     let origin = self.onoro.origin(&symm_state);
-    let canon_op = G::from_ord(self.canon_view().get_op_ord() as usize);
+    let canon_op = G::from_ord(self.canon_view().op_ord() as usize);
 
     self.onoro.pawns_typed().map(move |pawn| {
       let normalized_pos = (HexPos::from(pawn.pos) - origin).apply_d6_c(&symm_state.op);
@@ -215,7 +70,7 @@ impl<const N: usize> OnoroView<N> {
   }
 
   pub fn pawns(&self) -> impl Iterator<Item = (HexPosOffset, PawnColor)> + '_ {
-    match self.canon_view().get_symm_class() {
+    match self.canon_view().symm_class() {
       SymmetryClass::C => SymmetryClassContainer::C(self.pawns_iterator(HexPosOffset::apply_d6_c)),
       SymmetryClass::V => SymmetryClassContainer::V(self.pawns_iterator(HexPosOffset::apply_d3_v)),
       SymmetryClass::E => SymmetryClassContainer::E(self.pawns_iterator(HexPosOffset::apply_k4_e)),
@@ -256,8 +111,8 @@ impl<const N: usize> OnoroView<N> {
     let origin1 = onoro1.origin(&symm_state1);
     let origin2 = onoro2.origin(&symm_state2);
 
-    let canon_op1 = G::from_ord(view1.canon_view().get_op_ord() as usize);
-    let canon_op2 = G::from_ord(view2.canon_view().get_op_ord() as usize);
+    let canon_op1 = G::from_ord(view1.canon_view().op_ord() as usize);
+    let canon_op2 = G::from_ord(view2.canon_view().op_ord() as usize);
     let to_view2 = canon_op2.inverse() * canon_op1;
 
     let same_color_turn = onoro1.player_color() == onoro2.player_color();
@@ -290,13 +145,13 @@ impl<const N: usize> OnoroView<N> {
 
 impl<const N: usize> PartialEq for OnoroView<N> {
   fn eq(&self, other: &Self) -> bool {
-    if self.canon_view().get_hash() != other.canon_view().get_hash()
-      || self.canon_view().get_symm_class() != other.canon_view().get_symm_class()
+    if self.canon_view().hash() != other.canon_view().hash()
+      || self.canon_view().symm_class() != other.canon_view().symm_class()
     {
       return false;
     }
 
-    match self.canon_view().get_symm_class() {
+    match self.canon_view().symm_class() {
       SymmetryClass::C => Self::cmp_views(self, other, HexPosOffset::apply_d6_c),
       SymmetryClass::V => Self::cmp_views(self, other, HexPosOffset::apply_d3_v),
       SymmetryClass::E => Self::cmp_views(self, other, HexPosOffset::apply_k4_e),
@@ -312,43 +167,21 @@ impl<const N: usize> Eq for OnoroView<N> {}
 
 impl<const N: usize> Hash for OnoroView<N> {
   fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-    state.write_u64(self.canon_view().get_hash());
+    state.write_u64(self.canon_view().hash());
   }
 }
-
-/// Send/Sync rely on the OnoroView being initialized before being shared
-/// between threads. This assumption is safe because the view is inserted when
-/// it's inserted into the hash table.
-///
-/// Technically, since the CanonicalView is deterministically computed, it
-/// doesn't matter if there is a race to write it to the UnsafeCell, since all
-/// threads would be writing the same data to the same locations.
-unsafe impl<const N: usize> Send for OnoroView<N> {}
-unsafe impl<const N: usize> Sync for OnoroView<N> {}
 
 impl<const N: usize> Display for OnoroView<N> {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     let symm_state = board_symm_state(self.onoro());
     let rotated = self.onoro().rotated_d6_c(symm_state.op);
-    let _rotated = match self.canon_view().get_symm_class() {
-      SymmetryClass::C => {
-        rotated.rotated_d6_c(D6::from_ord(self.canon_view().get_op_ord() as usize))
-      }
-      SymmetryClass::V => {
-        rotated.rotated_d3_v(D3::from_ord(self.canon_view().get_op_ord() as usize))
-      }
-      SymmetryClass::E => {
-        rotated.rotated_k4_e(K4::from_ord(self.canon_view().get_op_ord() as usize))
-      }
-      SymmetryClass::CV => {
-        rotated.rotated_c2_cv(C2::from_ord(self.canon_view().get_op_ord() as usize))
-      }
-      SymmetryClass::CE => {
-        rotated.rotated_c2_ce(C2::from_ord(self.canon_view().get_op_ord() as usize))
-      }
-      SymmetryClass::EV => {
-        rotated.rotated_c2_ev(C2::from_ord(self.canon_view().get_op_ord() as usize))
-      }
+    let _rotated = match self.canon_view().symm_class() {
+      SymmetryClass::C => rotated.rotated_d6_c(D6::from_ord(self.canon_view().op_ord() as usize)),
+      SymmetryClass::V => rotated.rotated_d3_v(D3::from_ord(self.canon_view().op_ord() as usize)),
+      SymmetryClass::E => rotated.rotated_k4_e(K4::from_ord(self.canon_view().op_ord() as usize)),
+      SymmetryClass::CV => rotated.rotated_c2_cv(C2::from_ord(self.canon_view().op_ord() as usize)),
+      SymmetryClass::CE => rotated.rotated_c2_ce(C2::from_ord(self.canon_view().op_ord() as usize)),
+      SymmetryClass::EV => rotated.rotated_c2_ev(C2::from_ord(self.canon_view().op_ord() as usize)),
       SymmetryClass::Trivial => rotated,
     };
 
@@ -356,32 +189,30 @@ impl<const N: usize> Display for OnoroView<N> {
       f,
       "{}\n{:?}: canon: {}, normalize: {} ({:#018x?})",
       self.onoro,
-      self.canon_view().get_symm_class(),
+      self.canon_view().symm_class(),
       symm_state.op,
-      match self.canon_view().get_symm_class() {
-        SymmetryClass::C => D6::from_ord(self.canon_view().get_op_ord() as usize).to_string(),
-        SymmetryClass::V => D3::from_ord(self.canon_view().get_op_ord() as usize).to_string(),
-        SymmetryClass::E => K4::from_ord(self.canon_view().get_op_ord() as usize).to_string(),
+      match self.canon_view().symm_class() {
+        SymmetryClass::C => D6::from_ord(self.canon_view().op_ord() as usize).to_string(),
+        SymmetryClass::V => D3::from_ord(self.canon_view().op_ord() as usize).to_string(),
+        SymmetryClass::E => K4::from_ord(self.canon_view().op_ord() as usize).to_string(),
         SymmetryClass::CV | SymmetryClass::CE | SymmetryClass::EV =>
-          C2::from_ord(self.canon_view().get_op_ord() as usize).to_string(),
+          C2::from_ord(self.canon_view().op_ord() as usize).to_string(),
         SymmetryClass::Trivial =>
-          Trivial::from_ord(self.canon_view().get_op_ord() as usize).to_string(),
+          Trivial::from_ord(self.canon_view().op_ord() as usize).to_string(),
       },
-      self.canon_view().get_hash()
+      self.canon_view().hash()
     )
   }
 }
 
-pub struct ViewMoveGenerator<const N: usize> {
-  move_gen: MoveGenerator<N>,
-}
+pub struct ViewMoveGenerator<const N: usize>(MoveGenerator<N>);
 
 impl<const N: usize> GameMoveIterator for ViewMoveGenerator<N> {
   type Item = Move;
   type Game = OnoroView<N>;
 
   fn next(&mut self, view: &Self::Game) -> Option<Self::Item> {
-    self.move_gen.next(view.onoro())
+    self.0.next(view.onoro())
   }
 }
 
@@ -391,9 +222,7 @@ impl<const N: usize> Game for OnoroView<N> {
   type PlayerIdentifier = PawnColor;
 
   fn move_generator(&self) -> Self::MoveGenerator {
-    ViewMoveGenerator {
-      move_gen: self.onoro().each_move_gen(),
-    }
+    ViewMoveGenerator(self.onoro().each_move_gen())
   }
 
   fn make_move(&mut self, m: Self::Move) {
@@ -616,7 +445,7 @@ mod tests {
         B W",
     );
 
-    assert_eq!(view1.canon_view().get_symm_class(), SymmetryClass::V);
+    assert_eq!(view1.canon_view().symm_class(), SymmetryClass::V);
 
     expect_view_eq(&view1, &view2);
   }
@@ -650,9 +479,9 @@ mod tests {
          W .",
     );
 
-    assert_eq!(view1.canon_view().get_symm_class(), SymmetryClass::C);
-    assert_eq!(view3.canon_view().get_symm_class(), SymmetryClass::C);
-    assert_eq!(view4.canon_view().get_symm_class(), SymmetryClass::C);
+    assert_eq!(view1.canon_view().symm_class(), SymmetryClass::C);
+    assert_eq!(view3.canon_view().symm_class(), SymmetryClass::C);
+    assert_eq!(view4.canon_view().symm_class(), SymmetryClass::C);
 
     expect_view_eq(&view1, &view2);
     expect_view_ne(&view1, &view3);
@@ -690,8 +519,8 @@ mod tests {
          W . .",
     );
 
-    assert_eq!(view1.canon_view().get_symm_class(), SymmetryClass::C);
-    assert_eq!(view3.canon_view().get_symm_class(), SymmetryClass::C);
+    assert_eq!(view1.canon_view().symm_class(), SymmetryClass::C);
+    assert_eq!(view3.canon_view().symm_class(), SymmetryClass::C);
 
     expect_view_eq(&view1, &view2);
     expect_view_ne(&view1, &view3);
@@ -728,8 +557,8 @@ mod tests {
           W . . .",
     );
 
-    assert_eq!(view1.canon_view().get_symm_class(), SymmetryClass::E);
-    assert_eq!(view3.canon_view().get_symm_class(), SymmetryClass::E);
+    assert_eq!(view1.canon_view().symm_class(), SymmetryClass::E);
+    assert_eq!(view3.canon_view().symm_class(), SymmetryClass::E);
 
     expect_view_eq(&view1, &view2);
     expect_view_ne(&view1, &view3);
@@ -771,8 +600,8 @@ mod tests {
           W . . . . .",
     );
 
-    assert_eq!(view1.canon_view().get_symm_class(), SymmetryClass::CV);
-    assert_eq!(view3.canon_view().get_symm_class(), SymmetryClass::CV);
+    assert_eq!(view1.canon_view().symm_class(), SymmetryClass::CV);
+    assert_eq!(view3.canon_view().symm_class(), SymmetryClass::CV);
 
     expect_view_eq(&view1, &view2);
     expect_view_ne(&view1, &view3);
@@ -810,7 +639,7 @@ mod tests {
 
     let views = BOARD_POSITIONS.map(build_view);
     for i in 0..views.len() {
-      assert_eq!(views[i].canon_view().get_symm_class(), SymmetryClass::CV);
+      assert_eq!(views[i].canon_view().symm_class(), SymmetryClass::CV);
       for j in 0..i {
         let view1 = &views[j];
         let view2 = &views[i];
@@ -842,8 +671,8 @@ mod tests {
          W . .",
     );
 
-    assert_eq!(view1.canon_view().get_symm_class(), SymmetryClass::CE);
-    assert_eq!(view3.canon_view().get_symm_class(), SymmetryClass::CE);
+    assert_eq!(view1.canon_view().symm_class(), SymmetryClass::CE);
+    assert_eq!(view3.canon_view().symm_class(), SymmetryClass::CE);
 
     expect_view_eq(&view1, &view2);
     expect_view_ne(&view1, &view3);
@@ -882,8 +711,8 @@ mod tests {
           W . B .",
     );
 
-    assert_eq!(view1.canon_view().get_symm_class(), SymmetryClass::EV);
-    assert_eq!(view3.canon_view().get_symm_class(), SymmetryClass::EV);
+    assert_eq!(view1.canon_view().symm_class(), SymmetryClass::EV);
+    assert_eq!(view3.canon_view().symm_class(), SymmetryClass::EV);
 
     expect_view_eq(&view1, &view2);
     expect_view_ne(&view1, &view3);
@@ -922,8 +751,8 @@ mod tests {
           W W B .",
     );
 
-    assert_eq!(view1.canon_view().get_symm_class(), SymmetryClass::Trivial);
-    assert_eq!(view3.canon_view().get_symm_class(), SymmetryClass::Trivial);
+    assert_eq!(view1.canon_view().symm_class(), SymmetryClass::Trivial);
+    assert_eq!(view3.canon_view().symm_class(), SymmetryClass::Trivial);
 
     expect_view_eq(&view1, &view2);
     expect_view_ne(&view1, &view3);

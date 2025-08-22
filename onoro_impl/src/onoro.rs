@@ -256,7 +256,7 @@ impl<const N: usize> OnoroImpl<N> {
     let x = self.sum_of_mass.x() as u32;
     let y = self.sum_of_mass.y() as u32;
     let truncated_com = HexPos::new(x / self.pawns_in_play(), y / self.pawns_in_play());
-    truncated_com + symm_state.center_offset
+    truncated_com + symm_state.center_offset()
   }
 
   pub const fn symm_state_table_width() -> usize {
