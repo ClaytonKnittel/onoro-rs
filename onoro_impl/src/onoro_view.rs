@@ -46,7 +46,7 @@ impl<const N: usize> OnoroView<N> {
     &self.onoro
   }
 
-  fn canon_view(&self) -> &CanonicalView {
+  pub fn canon_view(&self) -> &CanonicalView {
     &self.view
   }
 

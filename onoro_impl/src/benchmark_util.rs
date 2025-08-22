@@ -66,6 +66,27 @@ pub fn random_playout<R: Rng>(onoro: &mut Onoro16, num_moves: usize, rng: &mut R
   num_moves + 1
 }
 
+pub fn random_unfinished_state<R: Rng>(
+  onoro: &Onoro16,
+  num_moves: usize,
+  rng: &mut R,
+) -> OnoroResult<Onoro16> {
+  const ATTEMPTS: u32 = 500;
+  for _ in 0..ATTEMPTS {
+    let mut tmp = onoro.clone();
+    if random_playout(&mut tmp, num_moves, rng) > num_moves {
+      return Ok(tmp);
+    }
+  }
+
+  Err(
+    OnoroError::new(format!(
+      "Failed to make an unfinished game after {ATTEMPTS} attempts"
+    ))
+    .into(),
+  )
+}
+
 pub fn generate_random_unfinished_states<R: Rng>(
   count: usize,
   num_moves: usize,
