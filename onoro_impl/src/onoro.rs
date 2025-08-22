@@ -5,7 +5,6 @@ use std::{
 
 use abstract_game::{GameIterator, GameMoveIterator};
 use algebra::group::Group;
-use itertools::interleave;
 use onoro::{
   Color, Colored, Onoro, OnoroMoveWrapper, OnoroPawn, PawnColor, TileState,
   groups::{C2, D3, D6, K4},
@@ -48,35 +47,17 @@ impl<const N: usize> OnoroImpl<N> {
     op: G,
     mut op_fn: OpFn,
   ) -> Self {
-    let mut game = unsafe { Self::new() };
-
-    let mut black_pawns = Vec::new();
-    let mut white_pawns = Vec::new();
     let symm_state = board_symm_state(self);
     let origin = self.origin(&symm_state);
-    let center = HexPos::new(N as u32 / 2, N as u32 / 2);
-    for pawn in self.pawns() {
-      let pos = HexPos::from(pawn.pos) - origin;
-      let pos = op_fn(&pos, &op);
-
-      match pawn.color {
-        PawnColor::Black => {
-          black_pawns.push(pos + center);
-        }
-        PawnColor::White => {
-          white_pawns.push(pos + center);
-        }
-      }
-    }
-
-    unsafe {
-      game.make_move_unchecked(Move::Phase1Move {
-        to: black_pawns[0].into(),
-      });
-    }
-    for pos in interleave(white_pawns, black_pawns.into_iter().skip(1)) {
-      game.make_move(Move::Phase1Move { to: pos.into() })
-    }
+    let pawns = self
+      .pawns()
+      .map(|pawn| {
+        let pos = HexPos::from(pawn.pos) - origin;
+        let pos = op_fn(&pos, &op);
+        (pos, pawn.color)
+      })
+      .collect();
+    let mut game = Self::from_pawns(pawns).unwrap();
 
     if !self.in_phase1() && !self.onoro_state().black_turn() {
       game.mut_onoro_state().swap_player_turn();
