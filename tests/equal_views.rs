@@ -52,9 +52,11 @@ fn test_random_exploration(board_string: &str, seed: u64) -> OnoroResult {
   let onoro = Onoro16::from_board_string(board_string)?;
   let mut rng = StdRng::seed_from_u64(seed);
 
-  // Make between 1-30 random moves.
-  let onoro = random_unfinished_state(&onoro, rng.gen_range(1..=30), &mut rng)?;
+  // Make between 1-30 random moves, preferring more moves.
+  let num_moves = rng.gen_range(1..=30).max(rng.gen_range(1..=30));
+  let onoro = random_unfinished_state(&onoro, num_moves, &mut rng)?;
 
+  // Randomly rotate the board.
   let ord = rng.gen_range(0..D6::SIZE);
   let op = D6::from_ord(ord);
   let rotated = onoro.rotated_d6_c(op);
