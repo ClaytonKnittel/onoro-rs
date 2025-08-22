@@ -20,7 +20,7 @@ impl<const N: usize> CheckWinBenchmark for OnoroImpl<N> {
   }
 }
 
-pub fn make_random_move<R: Rng>(onoro: &mut Onoro16, rng: &mut R) -> Move {
+pub fn make_random_move<R: Rng>(onoro: &mut Onoro16, rng: &mut R) -> Option<Move> {
   let mut moves = onoro.each_move().collect_vec();
   moves.sort_by(|&m1, &m2| match (m1, m2) {
     (Move::Phase1Move { to: to1 }, Move::Phase1Move { to: to2 }) => {
@@ -43,13 +43,14 @@ pub fn make_random_move<R: Rng>(onoro: &mut Onoro16, rng: &mut R) -> Move {
     // All moves should be in the same phase.
     _ => unreachable!(),
   });
-  assert!(
-    !moves.is_empty(),
-    "No moves available in position:\n{onoro:?}"
-  );
+
+  if moves.is_empty() {
+    return None;
+  }
+
   let m = moves[rng.gen_range(0..moves.len())];
   onoro.make_move(m);
-  m
+  Some(m)
 }
 
 /// Plays a random number of moves in the game, returning the number of moves
@@ -129,7 +130,11 @@ pub fn generate_random_walks<R: Rng>(
         if onoro.finished().is_some() {
           return Ok(moves);
         }
-        moves.push(make_random_move(&mut onoro, rng));
+        if let Some(m) = make_random_move(&mut onoro, rng) {
+          moves.push(m);
+        } else {
+          return Ok(moves);
+        }
       }
 
       Err(

@@ -1,5 +1,5 @@
 use algebra::{finite::Finite, ordinal::Ordinal};
-use googletest::{expect_eq, gtest};
+use googletest::gtest;
 use onoro::{error::OnoroResult, groups::D6, test_util::BOARD_POSITIONS, Onoro};
 use onoro_impl::{benchmark_util::random_unfinished_state, Onoro16, OnoroView};
 use rand::{rngs::StdRng, Rng, SeedableRng};
@@ -26,46 +26,52 @@ fn random_states(
   )]
   board_string: &str,
   #[values(
-    0x97153c8af3d7e275, 0x90ab05c07f4dee63, 0xe6a0fc271d33e8e5, 0x96cb8992055cce5d, 
-    0x4cb0dfe9cc4bb4af, 0x3d2f9250cdde3443, 0x8703b21deed1f04a, 0x716b7a74453435ef, 
-    0xee7cfaa0c8170b2f, 0xf545523cc1e64c7b, 0xa0ea6f5a36f1a897, 0xdfa93fc7825ea486, 
-    0x2bf223a942ce00bb, 0x311ac379ea41a488, 0x9f6f27e10a3eaa77, 0xf63e1632b562e5d3, 
-    0xf5a34e4fa171907e, 0x3ab223e7bce6dd78, 0xa93ec14213360a66, 0x517ad2805f8daf09, 
-    0x584909fb557b8b1f, 0xe2b21057d1d0b424, 0x5da53a371840d302, 0x2faf26c97bec2d33, 
-    0x413bda9b5bb9f6b2, 0xbdffa6440d8087aa, 0x4966731d7cec3109, 0x470f363fc0ee08d8, 
-    0x8feaf45a900ee957, 0xb3a9fd9b48262b6d, 0xd8178e5463678586, 0x9c8ecc78eaf466f1, 
-    0x1c9b1088faae1363, 0x5421f5e479fa892a, 0x73ea9b7f6a2c77a5, 0xd63fae2d81e444df, 
-    0xf965bf272882061b, 0xd21faa7bbc961f89, 0x1f496d5f65195611, 0xc7c41a686fa0e2a7, 
-    0x315c2b51477965cc, 0xc374cfb12a125972, 0xf2b1fc1f53c2e70e, 0xd74e3979e25d765d, 
-    0xf08675facb18b01c, 0x9ba572c296e29b7c, 0xbd22321f2e158a2d, 0xc7b3200030477a2f, 
-    0x5562a955466067a1, 0x7a647f495bdade39, 0x1679752ee8729181, 0xc18c19bba79b4100, 
-    0x33381bcf841d8a3d, 0x475c35a092ba15e0, 0xa0e79d7dc8283064, 0xbb37452cc9ca9742, 
-    0x23dcb634ee995173, 0x2e8a4d4792e97010, 0xfab52d9193d6059c, 0x781c13179f1fbb38, 
-    0xa6674c5fe54fe018, 0x389c7d749ce997ae, 0x234125fdc7dc23ad, 0xea617d7730315597,
+    0x80fd90e95c2f13e9, 0x5471d495b89053b9, 0xc627efbb2eed030b, 0x01a445d82f9f2021,
+    0xe3bf475fd9109bf5, 0x00b1b38e09b284d2, 0xc375da5a36154ce3, 0xbe284ab710be8050,
+    0xa52c989b265e454c, 0x8d2448bdf7208b65, 0x5891d4f6b3f61672, 0xbd204e48ab72a5cc,
+    0x89fc831bddd7250c, 0x817d0a7d2c7f3663, 0x84e971050f5b4d1d, 0xe92696a9f391b10f,
+    0xcad2fe42422c8091, 0x89d64462b811ac2c, 0xfc1dab4507e59064, 0x382a6788f1c2f859,
+    0xa20df572a82c8f57, 0xebe379f78c1f379e, 0xfa18905aed704ab5, 0x7eb5c244139b9514,
+    0x3e55be2c02f31bc6, 0xda3f253722535e21, 0xf752b0600fb4eb70, 0x26179030139e3bc7,
+    0x16ca8231cd24ebd6, 0xe0fd262cb6b8a0a6, 0x19519a29f7b189c6, 0xbdee445157381297,
+    0x6e57898105cb208b, 0x0936ce75456665ee, 0xbc21fc70de13043b, 0x232d7e5597e12024,
+    0xd08d5beb54583534, 0x1e19b7ef94504034, 0x6de62076f9d70a28, 0x39f7ced0ec4c2cc4,
+    0x99b5e55b529e3bc5, 0x3c2bd206f86c1762, 0x3dfe73f9e08fa92c, 0x0247efa155852b5f,
+    0xc0c3b19cb5ea7ec8, 0x5003ac15e2118cb4, 0xdc9f9b519196f43a, 0xab64091372563a88,
+    0x822c547170dc6a15, 0x843f1e3e884fedc0, 0x22e86f358318984f, 0xc0f1cbc3a1ef783b,
+    0x7ec5392b810c8630, 0xcdf70898e03aa18b, 0x3581fd5371ba4a4a, 0x390a6df1491d255a,
+    0xda92017aa17b7ee6, 0xc561086a3460a80a, 0x78784cd406eadd00, 0x6f49ee88d68ad9a0,
+    0x5da4dbcb73145b33, 0xd1b006567cf6b5db, 0xdfbf3079c51f1ca9, 0xcb2e93a448402216,
   )] seed: u64,
 ) {
 }
 
 #[apply(random_states)]
 #[gtest]
-fn test_random_exploration(board_string: &str, seed: u64) -> OnoroResult {
+fn test_equal_view(board_string: &str, seed: u64) -> OnoroResult {
   let onoro = Onoro16::from_board_string(board_string)?;
   let mut rng = StdRng::seed_from_u64(seed);
 
-  // Make between 1-30 random moves, preferring more moves.
-  let num_moves = rng.gen_range(1..=30).max(rng.gen_range(1..=30));
-  let onoro = random_unfinished_state(&onoro, num_moves, &mut rng)?;
+  for i in 0..64 {
+    // Make between 1-30 random moves, preferring more moves.
+    let num_moves = rng.gen_range(1..=30).max(rng.gen_range(1..=30));
+    let onoro = random_unfinished_state(&onoro, num_moves, &mut rng)?;
 
-  // Randomly rotate the board.
-  let ord = rng.gen_range(0..D6::SIZE);
-  let op = D6::from_ord(ord);
-  let rotated = onoro.rotated_d6_c(op);
+    // Randomly rotate the board.
+    let ord = rng.gen_range(0..D6::SIZE);
+    let op = D6::from_ord(ord);
+    let rotated = onoro.rotated_d6_c(op);
 
-  let view1 = OnoroView::new(onoro);
-  let view2 = OnoroView::new(rotated);
+    let view1 = OnoroView::new(onoro);
+    let view2 = OnoroView::new(rotated);
 
-  expect_eq!(view1.canon_view().hash(), view2.canon_view().hash());
-  expect_eq!(view1, view2);
+    assert_eq!(
+      view1.canon_view().hash(),
+      view2.canon_view().hash(),
+      "Failed on iteration {i}"
+    );
+    assert_eq!(view1, view2, "Failed on iteration {i}");
+  }
 
   Ok(())
 }
