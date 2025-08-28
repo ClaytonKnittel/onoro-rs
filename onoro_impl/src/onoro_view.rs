@@ -122,6 +122,9 @@ impl<const N: usize> OnoroView<N> {
     let pawns_equal =
       Self::pawns_equal_with_transform(onoro1, onoro2, |pos| apply_view_transform(pos, &to_view2));
 
+    // In the extremely unlikely case of a hash collision, the best-guess
+    // canonical orientations may not have produced equal orientations. As a
+    // fallback, we can simply check every other possible view transform.
     if unlikely(!pawns_equal) {
       return G::for_each().skip(1).any(|op| {
         debug_assert!(op != G::identity());
