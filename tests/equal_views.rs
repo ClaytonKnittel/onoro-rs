@@ -65,8 +65,8 @@ fn test_equal_view(board_string: &str, seed: u64) -> OnoroResult {
       let view2 = OnoroView::new(rotated);
 
       assert_eq!(
-        view1.canon_view().hash(),
-        view2.canon_view().hash(),
+        view1.hash(),
+        view2.hash(),
         "Failed on iteration {i} for rotation {op}"
       );
       assert_eq!(view1, view2, "Failed on iteration {i} for rotation {op}");

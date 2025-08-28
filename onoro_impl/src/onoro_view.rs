@@ -1,6 +1,6 @@
 use std::{
   collections::{HashMap, HashSet},
-  fmt::Display,
+  fmt::{Debug, Display},
   hash::Hash,
 };
 
@@ -13,7 +13,7 @@ use abstract_game::{Game, GameMoveIterator, GameResult};
 use onoro::{
   Compress, Onoro, PawnColor, TileState,
   error::{OnoroError, OnoroResult},
-  groups::{C2, D3, D6, K4, SymmetryClass, SymmetryClassContainer},
+  groups::{C2, D3, D6, K4, SymmetryClass},
   hex_pos::{HexPos, HexPosOffset},
 };
 
@@ -23,13 +23,14 @@ use crate::{
   canonicalize::board_symm_state,
   r#move::Move,
   onoro_defs::{Onoro16, Onoro16View},
+  util::unlikely,
 };
 
 /// A wrapper over Onoro states that caches the hash of the game state and it's
 /// canonicalizing symmetry operations. These cached values are used for quicker
 /// equality comparison between different Onoro game states which may be in
 /// different orientations.
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct OnoroView<const N: usize> {
   onoro: OnoroImpl<N>,
   view: CanonicalView,
@@ -46,64 +47,22 @@ impl<const N: usize> OnoroView<N> {
     &self.onoro
   }
 
-  pub fn canon_view(&self) -> &CanonicalView {
+  fn canon_view(&self) -> &CanonicalView {
     &self.view
   }
 
-  fn pawns_iterator<'a, G, F>(
-    &'a self,
-    mut apply_view_transform: F,
-  ) -> impl Iterator<Item = (HexPosOffset, PawnColor)> + 'a
-  where
-    G: Group + Ordinal + 'a,
-    F: FnMut(&HexPosOffset, &G) -> HexPosOffset + 'a,
-  {
-    let symm_state = board_symm_state(&self.onoro);
-    let origin = self.onoro.origin(&symm_state);
-    let canon_op = G::from_ord(self.canon_view().op_ord() as usize);
-
-    self.onoro.pawns_typed().map(move |pawn| {
-      let normalized_pos = (HexPos::from(pawn.pos) - origin).apply_d6_c(&symm_state.op);
-      let normalized_pos = apply_view_transform(&normalized_pos, &canon_op);
-      (normalized_pos, pawn.color)
-    })
+  pub fn hash(&self) -> u64 {
+    self.canon_view().hash()
   }
 
-  pub fn pawns(&self) -> impl Iterator<Item = (HexPosOffset, PawnColor)> + '_ {
-    match self.canon_view().symm_class() {
-      SymmetryClass::C => SymmetryClassContainer::C(self.pawns_iterator(HexPosOffset::apply_d6_c)),
-      SymmetryClass::V => SymmetryClassContainer::V(self.pawns_iterator(HexPosOffset::apply_d3_v)),
-      SymmetryClass::E => SymmetryClassContainer::E(self.pawns_iterator(HexPosOffset::apply_k4_e)),
-      SymmetryClass::CV => {
-        SymmetryClassContainer::CV(self.pawns_iterator(HexPosOffset::apply_c2_cv))
-      }
-      SymmetryClass::CE => {
-        SymmetryClassContainer::CE(self.pawns_iterator(HexPosOffset::apply_c2_ce))
-      }
-      SymmetryClass::EV => {
-        SymmetryClassContainer::EV(self.pawns_iterator(HexPosOffset::apply_c2_ev))
-      }
-      SymmetryClass::Trivial => {
-        SymmetryClassContainer::Trivial(self.pawns_iterator(HexPosOffset::apply_trivial))
-      }
-    }
-  }
-
-  fn cmp_views<G: Group + Ordinal + Display, F>(
-    view1: &OnoroView<N>,
-    view2: &OnoroView<N>,
+  fn pawns_equal_with_transform<F>(
+    onoro1: &OnoroImpl<N>,
+    onoro2: &OnoroImpl<N>,
     mut apply_view_transform: F,
   ) -> bool
   where
-    F: FnMut(&HexPosOffset, &G) -> HexPosOffset,
+    F: FnMut(&HexPosOffset) -> HexPosOffset,
   {
-    let onoro1 = &view1.onoro;
-    let onoro2 = &view2.onoro;
-
-    if onoro1.pawns_in_play() != onoro2.pawns_in_play() {
-      return false;
-    }
-
     let symm_state1 = board_symm_state(onoro1);
     let symm_state2 = board_symm_state(onoro2);
     let normalizing_op1 = symm_state1.op;
@@ -111,15 +70,11 @@ impl<const N: usize> OnoroView<N> {
     let origin1 = onoro1.origin(&symm_state1);
     let origin2 = onoro2.origin(&symm_state2);
 
-    let canon_op1 = G::from_ord(view1.canon_view().op_ord() as usize);
-    let canon_op2 = G::from_ord(view2.canon_view().op_ord() as usize);
-    let to_view2 = canon_op2.inverse() * canon_op1;
-
     let same_color_turn = onoro1.player_color() == onoro2.player_color();
 
     onoro1.pawns().all(|pawn| {
       let normalized_pos1 = (HexPos::from(pawn.pos) - origin1).apply_d6_c(&normalizing_op1);
-      let normalized_pos2 = apply_view_transform(&normalized_pos1, &to_view2);
+      let normalized_pos2 = apply_view_transform(&normalized_pos1);
       let pos2 = normalized_pos2.apply_d6_c(&denormalizing_op2) + origin2;
 
       match onoro2.get_tile(pos2.into()) {
@@ -140,6 +95,42 @@ impl<const N: usize> OnoroView<N> {
         TileState::Empty => false,
       }
     })
+  }
+
+  fn cmp_views<G: Group + Ordinal + Clone + Display, F>(
+    view1: &OnoroView<N>,
+    view2: &OnoroView<N>,
+    mut apply_view_transform: F,
+  ) -> bool
+  where
+    F: FnMut(&HexPosOffset, &G) -> HexPosOffset,
+  {
+    let onoro1 = &view1.onoro;
+    let onoro2 = &view2.onoro;
+
+    if onoro1.pawns_in_play() != onoro2.pawns_in_play() {
+      return false;
+    }
+    if view1.canon_view().hash() != view2.canon_view().hash() {
+      return false;
+    }
+
+    let canon_op1 = G::from_ord(view1.canon_view().op_ord() as usize);
+    let canon_op2 = G::from_ord(view2.canon_view().op_ord() as usize);
+    let to_view2 = canon_op2.inverse() * canon_op1;
+
+    let pawns_equal =
+      Self::pawns_equal_with_transform(onoro1, onoro2, |pos| apply_view_transform(pos, &to_view2));
+
+    if unlikely(!pawns_equal) {
+      return G::for_each().skip(1).any(|op| {
+        debug_assert!(op != G::identity());
+        let to_view2 = op * to_view2.clone();
+        Self::pawns_equal_with_transform(onoro1, onoro2, |pos| apply_view_transform(pos, &to_view2))
+      });
+    }
+
+    pawns_equal
   }
 }
 
@@ -205,6 +196,12 @@ impl<const N: usize> Display for OnoroView<N> {
   }
 }
 
+impl<const N: usize> Debug for OnoroView<N> {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(f, "{self}")
+  }
+}
+
 pub struct ViewMoveGenerator<const N: usize>(MoveGenerator<N>);
 
 impl<const N: usize> GameMoveIterator for ViewMoveGenerator<N> {
@@ -247,9 +244,15 @@ impl Compress for Onoro16View {
   type Repr = u64;
 
   fn compress(&self) -> u64 {
-    let pawn_colors: HashMap<_, _> = self.pawns().collect();
-    let (start_pawn_pos, start_pawn_color) = self
+    let pawn_colors: HashMap<HexPosOffset, _> = self
+      .onoro()
       .pawns()
+      .map(|pawn| (pawn.pos.into(), pawn.color))
+      .collect();
+    let (start_pawn_pos, start_pawn_color) = self
+      .onoro()
+      .pawns()
+      .map(|pawn| (pawn.pos.into(), pawn.color))
       .min_by_key(|(pos, _)| *pos)
       .expect("Cannot compress empty onoro board");
 
@@ -382,10 +385,9 @@ impl Compress for Onoro16View {
 #[cfg(test)]
 mod tests {
   use googletest::{
-    assert_that, expect_that, gtest,
-    prelude::{any, anything, container_eq},
+    expect_that, gtest,
+    prelude::{any, anything},
   };
-  use itertools::{Either, Itertools};
 
   use onoro::{
     Compress, Onoro, PawnColor, error::OnoroResult, groups::SymmetryClass, hex_pos::HexPosOffset,
@@ -395,38 +397,6 @@ mod tests {
 
   fn build_view(board_layout: &str) -> Onoro16View {
     OnoroView::new(Onoro16::from_board_string(board_layout).unwrap())
-  }
-
-  fn verify_pawn_iter<const N: usize>(view1: &OnoroView<N>, view2: &OnoroView<N>) {
-    let (mut b1, mut w1): (Vec<_>, Vec<_>) =
-      view1.pawns().partition_map(|(pos, color)| match color {
-        PawnColor::Black => Either::Left(pos),
-        PawnColor::White => Either::Right(pos),
-      });
-    let (mut b2, mut w2): (Vec<_>, Vec<_>) =
-      view2.pawns().partition_map(|(pos, color)| match color {
-        PawnColor::Black => Either::Left(pos),
-        PawnColor::White => Either::Right(pos),
-      });
-
-    let pos_cmp = |pos1: &HexPosOffset, pos2: &HexPosOffset| {
-      pos1.x().cmp(&pos2.x()).then(pos1.y().cmp(&pos2.y()))
-    };
-    b1.sort_by(pos_cmp);
-    b2.sort_by(pos_cmp);
-    w1.sort_by(pos_cmp);
-    w2.sort_by(pos_cmp);
-    assert_that!(b1, container_eq(b2));
-    assert_that!(w1, container_eq(w2));
-  }
-
-  fn expect_view_eq<const N: usize>(view1: &OnoroView<N>, view2: &OnoroView<N>) {
-    assert_eq!(view1, view2);
-    verify_pawn_iter(view1, view2);
-  }
-
-  fn expect_view_ne<const N: usize>(view1: &OnoroView<N>, view2: &OnoroView<N>) {
-    assert_ne!(view1, view2);
   }
 
   fn compress_round_trip(onoro: &Onoro16View) -> OnoroResult<Onoro16View> {
@@ -447,7 +417,7 @@ mod tests {
 
     assert_eq!(view1.canon_view().symm_class(), SymmetryClass::V);
 
-    expect_view_eq(&view1, &view2);
+    assert_eq!(&view1, &view2);
   }
 
   #[test]
@@ -483,16 +453,16 @@ mod tests {
     assert_eq!(view3.canon_view().symm_class(), SymmetryClass::C);
     assert_eq!(view4.canon_view().symm_class(), SymmetryClass::C);
 
-    expect_view_eq(&view1, &view2);
-    expect_view_ne(&view1, &view3);
-    expect_view_ne(&view2, &view3);
-    expect_view_ne(&view1, &view4);
-    expect_view_ne(&view2, &view4);
-    expect_view_ne(&view3, &view4);
-    expect_view_ne(&view1, &view5);
-    expect_view_ne(&view2, &view5);
-    expect_view_ne(&view3, &view5);
-    expect_view_eq(&view4, &view5);
+    assert_eq!(&view1, &view2);
+    assert_ne!(&view1, &view3);
+    assert_ne!(&view2, &view3);
+    assert_ne!(&view1, &view4);
+    assert_ne!(&view2, &view4);
+    assert_ne!(&view3, &view4);
+    assert_ne!(&view1, &view5);
+    assert_ne!(&view2, &view5);
+    assert_ne!(&view3, &view5);
+    assert_eq!(&view4, &view5);
   }
 
   #[test]
@@ -522,12 +492,40 @@ mod tests {
     assert_eq!(view1.canon_view().symm_class(), SymmetryClass::C);
     assert_eq!(view3.canon_view().symm_class(), SymmetryClass::C);
 
-    expect_view_eq(&view1, &view2);
-    expect_view_ne(&view1, &view3);
-    expect_view_ne(&view2, &view3);
-    expect_view_ne(&view1, &view4);
-    expect_view_ne(&view2, &view4);
-    expect_view_eq(&view3, &view4);
+    assert_eq!(&view1, &view2);
+    assert_ne!(&view1, &view3);
+    assert_ne!(&view2, &view3);
+    assert_ne!(&view1, &view4);
+    assert_ne!(&view2, &view4);
+    assert_eq!(&view3, &view4);
+  }
+
+  #[test]
+  #[allow(non_snake_case)]
+  fn test_C_symm_3() {
+    let view1 = build_view(
+      ". . . . . . .
+        . . . . B B .
+         . . B W B W .
+          . . B B W . .
+           . B W B W . .
+            . W W . . . .
+             . . . . . . .",
+    );
+    let view2 = build_view(
+      ". . . . . . .
+        . . . W W . .
+         . . B W B W .
+          . . B B W . .
+           . B W B W . .
+            . . B B . . .
+             . . . . . . .",
+    );
+
+    assert_eq!(view1.canon_view().symm_class(), SymmetryClass::C);
+    assert_eq!(view2.canon_view().symm_class(), SymmetryClass::C);
+
+    assert_eq!(&view1, &view2);
   }
 
   #[test]
@@ -560,12 +558,12 @@ mod tests {
     assert_eq!(view1.canon_view().symm_class(), SymmetryClass::E);
     assert_eq!(view3.canon_view().symm_class(), SymmetryClass::E);
 
-    expect_view_eq(&view1, &view2);
-    expect_view_ne(&view1, &view3);
-    expect_view_ne(&view2, &view3);
-    expect_view_ne(&view1, &view4);
-    expect_view_ne(&view2, &view4);
-    expect_view_eq(&view3, &view4);
+    assert_eq!(&view1, &view2);
+    assert_ne!(&view1, &view3);
+    assert_ne!(&view2, &view3);
+    assert_ne!(&view1, &view4);
+    assert_ne!(&view2, &view4);
+    assert_eq!(&view3, &view4);
   }
 
   #[test]
@@ -603,12 +601,12 @@ mod tests {
     assert_eq!(view1.canon_view().symm_class(), SymmetryClass::CV);
     assert_eq!(view3.canon_view().symm_class(), SymmetryClass::CV);
 
-    expect_view_eq(&view1, &view2);
-    expect_view_ne(&view1, &view3);
-    expect_view_ne(&view2, &view3);
-    expect_view_ne(&view1, &view4);
-    expect_view_ne(&view2, &view4);
-    expect_view_eq(&view3, &view4);
+    assert_eq!(&view1, &view2);
+    assert_ne!(&view1, &view3);
+    assert_ne!(&view2, &view3);
+    assert_ne!(&view1, &view4);
+    assert_ne!(&view2, &view4);
+    assert_eq!(&view3, &view4);
   }
 
   #[test]
@@ -644,7 +642,7 @@ mod tests {
         let view1 = &views[j];
         let view2 = &views[i];
 
-        expect_view_eq(view1, view2);
+        assert_eq!(view1, view2);
       }
     }
   }
@@ -674,12 +672,12 @@ mod tests {
     assert_eq!(view1.canon_view().symm_class(), SymmetryClass::CE);
     assert_eq!(view3.canon_view().symm_class(), SymmetryClass::CE);
 
-    expect_view_eq(&view1, &view2);
-    expect_view_ne(&view1, &view3);
-    expect_view_ne(&view2, &view3);
-    expect_view_ne(&view1, &view4);
-    expect_view_ne(&view2, &view4);
-    expect_view_eq(&view3, &view4);
+    assert_eq!(&view1, &view2);
+    assert_ne!(&view1, &view3);
+    assert_ne!(&view2, &view3);
+    assert_ne!(&view1, &view4);
+    assert_ne!(&view2, &view4);
+    assert_eq!(&view3, &view4);
   }
 
   #[test]
@@ -714,12 +712,12 @@ mod tests {
     assert_eq!(view1.canon_view().symm_class(), SymmetryClass::EV);
     assert_eq!(view3.canon_view().symm_class(), SymmetryClass::EV);
 
-    expect_view_eq(&view1, &view2);
-    expect_view_ne(&view1, &view3);
-    expect_view_ne(&view2, &view3);
-    expect_view_ne(&view1, &view4);
-    expect_view_ne(&view2, &view4);
-    expect_view_eq(&view3, &view4);
+    assert_eq!(&view1, &view2);
+    assert_ne!(&view1, &view3);
+    assert_ne!(&view2, &view3);
+    assert_ne!(&view1, &view4);
+    assert_ne!(&view2, &view4);
+    assert_eq!(&view3, &view4);
   }
 
   #[test]
@@ -754,12 +752,12 @@ mod tests {
     assert_eq!(view1.canon_view().symm_class(), SymmetryClass::Trivial);
     assert_eq!(view3.canon_view().symm_class(), SymmetryClass::Trivial);
 
-    expect_view_eq(&view1, &view2);
-    expect_view_ne(&view1, &view3);
-    expect_view_ne(&view2, &view3);
-    expect_view_ne(&view1, &view4);
-    expect_view_ne(&view2, &view4);
-    expect_view_eq(&view3, &view4);
+    assert_eq!(&view1, &view2);
+    assert_ne!(&view1, &view3);
+    assert_ne!(&view2, &view3);
+    assert_ne!(&view1, &view4);
+    assert_ne!(&view2, &view4);
+    assert_eq!(&view3, &view4);
   }
 
   #[test]
@@ -821,7 +819,7 @@ mod tests {
         B W B W B W B W B W B W B W
          . . . . . . . . . . . . B .",
     );
-    expect_view_eq(&view, &compress_round_trip(&view)?);
+    assert_eq!(&view, &compress_round_trip(&view)?);
     Ok(())
   }
 
@@ -834,7 +832,7 @@ mod tests {
           . W B W . .
            . W B B . .",
     );
-    expect_view_eq(&view, &compress_round_trip(&view)?);
+    assert_eq!(&view, &compress_round_trip(&view)?);
     Ok(())
   }
 }

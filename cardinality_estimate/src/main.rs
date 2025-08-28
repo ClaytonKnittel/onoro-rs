@@ -59,6 +59,11 @@ impl<R: Rng> RandomCompressedBoard<R> {
 }
 
 fn main() {
+  todo!(
+    "This is broken now that we don't have canonical pawn iteration in OnoroView (e.g. different orientations of the same board may compress to different values now)."
+  );
+
+  #[allow(unreachable_code)]
   let mut rng = RandomCompressedBoard::new(rand::rng()).unwrap();
 
   const ITERS: u64 = 1_000_000_000;
