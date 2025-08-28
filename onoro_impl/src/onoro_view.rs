@@ -104,13 +104,14 @@ impl<const N: usize> OnoroView<N> {
   where
     F: FnMut(&HexPosOffset, &G) -> HexPosOffset,
   {
+    if view1.hash() != view2.hash() {
+      return false;
+    }
+
     let onoro1 = &view1.onoro;
     let onoro2 = &view2.onoro;
 
     if onoro1.pawns_in_play() != onoro2.pawns_in_play() {
-      return false;
-    }
-    if view1.canon_view().hash() != view2.canon_view().hash() {
       return false;
     }
 
