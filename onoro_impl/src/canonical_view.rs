@@ -49,6 +49,14 @@ impl CanonicalView {
     self.hash
   }
 
+  /// This is a best-guess for what a canonicalized orientation of the board
+  /// is. It is possible, due to hash collisions, that two non-symmetric
+  /// orientations have the same hash, which we cannot disambiguate here
+  /// without paying a runtime cost.
+  ///
+  /// Note that we should not have a slow path for this, since hash
+  /// "collisions" will happen for orientations which are symmetric, which are
+  /// common.
   pub fn find_canonical_view<const N: usize>(onoro: &OnoroImpl<N>) -> Self {
     let symm_state = board_symm_state(onoro);
     let (hash, op_ord) = match symm_state.symm_class {

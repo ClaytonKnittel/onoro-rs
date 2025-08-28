@@ -37,7 +37,6 @@ pub struct OnoroView<const N: usize> {
 }
 
 impl<const N: usize> OnoroView<N> {
-  /// TODO: Make new lazy
   pub fn new(onoro: OnoroImpl<N>) -> Self {
     let view = CanonicalView::find_canonical_view(&onoro);
     Self { onoro, view }
