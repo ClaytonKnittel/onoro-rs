@@ -16,8 +16,8 @@ pub struct PawnList8 {
   pawns: [HexPosOffset; 8],
 }
 
+#[cfg(target_feature = "ssse3")]
 impl PawnList8 {
-  #[cfg(target_feature = "ssse3")]
   #[target_feature(enable = "ssse3")]
   fn extract_black_pawns_sse(pawn_poses: &[PackedIdx; N], origin: HexPos) -> Self {
     let pawns = unsafe { _mm_loadu_si128(pawn_poses.as_ptr() as *const _) };
@@ -38,7 +38,6 @@ impl PawnList8 {
     }
   }
 
-  #[cfg(target_feature = "ssse3")]
   #[target_feature(enable = "ssse3")]
   fn extract_white_pawns_sse(pawn_poses: &[PackedIdx; N], origin: HexPos) -> Self {
     let pawns = unsafe { _mm_loadu_si128(pawn_poses.as_ptr() as *const _) };
@@ -60,7 +59,6 @@ impl PawnList8 {
     }
   }
 
-  #[cfg(target_feature = "ssse3")]
   #[target_feature(enable = "ssse3")]
   fn centered_by(pawns: __m128i, origin: HexPos) -> __m128i {
     let x = origin.x();
@@ -73,61 +71,107 @@ impl PawnList8 {
     _mm_sub_epi8(pawns, origin_array)
   }
 
-  #[cfg(not(target_feature = "ssse3"))]
-  fn extract_black_pawns_slow(pawn_poses: &[PackedIdx; N], origin: HexPos) -> Self {
-    let pawns = [
-      HexPos::from(pawn_poses[0]) - origin,
-      HexPos::from(pawn_poses[2]) - origin,
-      HexPos::from(pawn_poses[4]) - origin,
-      HexPos::from(pawn_poses[6]) - origin,
-      HexPos::from(pawn_poses[8]) - origin,
-      HexPos::from(pawn_poses[10]) - origin,
-      HexPos::from(pawn_poses[12]) - origin,
-      HexPos::from(pawn_poses[14]) - origin,
-    ];
-    Self { pawns }
-  }
-
-  #[cfg(not(target_feature = "ssse3"))]
-  fn extract_white_pawns_slow(pawn_poses: &[PackedIdx; N], origin: HexPos) -> Self {
-    let pawns = [
-      HexPos::from(pawn_poses[1]) - origin,
-      HexPos::from(pawn_poses[3]) - origin,
-      HexPos::from(pawn_poses[5]) - origin,
-      HexPos::from(pawn_poses[7]) - origin,
-      HexPos::from(pawn_poses[9]) - origin,
-      HexPos::from(pawn_poses[11]) - origin,
-      HexPos::from(pawn_poses[13]) - origin,
-      HexPos::from(pawn_poses[15]) - origin,
-    ];
-    Self { pawns }
-  }
-
   pub fn extract_black_pawns(pawn_poses: &[PackedIdx; N], origin: HexPos) -> Self {
-    #[cfg(target_feature = "ssse3")]
-    unsafe {
-      Self::extract_black_pawns_sse(pawn_poses, origin)
-    }
-    #[cfg(not(target_feature = "ssse3"))]
-    Self::extract_black_pawns_slow(pawn_poses, origin)
+    unsafe { Self::extract_black_pawns_sse(pawn_poses, origin) }
   }
 
   pub fn extract_white_pawns(pawn_poses: &[PackedIdx; N], origin: HexPos) -> Self {
-    #[cfg(target_feature = "ssse3")]
-    unsafe {
-      Self::extract_white_pawns_sse(pawn_poses, origin)
-    }
-    #[cfg(not(target_feature = "ssse3"))]
-    Self::extract_white_pawns_slow(pawn_poses, origin)
+    unsafe { Self::extract_white_pawns_sse(pawn_poses, origin) }
   }
 
+  #[target_feature(enable = "ssse3")]
+  fn only_x(pawns: __m128i) -> __m128i {
+    let x_mask = _mm_set1_epi16(0x00ff);
+    _mm_and_si128(pawns, x_mask)
+  }
+
+  #[target_feature(enable = "ssse3")]
+  fn only_y(pawns: __m128i) -> __m128i {
+    let y_mask = _mm_set1_epi16(0xff00);
+    _mm_and_si128(pawns, y_mask)
+  }
+
+  #[target_feature(enable = "ssse3")]
+  fn negate_x(pawns: __m128i) -> __m128i {
+    let x_mask = _mm_set1_epi16(0x00ff);
+    let add_x_mask = _mm_set1_epi16(0x0001);
+    _mm_add_epi8(_mm_xor_si128(pawns, x_mask), add_x_mask)
+  }
+
+  #[target_feature(enable = "ssse3")]
+  fn negate_y(pawns: __m128i) -> __m128i {
+    let y_mask = _mm_set1_epi16(0xff00);
+    let add_y_mask = _mm_set1_epi16(0x0100);
+    _mm_add_epi8(_mm_xor_si128(pawns, y_mask), add_y_mask)
+  }
+
+  #[target_feature(enable = "ssse3")]
+  fn negate_xy(pawns: __m128i) -> __m128i {
+    _mm_sub_epi8(_mm_setzero_si128(), pawns)
+  }
+
+  #[target_feature(enable = "ssse3")]
+  fn swap_xy(pawns: __m128i) -> __m128i {
+    let shuffle_indexes = _mm_set_epi8(14, 15, 12, 13, 10, 11, 8, 9, 6, 7, 4, 5, 2, 3, 0, 1);
+    _mm_shuffle_epi8(pawns, shuffle_indexes)
+  }
+
+  #[target_feature(enable = "ssse3")]
   fn c_r1(&self) -> Self {
+    let pawns = self.pawns;
+    // (y, x)
+    let swapped = Self::swap_xy(pawns);
+    // (-y, x)
+    let negated = Self::negate_x(swapped);
+    // (x - y, x)
+    let rotated = _mm_add_epi8(Self::only_x(pawns), negated);
+    Self { pawns: rotated }
+  }
+
+  #[target_feature(enable = "ssse3")]
+  fn c_r2(&self) -> Self {
+    let pawns = self.pawns;
+    // (y, x)
+    let swapped = Self::swap_xy(pawns);
+    // (-y, x)
+    let negated = Self::negate_x(swapped);
+    // (-y, x - y)
+    let rotated = _mm_sub_epi8(negated, Self::only_y(pawns));
+    Self { pawns: rotated }
+  }
+
+  #[target_feature(enable = "ssse3")]
+  fn c_r3(&self) -> Self {
     Self {
-      x: self.x - self.y,
-      y: self.x,
+      pawns: Self::negate_xy(self.pawns),
     }
   }
 
+  #[target_feature(enable = "ssse3")]
+  fn c_r4(&self) -> Self {
+    let pawns = self.pawns;
+    // (y, x)
+    let swapped = Self::swap_xy(pawns);
+    // (y, -x)
+    let negated = Self::negate_y(swapped);
+    // (y - x, -x)
+    let rotated = _mm_sub_epi8(negated, Self::only_x(pawns));
+    Self { pawns: rotated }
+  }
+
+  #[target_feature(enable = "ssse3")]
+  fn c_r5(&self) -> Self {
+    let pawns = self.pawns;
+    // (y, x)
+    let swapped = Self::swap_xy(pawns);
+    // (y, -x)
+    let negated = Self::negate_y(swapped);
+    // (y, y - x)
+    let rotated = _mm_add_epi8(Self::only_y(pawns), negated);
+    Self { pawns: rotated }
+  }
+
+  #[target_feature(enable = "ssse3")]
   pub fn apply_d6_c(&self, op: &D6) -> Self {
     match op {
       D6::Rot(0) => *self,
@@ -144,6 +188,37 @@ impl PawnList8 {
       D6::Rfl(5) => self.c_s5(),
       _ => unreachable(),
     }
+  }
+}
+
+#[cfg(not(target_feature = "ssse3"))]
+impl PawnList8 {
+  pub fn extract_black_pawns(pawn_poses: &[PackedIdx; N], origin: HexPos) -> Self {
+    let pawns = [
+      HexPos::from(pawn_poses[0]) - origin,
+      HexPos::from(pawn_poses[2]) - origin,
+      HexPos::from(pawn_poses[4]) - origin,
+      HexPos::from(pawn_poses[6]) - origin,
+      HexPos::from(pawn_poses[8]) - origin,
+      HexPos::from(pawn_poses[10]) - origin,
+      HexPos::from(pawn_poses[12]) - origin,
+      HexPos::from(pawn_poses[14]) - origin,
+    ];
+    Self { pawns }
+  }
+
+  pub fn extract_white_pawns(pawn_poses: &[PackedIdx; N], origin: HexPos) -> Self {
+    let pawns = [
+      HexPos::from(pawn_poses[1]) - origin,
+      HexPos::from(pawn_poses[3]) - origin,
+      HexPos::from(pawn_poses[5]) - origin,
+      HexPos::from(pawn_poses[7]) - origin,
+      HexPos::from(pawn_poses[9]) - origin,
+      HexPos::from(pawn_poses[11]) - origin,
+      HexPos::from(pawn_poses[13]) - origin,
+      HexPos::from(pawn_poses[15]) - origin,
+    ];
+    Self { pawns }
   }
 }
 
