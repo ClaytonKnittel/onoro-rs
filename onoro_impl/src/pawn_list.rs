@@ -1,8 +1,8 @@
 use std::arch::x86_64::*;
 
-use onoro::hex_pos::HexPos;
 #[cfg(not(target_feature = "ssse3"))]
 use onoro::hex_pos::HexPosOffset;
+use onoro::{groups::D6, hex_pos::HexPos};
 
 use crate::{PackedIdx, util::unreachable};
 
@@ -28,6 +28,28 @@ impl PawnList8 {
     let black_y_coords_mask = _mm_set1_epi16(0x00_f0);
     let y_coords = _mm_and_si128(pawns, black_y_coords_mask);
     let y_coords = _mm_slli_epi16::<4>(y_coords);
+
+    let pawns = _mm_or_si128(x_coords, y_coords);
+
+    let centered_pawns = Self::centered_by(pawns, origin);
+
+    Self {
+      pawns: centered_pawns,
+    }
+  }
+
+  #[cfg(target_feature = "ssse3")]
+  #[target_feature(enable = "ssse3")]
+  fn extract_white_pawns_sse(pawn_poses: &[PackedIdx; N], origin: HexPos) -> Self {
+    let pawns = unsafe { _mm_loadu_si128(pawn_poses.as_ptr() as *const _) };
+
+    let white_x_coords_mask = _mm_set1_epi16(0x0f_00);
+    let x_coords = _mm_and_si128(pawns, white_x_coords_mask);
+    let x_coords = _mm_srli_epi16::<8>(x_coords);
+
+    let white_y_coords_mask = _mm_set1_epi16(0xf0_00u16 as i16);
+    let y_coords = _mm_and_si128(pawns, white_y_coords_mask);
+    let y_coords = _mm_srli_epi16::<4>(y_coords);
 
     let pawns = _mm_or_si128(x_coords, y_coords);
 
@@ -66,6 +88,21 @@ impl PawnList8 {
     Self { pawns }
   }
 
+  #[cfg(not(target_feature = "ssse3"))]
+  fn extract_white_pawns_slow(pawn_poses: &[PackedIdx; N], origin: HexPos) -> Self {
+    let pawns = [
+      HexPos::from(pawn_poses[1]) - origin,
+      HexPos::from(pawn_poses[3]) - origin,
+      HexPos::from(pawn_poses[5]) - origin,
+      HexPos::from(pawn_poses[7]) - origin,
+      HexPos::from(pawn_poses[9]) - origin,
+      HexPos::from(pawn_poses[11]) - origin,
+      HexPos::from(pawn_poses[13]) - origin,
+      HexPos::from(pawn_poses[15]) - origin,
+    ];
+    Self { pawns }
+  }
+
   pub fn extract_black_pawns(pawn_poses: &[PackedIdx; N], origin: HexPos) -> Self {
     #[cfg(target_feature = "ssse3")]
     unsafe {
@@ -73,6 +110,40 @@ impl PawnList8 {
     }
     #[cfg(not(target_feature = "ssse3"))]
     Self::extract_black_pawns_slow(pawn_poses, origin)
+  }
+
+  pub fn extract_white_pawns(pawn_poses: &[PackedIdx; N], origin: HexPos) -> Self {
+    #[cfg(target_feature = "ssse3")]
+    unsafe {
+      Self::extract_white_pawns_sse(pawn_poses, origin)
+    }
+    #[cfg(not(target_feature = "ssse3"))]
+    Self::extract_white_pawns_slow(pawn_poses, origin)
+  }
+
+  fn c_r1(&self) -> Self {
+    Self {
+      x: self.x - self.y,
+      y: self.x,
+    }
+  }
+
+  pub fn apply_d6_c(&self, op: &D6) -> Self {
+    match op {
+      D6::Rot(0) => *self,
+      D6::Rot(1) => self.c_r1(),
+      D6::Rot(2) => self.c_r2(),
+      D6::Rot(3) => self.c_r3(),
+      D6::Rot(4) => self.c_r4(),
+      D6::Rot(5) => self.c_r5(),
+      D6::Rfl(0) => self.c_s0(),
+      D6::Rfl(1) => self.c_s1(),
+      D6::Rfl(2) => self.c_s2(),
+      D6::Rfl(3) => self.c_s3(),
+      D6::Rfl(4) => self.c_s4(),
+      D6::Rfl(5) => self.c_s5(),
+      _ => unreachable(),
+    }
   }
 }
 
@@ -143,10 +214,11 @@ mod tests {
       PackedIdx::new(2, 11),
     ];
 
-    let pawn_list = PawnList8::extract_black_pawns(&pawns, HexPos::new(4, 10));
+    let black_pawn_list = PawnList8::extract_black_pawns(&pawns, HexPos::new(4, 10));
+    let white_pawn_list = PawnList8::extract_white_pawns(&pawns, HexPos::new(4, 10));
 
     expect_that!(
-      positions(&pawn_list),
+      positions(&black_pawn_list),
       elements_are![
         &HexPosOffset::new(-3, -2),
         &HexPosOffset::new(-2, 0),
@@ -156,6 +228,20 @@ mod tests {
         &HexPosOffset::new(2, 0),
         &HexPosOffset::new(3, -2),
         &HexPosOffset::new(4, 0),
+      ]
+    );
+
+    expect_that!(
+      positions(&white_pawn_list),
+      elements_are![
+        &HexPosOffset::new(-1, -1),
+        &HexPosOffset::new(0, 1),
+        &HexPosOffset::new(1, 1),
+        &HexPosOffset::new(2, -1),
+        &HexPosOffset::new(3, 1),
+        &HexPosOffset::new(-2, -1),
+        &HexPosOffset::new(-3, -1),
+        &HexPosOffset::new(-2, 1),
       ]
     );
   }
