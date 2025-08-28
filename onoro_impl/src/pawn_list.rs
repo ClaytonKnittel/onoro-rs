@@ -8,6 +8,7 @@ use crate::{PackedIdx, util::unreachable};
 
 const N: usize = 16;
 
+#[derive(Clone, Copy)]
 pub struct PawnList8 {
   /// Stores 8 pawns, with x- and y- coordinates in back-to-back epi8 channels.
   #[cfg(target_feature = "ssse3")]
@@ -80,18 +81,6 @@ impl PawnList8 {
   }
 
   #[target_feature(enable = "ssse3")]
-  fn only_x(pawns: __m128i) -> __m128i {
-    let x_mask = _mm_set1_epi16(0x00ff);
-    _mm_and_si128(pawns, x_mask)
-  }
-
-  #[target_feature(enable = "ssse3")]
-  fn only_y(pawns: __m128i) -> __m128i {
-    let y_mask = _mm_set1_epi16(0xff00);
-    _mm_and_si128(pawns, y_mask)
-  }
-
-  #[target_feature(enable = "ssse3")]
   fn negate_x(pawns: __m128i) -> __m128i {
     let x_mask = _mm_set1_epi16(0x00ff);
     let add_x_mask = _mm_set1_epi16(0x0001);
@@ -100,7 +89,7 @@ impl PawnList8 {
 
   #[target_feature(enable = "ssse3")]
   fn negate_y(pawns: __m128i) -> __m128i {
-    let y_mask = _mm_set1_epi16(0xff00);
+    let y_mask = _mm_set1_epi16(0xff00u16 as i16);
     let add_y_mask = _mm_set1_epi16(0x0100);
     _mm_add_epi8(_mm_xor_si128(pawns, y_mask), add_y_mask)
   }
@@ -117,26 +106,62 @@ impl PawnList8 {
   }
 
   #[target_feature(enable = "ssse3")]
+  fn isolate_x(pawns: __m128i) -> __m128i {
+    let mask = _mm_set1_epi16(0x00ff);
+    _mm_and_si128(pawns, mask)
+  }
+
+  #[target_feature(enable = "ssse3")]
+  fn isolate_y(pawns: __m128i) -> __m128i {
+    let mask = _mm_set1_epi16(0xff00u16 as i16);
+    _mm_and_si128(pawns, mask)
+  }
+
+  #[target_feature(enable = "ssse3")]
+  fn duplicate_x(pawns: __m128i) -> __m128i {
+    let shuffle_indexes = _mm_set_epi8(14, 14, 12, 12, 10, 10, 8, 8, 6, 6, 4, 4, 2, 2, 0, 0);
+    _mm_shuffle_epi8(pawns, shuffle_indexes)
+  }
+
+  #[target_feature(enable = "ssse3")]
+  fn duplicate_y(pawns: __m128i) -> __m128i {
+    let shuffle_indexes = _mm_set_epi8(15, 15, 13, 13, 11, 11, 9, 9, 7, 7, 5, 5, 3, 3, 1, 1);
+    _mm_shuffle_epi8(pawns, shuffle_indexes)
+  }
+
+  #[target_feature(enable = "ssse3")]
+  fn move_x_to_y(pawns: __m128i) -> __m128i {
+    let shuffle_indexes = _mm_set_epi8(14, -1, 12, -1, 10, -1, 8, -1, 6, -1, 4, -1, 2, -1, 0, -1);
+    _mm_shuffle_epi8(pawns, shuffle_indexes)
+  }
+
+  #[target_feature(enable = "ssse3")]
+  fn move_y_to_x(pawns: __m128i) -> __m128i {
+    let shuffle_indexes = _mm_set_epi8(-1, 15, -1, 13, -1, 11, -1, 9, -1, 7, -1, 5, -1, 3, -1, 1);
+    _mm_shuffle_epi8(pawns, shuffle_indexes)
+  }
+
+  #[target_feature(enable = "ssse3")]
   fn c_r1(&self) -> Self {
     let pawns = self.pawns;
-    // (y, x)
-    let swapped = Self::swap_xy(pawns);
-    // (-y, x)
-    let negated = Self::negate_x(swapped);
+    // (x, x)
+    let xx = Self::duplicate_x(pawns);
+    // (y, 0)
+    let yz = Self::move_y_to_x(pawns);
     // (x - y, x)
-    let rotated = _mm_add_epi8(Self::only_x(pawns), negated);
+    let rotated = _mm_sub_epi8(xx, yz);
     Self { pawns: rotated }
   }
 
   #[target_feature(enable = "ssse3")]
   fn c_r2(&self) -> Self {
     let pawns = self.pawns;
-    // (y, x)
-    let swapped = Self::swap_xy(pawns);
-    // (-y, x)
-    let negated = Self::negate_x(swapped);
+    // (y, y)
+    let yy = Self::duplicate_y(pawns);
+    // (0, x)
+    let zx = Self::move_x_to_y(pawns);
     // (-y, x - y)
-    let rotated = _mm_sub_epi8(negated, Self::only_y(pawns));
+    let rotated = _mm_sub_epi8(zx, yy);
     Self { pawns: rotated }
   }
 
@@ -150,29 +175,94 @@ impl PawnList8 {
   #[target_feature(enable = "ssse3")]
   fn c_r4(&self) -> Self {
     let pawns = self.pawns;
-    // (y, x)
-    let swapped = Self::swap_xy(pawns);
-    // (y, -x)
-    let negated = Self::negate_y(swapped);
+    // (x, x)
+    let xx = Self::duplicate_x(pawns);
+    // (y, 0)
+    let yz = Self::move_y_to_x(pawns);
     // (y - x, -x)
-    let rotated = _mm_sub_epi8(negated, Self::only_x(pawns));
+    let rotated = _mm_sub_epi8(yz, xx);
     Self { pawns: rotated }
   }
 
   #[target_feature(enable = "ssse3")]
   fn c_r5(&self) -> Self {
     let pawns = self.pawns;
-    // (y, x)
-    let swapped = Self::swap_xy(pawns);
-    // (y, -x)
-    let negated = Self::negate_y(swapped);
+    // (y, y)
+    let yy = Self::duplicate_y(pawns);
+    // (0, x)
+    let zx = Self::move_x_to_y(pawns);
     // (y, y - x)
-    let rotated = _mm_add_epi8(Self::only_y(pawns), negated);
+    let rotated = _mm_sub_epi8(yy, zx);
     Self { pawns: rotated }
   }
 
   #[target_feature(enable = "ssse3")]
-  pub fn apply_d6_c(&self, op: &D6) -> Self {
+  fn c_s0(&self) -> Self {
+    let pawns = self.pawns;
+    // (y, y)
+    let yy = Self::duplicate_y(pawns);
+    // (x, 0)
+    let xz = Self::isolate_x(pawns);
+    // (x - y, -y)
+    let rotated = _mm_sub_epi8(xz, yy);
+    Self { pawns: rotated }
+  }
+
+  #[target_feature(enable = "ssse3")]
+  fn c_s1(&self) -> Self {
+    let pawns = self.pawns;
+    // (x, x)
+    let xx = Self::duplicate_x(pawns);
+    // (0, y)
+    let zy = Self::isolate_y(pawns);
+    // (x, x - y)
+    let rotated = _mm_sub_epi8(xx, zy);
+    Self { pawns: rotated }
+  }
+
+  #[target_feature(enable = "ssse3")]
+  fn c_s2(&self) -> Self {
+    Self {
+      pawns: Self::swap_xy(self.pawns),
+    }
+  }
+
+  #[target_feature(enable = "ssse3")]
+  fn c_s3(&self) -> Self {
+    let pawns = self.pawns;
+    // (y, y)
+    let yy = Self::duplicate_y(pawns);
+    // (x, 0)
+    let xz = Self::isolate_x(pawns);
+    // (y - x, y)
+    let rotated = _mm_sub_epi8(yy, xz);
+    Self { pawns: rotated }
+  }
+
+  #[target_feature(enable = "ssse3")]
+  fn c_s4(&self) -> Self {
+    let pawns = self.pawns;
+    // (x, x)
+    let xx = Self::duplicate_x(pawns);
+    // (0, y)
+    let zy = Self::isolate_y(pawns);
+    // (-x, y - x)
+    let rotated = _mm_sub_epi8(zy, xx);
+    Self { pawns: rotated }
+  }
+
+  #[target_feature(enable = "ssse3")]
+  fn c_s5(&self) -> Self {
+    let pawns = self.pawns;
+    // (y, x)
+    let yx = Self::swap_xy(pawns);
+    // (-y, -x)
+    let rotated = Self::negate_xy(yx);
+    Self { pawns: rotated }
+  }
+
+  #[target_feature(enable = "ssse3")]
+  fn apply_d6_c_sse(&self, op: &D6) -> Self {
     match op {
       D6::Rot(0) => *self,
       D6::Rot(1) => self.c_r1(),
@@ -188,6 +278,10 @@ impl PawnList8 {
       D6::Rfl(5) => self.c_s5(),
       _ => unreachable(),
     }
+  }
+
+  pub fn apply_d6_c(&self, op: &D6) -> Self {
+    unsafe { self.apply_d6_c_sse(op) }
   }
 }
 
@@ -226,10 +320,18 @@ impl PawnList8 {
 mod tests {
   use std::arch::x86_64::{_mm_bsrli_si128, _mm_cvtsi128_si64x};
 
+  use algebra::semigroup::Semigroup;
   use googletest::{gtest, prelude::*};
-  use onoro::hex_pos::{HexPos, HexPosOffset};
+  use itertools::Itertools;
+  use onoro::{
+    groups::D6,
+    hex_pos::{HexPos, HexPosOffset},
+  };
 
-  use crate::{PackedIdx, pawn_list::PawnList8};
+  use crate::{
+    PackedIdx,
+    pawn_list::{N, PawnList8},
+  };
 
   #[cfg(target_feature = "ssse3")]
   #[target_feature(enable = "ssse3")]
@@ -319,5 +421,41 @@ mod tests {
         &HexPosOffset::new(-2, 1),
       ]
     );
+  }
+
+  #[gtest]
+  fn test_rotate_d6_c() {
+    for y in 1..=15 {
+      let mut poses = [PackedIdx::null(); N];
+      for (x, pos) in poses.iter_mut().enumerate() {
+        *pos = PackedIdx::new(x.max(1) as u32, y);
+      }
+
+      let center = HexPos::new(6, 10);
+      let black_pawns = PawnList8::extract_black_pawns(&poses, center);
+      let white_pawns = PawnList8::extract_white_pawns(&poses, center);
+
+      for op in D6::for_each() {
+        let rotated_black = black_pawns.apply_d6_c(&op);
+        let rotated_white = white_pawns.apply_d6_c(&op);
+
+        let expected_black = poses
+          .iter()
+          .step_by(2)
+          .map(|&idx| HexPos::from(idx) - center)
+          .map(|pos| pos.apply_d6_c(&op))
+          .collect_vec();
+        let expected_white = poses
+          .iter()
+          .skip(1)
+          .step_by(2)
+          .map(|&idx| HexPos::from(idx) - center)
+          .map(|pos| pos.apply_d6_c(&op))
+          .collect_vec();
+
+        assert_that!(positions(&rotated_black), container_eq(expected_black));
+        assert_that!(positions(&rotated_white), container_eq(expected_white));
+      }
+    }
   }
 }
