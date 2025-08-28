@@ -314,6 +314,12 @@ impl PawnList8 {
     ];
     Self { pawns }
   }
+
+  pub fn apply_d6_c(&self, op: &D6) -> Self {
+    Self {
+      pawns: self.pawns.map(|pos| pos.apply_d6_c(op)),
+    }
+  }
 }
 
 #[cfg(test)]
