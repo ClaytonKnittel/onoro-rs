@@ -1,5 +1,7 @@
 use std::arch::x86_64::*;
 
+#[cfg(target_feature = "ssse3")]
+use algebra::group::Cyclic;
 #[cfg(not(target_feature = "ssse3"))]
 use onoro::hex_pos::HexPosOffset;
 use onoro::{
@@ -376,6 +378,53 @@ impl PawnList8 {
   pub fn apply_d3_v(&self, op: &D3) -> Self {
     unsafe { self.apply_d3_v_sse(op) }
   }
+
+  #[target_feature(enable = "ssse3")]
+  fn e_s0(&self) -> Self {
+    let pawns = self.pawns;
+    // (y, y)
+    let yy = Self::duplicate_y(pawns);
+    // (x, 0)
+    let xz = Self::isolate_x(pawns);
+    // (x - y, -y)
+    let rotated = _mm_sub_epi8(xz, yy);
+    Self { pawns: rotated }
+  }
+
+  #[target_feature(enable = "ssse3")]
+  fn e_s3(&self) -> Self {
+    let pawns = self.pawns;
+    // (y, y)
+    let yy = Self::duplicate_y(pawns);
+    // (x, 0)
+    let xz = Self::isolate_x(pawns);
+    // (y + 1 - x, y)
+    let rotated = _mm_sub_epi8(_mm_add_epi8(yy, Self::x_ones()), xz);
+    Self { pawns: rotated }
+  }
+
+  #[target_feature(enable = "ssse3")]
+  fn e_r3(&self) -> Self {
+    let pawns = self.pawns;
+    // (1 - x, -y)
+    let rotated = _mm_sub_epi8(Self::x_ones(), pawns);
+    Self { pawns: rotated }
+  }
+
+  #[target_feature(enable = "ssse3")]
+  fn apply_k4_e_sse(&self, op: &K4) -> Self {
+    match (op.left(), op.right()) {
+      (Cyclic::<2>(0), Cyclic::<2>(0)) => *self,
+      (Cyclic::<2>(1), Cyclic::<2>(0)) => self.e_s0(),
+      (Cyclic::<2>(0), Cyclic::<2>(1)) => self.e_s3(),
+      (Cyclic::<2>(1), Cyclic::<2>(1)) => self.e_r3(),
+      _ => unreachable(),
+    }
+  }
+
+  pub fn apply_k4_e(&self, op: &K4) -> Self {
+    unsafe { self.apply_k4_e_sse(op) }
+  }
 }
 
 #[cfg(not(target_feature = "ssse3"))]
@@ -457,7 +506,7 @@ mod tests {
   use googletest::{gtest, prelude::*};
   use itertools::Itertools;
   use onoro::{
-    groups::{D3, D6},
+    groups::{D3, D6, K4},
     hex_pos::{HexPos, HexPosOffset},
   };
 
@@ -598,4 +647,5 @@ mod tests {
 
   test_rotate!(test_rotate_d6_c, apply_d6_c, D6);
   test_rotate!(test_rotate_d3_v, apply_d3_v, D3);
+  test_rotate!(test_rotate_k4_e, apply_k4_e, K4);
 }
