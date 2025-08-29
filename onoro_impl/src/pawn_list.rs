@@ -2,7 +2,10 @@ use std::arch::x86_64::*;
 
 #[cfg(not(target_feature = "ssse3"))]
 use onoro::hex_pos::HexPosOffset;
-use onoro::{groups::D6, hex_pos::HexPos};
+use onoro::{
+  groups::{C2, D3, D6, K4},
+  hex_pos::HexPos,
+};
 
 use crate::{PackedIdx, util::unreachable};
 
@@ -81,16 +84,31 @@ impl PawnList8 {
   }
 
   #[target_feature(enable = "ssse3")]
+  fn xy_ones() -> __m128i {
+    _mm_set1_epi8(0x01)
+  }
+
+  #[target_feature(enable = "ssse3")]
+  fn x_ones() -> __m128i {
+    _mm_set1_epi16(0x0001)
+  }
+
+  #[target_feature(enable = "ssse3")]
+  fn y_ones() -> __m128i {
+    _mm_set1_epi16(0x0100)
+  }
+
+  #[target_feature(enable = "ssse3")]
   fn negate_x(pawns: __m128i) -> __m128i {
     let x_mask = _mm_set1_epi16(0x00ff);
-    let add_x_mask = _mm_set1_epi16(0x0001);
+    let add_x_mask = Self::x_ones();
     _mm_add_epi8(_mm_xor_si128(pawns, x_mask), add_x_mask)
   }
 
   #[target_feature(enable = "ssse3")]
   fn negate_y(pawns: __m128i) -> __m128i {
     let y_mask = _mm_set1_epi16(0xff00u16 as i16);
-    let add_y_mask = _mm_set1_epi16(0x0100);
+    let add_y_mask = Self::y_ones();
     _mm_add_epi8(_mm_xor_si128(pawns, y_mask), add_y_mask)
   }
 
@@ -283,6 +301,81 @@ impl PawnList8 {
   pub fn apply_d6_c(&self, op: &D6) -> Self {
     unsafe { self.apply_d6_c_sse(op) }
   }
+
+  #[target_feature(enable = "ssse3")]
+  fn v_r2(&self) -> Self {
+    let pawns = self.pawns;
+    // (y, y)
+    let yy = Self::duplicate_y(pawns);
+    // (0, x)
+    let zx = Self::move_x_to_y(pawns);
+    // (1 - y, x - y)
+    let rotated = _mm_sub_epi8(_mm_add_epi8(zx, Self::x_ones()), yy);
+    Self { pawns: rotated }
+  }
+
+  #[target_feature(enable = "ssse3")]
+  fn v_r4(&self) -> Self {
+    let pawns = self.pawns;
+    // (x, x)
+    let xx = Self::duplicate_x(pawns);
+    // (y, 0)
+    let yz = Self::move_y_to_x(pawns);
+    // (y + 1 - x, 1 - x)
+    let rotated = _mm_sub_epi8(_mm_add_epi8(yz, Self::xy_ones()), xx);
+    Self { pawns: rotated }
+  }
+
+  #[target_feature(enable = "ssse3")]
+  fn v_s1(&self) -> Self {
+    let pawns = self.pawns;
+    // (x, x)
+    let xx = Self::duplicate_x(pawns);
+    // (0, y)
+    let zy = Self::isolate_y(pawns);
+    // (x, x - y)
+    let rotated = _mm_sub_epi8(xx, zy);
+    Self { pawns: rotated }
+  }
+
+  #[target_feature(enable = "ssse3")]
+  fn v_s3(&self) -> Self {
+    let pawns = self.pawns;
+    // (y, y)
+    let yy = Self::duplicate_y(pawns);
+    // (x, 0)
+    let xz = Self::isolate_x(pawns);
+    // (y + 1 - x, y)
+    let rotated = _mm_sub_epi8(_mm_add_epi8(yy, Self::x_ones()), xz);
+    Self { pawns: rotated }
+  }
+
+  #[target_feature(enable = "ssse3")]
+  fn v_s5(&self) -> Self {
+    let pawns = self.pawns;
+    // (y, x)
+    let yx = Self::swap_xy(pawns);
+    // (1 - y, 1 - x)
+    let rotated = _mm_sub_epi8(Self::xy_ones(), yx);
+    Self { pawns: rotated }
+  }
+
+  #[target_feature(enable = "ssse3")]
+  fn apply_d3_v_sse(&self, op: &D3) -> Self {
+    match op {
+      D3::Rot(0) => *self,
+      D3::Rot(1) => self.v_r2(),
+      D3::Rot(2) => self.v_r4(),
+      D3::Rfl(0) => self.v_s1(),
+      D3::Rfl(1) => self.v_s3(),
+      D3::Rfl(2) => self.v_s5(),
+      _ => unreachable(),
+    }
+  }
+
+  pub fn apply_d3_v(&self, op: &D3) -> Self {
+    unsafe { self.apply_d3_v_sse(op) }
+  }
 }
 
 #[cfg(not(target_feature = "ssse3"))]
@@ -320,6 +413,40 @@ impl PawnList8 {
       pawns: self.pawns.map(|pos| pos.apply_d6_c(op)),
     }
   }
+
+  pub fn apply_d3_v(&self, op: &D3) -> Self {
+    Self {
+      pawns: self.pawns.map(|pos| pos.apply_d3_v(op)),
+    }
+  }
+
+  pub fn apply_k4_e(&self, op: &K4) -> Self {
+    Self {
+      pawns: self.pawns.map(|pos| pos.apply_k4_e(op)),
+    }
+  }
+
+  pub fn apply_c2_cv(&self, op: &C2) -> Self {
+    Self {
+      pawns: self.pawns.map(|pos| pos.apply_c2_cv(op)),
+    }
+  }
+
+  pub fn apply_c2_ce(&self, op: &C2) -> Self {
+    Self {
+      pawns: self.pawns.map(|pos| pos.apply_c2_ce(op)),
+    }
+  }
+
+  pub fn apply_c2_ev(&self, op: &C2) -> Self {
+    Self {
+      pawns: self.pawns.map(|pos| pos.apply_c2_ev(op)),
+    }
+  }
+
+  pub fn apply_trivial(&self, op: &C2) -> Self {
+    *self
+  }
 }
 
 #[cfg(test)]
@@ -330,7 +457,7 @@ mod tests {
   use googletest::{gtest, prelude::*};
   use itertools::Itertools;
   use onoro::{
-    groups::D6,
+    groups::{D3, D6},
     hex_pos::{HexPos, HexPosOffset},
   };
 
@@ -429,39 +556,46 @@ mod tests {
     );
   }
 
-  #[gtest]
-  fn test_rotate_d6_c() {
-    for y in 1..=15 {
-      let mut poses = [PackedIdx::null(); N];
-      for (x, pos) in poses.iter_mut().enumerate() {
-        *pos = PackedIdx::new(x.max(1) as u32, y);
+  macro_rules! test_rotate {
+    ($name:ident, $apply_op:ident, $op_t:ty) => {
+      #[gtest]
+      fn $name() {
+        for y in 1..=15 {
+          let mut poses = [PackedIdx::null(); N];
+          for (x, pos) in poses.iter_mut().enumerate() {
+            *pos = PackedIdx::new(x.max(1) as u32, y);
+          }
+
+          let center = HexPos::new(6, 10);
+          let black_pawns = PawnList8::extract_black_pawns(&poses, center);
+          let white_pawns = PawnList8::extract_white_pawns(&poses, center);
+
+          for op in <$op_t>::for_each() {
+            let rotated_black = black_pawns.$apply_op(&op);
+            let rotated_white = white_pawns.$apply_op(&op);
+
+            let expected_black = poses
+              .iter()
+              .step_by(2)
+              .map(|&idx| HexPos::from(idx) - center)
+              .map(|pos| pos.$apply_op(&op))
+              .collect_vec();
+            let expected_white = poses
+              .iter()
+              .skip(1)
+              .step_by(2)
+              .map(|&idx| HexPos::from(idx) - center)
+              .map(|pos| pos.$apply_op(&op))
+              .collect_vec();
+
+            assert_that!(positions(&rotated_black), container_eq(expected_black));
+            assert_that!(positions(&rotated_white), container_eq(expected_white));
+          }
+        }
       }
-
-      let center = HexPos::new(6, 10);
-      let black_pawns = PawnList8::extract_black_pawns(&poses, center);
-      let white_pawns = PawnList8::extract_white_pawns(&poses, center);
-
-      for op in D6::for_each() {
-        let rotated_black = black_pawns.apply_d6_c(&op);
-        let rotated_white = white_pawns.apply_d6_c(&op);
-
-        let expected_black = poses
-          .iter()
-          .step_by(2)
-          .map(|&idx| HexPos::from(idx) - center)
-          .map(|pos| pos.apply_d6_c(&op))
-          .collect_vec();
-        let expected_white = poses
-          .iter()
-          .skip(1)
-          .step_by(2)
-          .map(|&idx| HexPos::from(idx) - center)
-          .map(|pos| pos.apply_d6_c(&op))
-          .collect_vec();
-
-        assert_that!(positions(&rotated_black), container_eq(expected_black));
-        assert_that!(positions(&rotated_white), container_eq(expected_white));
-      }
-    }
+    };
   }
+
+  test_rotate!(test_rotate_d6_c, apply_d6_c, D6);
+  test_rotate!(test_rotate_d3_v, apply_d3_v, D3);
 }
