@@ -2,6 +2,7 @@ use std::arch::x86_64::*;
 
 #[cfg(target_feature = "ssse3")]
 use algebra::group::Cyclic;
+use algebra::group::Trivial;
 #[cfg(not(target_feature = "ssse3"))]
 use onoro::hex_pos::HexPosOffset;
 use onoro::{
@@ -425,6 +426,49 @@ impl PawnList8 {
   pub fn apply_k4_e(&self, op: &K4) -> Self {
     unsafe { self.apply_k4_e_sse(op) }
   }
+
+  #[target_feature(enable = "ssse3")]
+  fn apply_c2_cv_sse(&self, op: &C2) -> Self {
+    match op {
+      Cyclic::<2>(0) => *self,
+      Cyclic::<2>(1) => self.c_s1(),
+      _ => unreachable(),
+    }
+  }
+
+  pub fn apply_c2_cv(&self, op: &C2) -> Self {
+    unsafe { self.apply_c2_cv_sse(op) }
+  }
+
+  #[target_feature(enable = "ssse3")]
+  fn apply_c2_ce_sse(&self, op: &C2) -> Self {
+    match op {
+      Cyclic::<2>(0) => *self,
+      Cyclic::<2>(1) => self.c_s0(),
+      _ => unreachable(),
+    }
+  }
+
+  pub fn apply_c2_ce(&self, op: &C2) -> Self {
+    unsafe { self.apply_c2_ce_sse(op) }
+  }
+
+  #[target_feature(enable = "ssse3")]
+  fn apply_c2_ev_sse(&self, op: &C2) -> Self {
+    match op {
+      Cyclic::<2>(0) => *self,
+      Cyclic::<2>(1) => self.e_s3(),
+      _ => unreachable(),
+    }
+  }
+
+  pub fn apply_c2_ev(&self, op: &C2) -> Self {
+    unsafe { self.apply_c2_ev_sse(op) }
+  }
+
+  pub fn apply_trivial(&self, _op: &Trivial) -> Self {
+    *self
+  }
 }
 
 #[cfg(not(target_feature = "ssse3"))]
@@ -493,7 +537,7 @@ impl PawnList8 {
     }
   }
 
-  pub fn apply_trivial(&self, op: &C2) -> Self {
+  pub fn apply_trivial(&self, op: &Trivial) -> Self {
     *self
   }
 }
@@ -502,11 +546,11 @@ impl PawnList8 {
 mod tests {
   use std::arch::x86_64::{_mm_bsrli_si128, _mm_cvtsi128_si64x};
 
-  use algebra::semigroup::Semigroup;
+  use algebra::{group::Trivial, semigroup::Semigroup};
   use googletest::{gtest, prelude::*};
   use itertools::Itertools;
   use onoro::{
-    groups::{D3, D6, K4},
+    groups::{C2, D3, D6, K4},
     hex_pos::{HexPos, HexPosOffset},
   };
 
@@ -648,4 +692,8 @@ mod tests {
   test_rotate!(test_rotate_d6_c, apply_d6_c, D6);
   test_rotate!(test_rotate_d3_v, apply_d3_v, D3);
   test_rotate!(test_rotate_k4_e, apply_k4_e, K4);
+  test_rotate!(test_rotate_c2_cv, apply_c2_cv, C2);
+  test_rotate!(test_rotate_c2_ce, apply_c2_ce, C2);
+  test_rotate!(test_rotate_c2_ev, apply_c2_ev, C2);
+  test_rotate!(test_rotate_trivial, apply_trivial, Trivial);
 }
