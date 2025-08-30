@@ -104,10 +104,6 @@ impl<const N: usize> OnoroView<N> {
   where
     F: FnMut(&HexPosOffset, &G) -> HexPosOffset,
   {
-    if view1.hash() != view2.hash() {
-      return false;
-    }
-
     let onoro1 = &view1.onoro;
     let onoro2 = &view2.onoro;
 

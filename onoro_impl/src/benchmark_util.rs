@@ -10,6 +10,8 @@ use crate::{Move, Onoro16, OnoroImpl, canonical_view};
 
 pub type BenchCanonicalView = canonical_view::CanonicalView;
 
+pub use crate::canonicalize::board_symm_state;
+
 pub trait CheckWinBenchmark {
   fn bench_check_win(&self, last_move: HexPos) -> bool;
 }
