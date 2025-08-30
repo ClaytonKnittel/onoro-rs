@@ -12,6 +12,8 @@ use onoro::{
   hex_pos::HexPos,
 };
 
+#[cfg(target_feature = "sse4.1")]
+use crate::util::sort_epi16;
 use crate::{PackedIdx, util::unreachable};
 
 const N: usize = 16;
@@ -472,44 +474,12 @@ impl PawnList8 {
     *self
   }
 
-  #[target_feature(enable = "sse4.1")]
-  fn sort_epi32_pairs<const SHUFFLE_MASK: i32>(
-    pawns: __m128i,
-    lower_positions: __m128i,
-  ) -> __m128i {
-    let shuffled = _mm_shuffle_epi32::<SHUFFLE_MASK>(pawns);
-    let cmp = _mm_cmplt_epi16(pawns, shuffled);
-    let select = _mm_add_epi8(cmp, lower_positions);
-    _mm_blendv_epi8(pawns, shuffled, select)
-  }
-
-  #[target_feature(enable = "sse4.1")]
-  fn sort_pawns(pawns: __m128i) -> __m128i {
-    // Implemented using the optimal sorting network for size = 8:
-    // [(0,2),(1,3),(4,6),(5,7)]
-    // shuffled: [2, 3, 0, 1, 6, 7, 4, 5]
-    let pawns =
-      Self::sort_epi32_pairs::<0b10_11_00_01>(pawns, _mm_set1_epi64x(0x0000_0000_8080_8080));
-
-    // [(0,4),(1,5),(2,6),(3,7)]
-    // shuffled: [4, 5, 6, 7, 0, 1, 2, 3]
-    let pawns = Self::sort_epi32_pairs::<0b01_00_11_10>(
-      pawns,
-      _mm_set_epi64x(0, 0x8080_8080_8080_8080u64 as i64),
-    );
-    // [(0,1),(2,3),(4,5),(6,7)]
-    // [(2,4),(3,5)]
-    // [(1,4),(3,6)]
-    // [(1,2),(3,4),(5,6)]
-    pawns
-  }
-
   /// Returns true if the two pawn lists are equal ignoring the order of the
   /// elements.
   #[target_feature(enable = "sse4.1")]
   fn equal_ignoring_order_sse(&self, other: PawnList8) -> bool {
-    let sorted1 = Self::sort_pawns(self.pawns);
-    let sorted2 = Self::sort_pawns(other.pawns);
+    let sorted1 = sort_epi16(self.pawns);
+    let sorted2 = sort_epi16(other.pawns);
     let eq_masks = _mm_cmpeq_epi16(sorted1, sorted2);
     let eq_bitv = _mm_movemask_epi8(eq_masks);
     eq_bitv == 0xffff
