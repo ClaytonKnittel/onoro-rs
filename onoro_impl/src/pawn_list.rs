@@ -4,6 +4,8 @@ use std::arch::x86_64::*;
 use algebra::group::Cyclic;
 use algebra::group::Trivial;
 #[cfg(not(target_feature = "ssse3"))]
+use itertools::Itertools;
+#[cfg(not(target_feature = "ssse3"))]
 use onoro::hex_pos::HexPosOffset;
 use onoro::{
   groups::{C2, D3, D6, K4},
@@ -469,6 +471,12 @@ impl PawnList8 {
   pub fn apply_trivial(&self, _op: &Trivial) -> Self {
     *self
   }
+
+  /// Returns true if the two pawn lists are equal ignoring the order of the
+  /// elements.
+  pub fn equal_ignoring_order(&self, other: PawnList8) -> bool {
+    false
+  }
 }
 
 #[cfg(not(target_feature = "ssse3"))]
@@ -540,6 +548,25 @@ impl PawnList8 {
   pub fn apply_trivial(&self, op: &Trivial) -> Self {
     *self
   }
+
+  /// Returns true if the two pawn lists are equal ignoring the order of the
+  /// elements.
+  pub fn equal_ignoring_order(&self, other: PawnList8) -> bool {
+    let pawns1 = self
+      .pawns
+      .iter()
+      .map(|pos| (pos.x(), pos.y()))
+      .sorted()
+      .collect_vec();
+    let pawns2 = other
+      .pawns
+      .iter()
+      .map(|pos| (pos.x(), pos.y()))
+      .sorted()
+      .collect_vec();
+
+    pawns1 == pawns2
+  }
 }
 
 #[cfg(test)]
@@ -553,6 +580,7 @@ mod tests {
     groups::{C2, D3, D6, K4},
     hex_pos::{HexPos, HexPosOffset},
   };
+  use rand::{Rng, SeedableRng, rngs::StdRng};
 
   use crate::{
     PackedIdx,
@@ -696,4 +724,87 @@ mod tests {
   test_rotate!(test_rotate_c2_ce, apply_c2_ce, C2);
   test_rotate!(test_rotate_c2_ev, apply_c2_ev, C2);
   test_rotate!(test_rotate_trivial, apply_trivial, Trivial);
+
+  fn equal_ignoring_order<'a>(
+    lhs: impl IntoIterator<Item = &'a PackedIdx>,
+    rhs: impl IntoIterator<Item = &'a PackedIdx>,
+  ) -> bool {
+    lhs
+      .into_iter()
+      .map(|pos| (pos.x(), pos.y()))
+      .sorted()
+      .collect_vec()
+      == rhs
+        .into_iter()
+        .map(|pos| (pos.x(), pos.y()))
+        .sorted()
+        .collect_vec()
+  }
+
+  #[test]
+  fn fuzz_equals_ignoring_order() {
+    const ITERATIONS: u32 = 10_000;
+
+    let mut rng = StdRng::seed_from_u64(19304910);
+
+    for t in 0..ITERATIONS {
+      let origin = HexPos::new(rng.gen_range(1..15), rng.gen_range(1..15));
+
+      let mut poses1 = [PackedIdx::null(); N];
+      let mut poses2 = [PackedIdx::null(); N];
+
+      let (black_equal, white_equal) = if rng.gen_bool(0.5) {
+        // Generate equal positions.
+        for (pos1, pos2) in poses1.iter_mut().zip(poses2.iter_mut()) {
+          let pos = PackedIdx::new(rng.gen_range(1..15), rng.gen_range(1..15));
+          *pos1 = pos;
+          *pos2 = pos;
+        }
+
+        (true, true)
+      } else {
+        // Generate different positions.
+        for (pos1, pos2) in poses1.iter_mut().zip(poses2.iter_mut()) {
+          let pos = PackedIdx::new(rng.gen_range(1..15), rng.gen_range(1..15));
+          *pos1 = pos;
+
+          *pos2 = if rng.gen_bool(0.4) {
+            PackedIdx::new(rng.gen_range(1..15), rng.gen_range(1..15))
+          } else {
+            pos
+          };
+        }
+
+        (
+          equal_ignoring_order(poses1.iter().step_by(2), poses2.iter().step_by(2)),
+          equal_ignoring_order(
+            poses1.iter().skip(1).step_by(2),
+            poses2.iter().skip(1).step_by(2),
+          ),
+        )
+      };
+
+      // Shuffle the even indices of poses2.
+      for i in 2..N {
+        let j = 2 * rng.gen_range(0..=(i / 2)) + (i % 2);
+        poses2.swap(i, j);
+      }
+
+      let black_pawns1 = PawnList8::extract_black_pawns(&poses1, origin);
+      let black_pawns2 = PawnList8::extract_black_pawns(&poses2, origin);
+      assert_eq!(
+        black_pawns1.equal_ignoring_order(black_pawns2),
+        black_equal,
+        "Iteration {t}"
+      );
+
+      let white_pawns1 = PawnList8::extract_white_pawns(&poses1, origin);
+      let white_pawns2 = PawnList8::extract_white_pawns(&poses2, origin);
+      assert_eq!(
+        white_pawns1.equal_ignoring_order(white_pawns2),
+        white_equal,
+        "Iteration {t}"
+      );
+    }
+  }
 }
