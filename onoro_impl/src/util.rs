@@ -137,20 +137,27 @@ pub fn sort_epi16(vec: __m128i) -> __m128i {
   // [(0,1),(2,3),(4,5),(6,7)]
   let pawns = sort_epi8_pairs(
     pawns,
-    _mm_set_epi64x(0x0d0c_0f0e_0807_0b0a, 0x0504_0706_0100_0302),
+    _mm_set_epi64x(0x0d0c_0f0e_0908_0b0a, 0x0504_0706_0100_0302),
     _mm_set1_epi32(0x0000_8080),
   );
 
   // [(2,4),(3,5)]
-  let pawns = sort_epi8_pairs(
-    pawns,
-    _mm_set_epi64x(0x0d0c_0f0e_0807_0b0a, 0x0504_0706_0100_0302),
-    _mm_set1_epi32(0x0000_8080),
-  );
+  let pawns =
+    sort_epi32_pairs::<0b11_01_10_00>(pawns, _mm_set1_epi64x(0xffff_ffff_0000_0000u64 as i64));
 
   // [(1,4),(3,6)]
+  let pawns = sort_epi8_pairs(
+    pawns,
+    _mm_set_epi64x(0x0f0e_0706_0b0a_0302, 0x0d0c_0504_0908_0100),
+    _mm_set1_epi32(0x8080_0000u32 as i32),
+  );
+
   // [(1,2),(3,4),(5,6)]
-  pawns
+  sort_epi8_pairs(
+    pawns,
+    _mm_set_epi64x(0x0f0e_0b0a_0d0c_0706, 0x0908_0302_0504_0100),
+    _mm_set1_epi32(0x8080_0000u32 as i32),
+  )
 }
 
 #[inline]
