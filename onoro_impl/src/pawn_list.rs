@@ -1,11 +1,11 @@
 use std::arch::x86_64::*;
 
-#[cfg(target_feature = "ssse3")]
+#[cfg(target_feature = "sse4.1")]
 use algebra::group::Cyclic;
 use algebra::group::Trivial;
-#[cfg(not(target_feature = "ssse3"))]
+#[cfg(not(target_feature = "sse4.1"))]
 use itertools::Itertools;
-#[cfg(not(target_feature = "ssse3"))]
+#[cfg(not(target_feature = "sse4.1"))]
 use onoro::hex_pos::HexPosOffset;
 use onoro::{
   groups::{C2, D3, D6, K4},
@@ -19,15 +19,15 @@ const N: usize = 16;
 #[derive(Clone, Copy)]
 pub struct PawnList8 {
   /// Stores 8 pawns, with x- and y- coordinates in back-to-back epi8 channels.
-  #[cfg(target_feature = "ssse3")]
+  #[cfg(target_feature = "sse4.1")]
   pawns: __m128i,
-  #[cfg(not(target_feature = "ssse3"))]
+  #[cfg(not(target_feature = "sse4.1"))]
   pawns: [HexPosOffset; 8],
 }
 
-#[cfg(target_feature = "ssse3")]
+#[cfg(target_feature = "sse4.1")]
 impl PawnList8 {
-  #[target_feature(enable = "ssse3")]
+  #[target_feature(enable = "sse4.1")]
   fn extract_black_pawns_sse(pawn_poses: &[PackedIdx; N], origin: HexPos) -> Self {
     let pawns = unsafe { _mm_loadu_si128(pawn_poses.as_ptr() as *const _) };
 
@@ -47,7 +47,7 @@ impl PawnList8 {
     }
   }
 
-  #[target_feature(enable = "ssse3")]
+  #[target_feature(enable = "sse4.1")]
   fn extract_white_pawns_sse(pawn_poses: &[PackedIdx; N], origin: HexPos) -> Self {
     let pawns = unsafe { _mm_loadu_si128(pawn_poses.as_ptr() as *const _) };
 
@@ -68,7 +68,7 @@ impl PawnList8 {
     }
   }
 
-  #[target_feature(enable = "ssse3")]
+  #[target_feature(enable = "sse4.1")]
   fn centered_by(pawns: __m128i, origin: HexPos) -> __m128i {
     let x = origin.x();
     let y = origin.y();
@@ -88,83 +88,83 @@ impl PawnList8 {
     unsafe { Self::extract_white_pawns_sse(pawn_poses, origin) }
   }
 
-  #[target_feature(enable = "ssse3")]
+  #[target_feature(enable = "sse4.1")]
   fn xy_ones() -> __m128i {
     _mm_set1_epi8(0x01)
   }
 
-  #[target_feature(enable = "ssse3")]
+  #[target_feature(enable = "sse4.1")]
   fn x_ones() -> __m128i {
     _mm_set1_epi16(0x0001)
   }
 
-  #[target_feature(enable = "ssse3")]
+  #[target_feature(enable = "sse4.1")]
   fn y_ones() -> __m128i {
     _mm_set1_epi16(0x0100)
   }
 
-  #[target_feature(enable = "ssse3")]
+  #[target_feature(enable = "sse4.1")]
   fn negate_x(pawns: __m128i) -> __m128i {
     let x_mask = _mm_set1_epi16(0x00ff);
     let add_x_mask = Self::x_ones();
     _mm_add_epi8(_mm_xor_si128(pawns, x_mask), add_x_mask)
   }
 
-  #[target_feature(enable = "ssse3")]
+  #[target_feature(enable = "sse4.1")]
   fn negate_y(pawns: __m128i) -> __m128i {
     let y_mask = _mm_set1_epi16(0xff00u16 as i16);
     let add_y_mask = Self::y_ones();
     _mm_add_epi8(_mm_xor_si128(pawns, y_mask), add_y_mask)
   }
 
-  #[target_feature(enable = "ssse3")]
+  #[target_feature(enable = "sse4.1")]
   fn negate_xy(pawns: __m128i) -> __m128i {
     _mm_sub_epi8(_mm_setzero_si128(), pawns)
   }
 
-  #[target_feature(enable = "ssse3")]
+  #[target_feature(enable = "sse4.1")]
   fn swap_xy(pawns: __m128i) -> __m128i {
     let shuffle_indexes = _mm_set_epi8(14, 15, 12, 13, 10, 11, 8, 9, 6, 7, 4, 5, 2, 3, 0, 1);
     _mm_shuffle_epi8(pawns, shuffle_indexes)
   }
 
-  #[target_feature(enable = "ssse3")]
+  #[target_feature(enable = "sse4.1")]
   fn isolate_x(pawns: __m128i) -> __m128i {
     let mask = _mm_set1_epi16(0x00ff);
     _mm_and_si128(pawns, mask)
   }
 
-  #[target_feature(enable = "ssse3")]
+  #[target_feature(enable = "sse4.1")]
   fn isolate_y(pawns: __m128i) -> __m128i {
     let mask = _mm_set1_epi16(0xff00u16 as i16);
     _mm_and_si128(pawns, mask)
   }
 
-  #[target_feature(enable = "ssse3")]
+  #[target_feature(enable = "sse4.1")]
   fn duplicate_x(pawns: __m128i) -> __m128i {
     let shuffle_indexes = _mm_set_epi8(14, 14, 12, 12, 10, 10, 8, 8, 6, 6, 4, 4, 2, 2, 0, 0);
     _mm_shuffle_epi8(pawns, shuffle_indexes)
   }
 
-  #[target_feature(enable = "ssse3")]
+  #[target_feature(enable = "sse4.1")]
   fn duplicate_y(pawns: __m128i) -> __m128i {
     let shuffle_indexes = _mm_set_epi8(15, 15, 13, 13, 11, 11, 9, 9, 7, 7, 5, 5, 3, 3, 1, 1);
     _mm_shuffle_epi8(pawns, shuffle_indexes)
   }
 
-  #[target_feature(enable = "ssse3")]
+  #[target_feature(enable = "sse4.1")]
   fn move_x_to_y(pawns: __m128i) -> __m128i {
     let shuffle_indexes = _mm_set_epi8(14, -1, 12, -1, 10, -1, 8, -1, 6, -1, 4, -1, 2, -1, 0, -1);
     _mm_shuffle_epi8(pawns, shuffle_indexes)
   }
 
-  #[target_feature(enable = "ssse3")]
+  #[target_feature(enable = "sse4.1")]
   fn move_y_to_x(pawns: __m128i) -> __m128i {
     let shuffle_indexes = _mm_set_epi8(-1, 15, -1, 13, -1, 11, -1, 9, -1, 7, -1, 5, -1, 3, -1, 1);
     _mm_shuffle_epi8(pawns, shuffle_indexes)
   }
 
-  #[target_feature(enable = "ssse3")]
+  #[target_feature(enable = "sse4.1")]
   fn c_r1(&self) -> Self {
     let pawns = self.pawns;
     // (x, x)
@@ -176,7 +176,7 @@ impl PawnList8 {
     Self { pawns: rotated }
   }
 
-  #[target_feature(enable = "ssse3")]
+  #[target_feature(enable = "sse4.1")]
   fn c_r2(&self) -> Self {
     let pawns = self.pawns;
     // (y, y)
@@ -188,14 +188,14 @@ impl PawnList8 {
     Self { pawns: rotated }
   }
 
-  #[target_feature(enable = "ssse3")]
+  #[target_feature(enable = "sse4.1")]
   fn c_r3(&self) -> Self {
     Self {
       pawns: Self::negate_xy(self.pawns),
     }
   }
 
-  #[target_feature(enable = "ssse3")]
+  #[target_feature(enable = "sse4.1")]
   fn c_r4(&self) -> Self {
     let pawns = self.pawns;
     // (x, x)
@@ -207,7 +207,7 @@ impl PawnList8 {
     Self { pawns: rotated }
   }
 
-  #[target_feature(enable = "ssse3")]
+  #[target_feature(enable = "sse4.1")]
   fn c_r5(&self) -> Self {
     let pawns = self.pawns;
     // (y, y)
@@ -219,7 +219,7 @@ impl PawnList8 {
     Self { pawns: rotated }
   }
 
-  #[target_feature(enable = "ssse3")]
+  #[target_feature(enable = "sse4.1")]
   fn c_s0(&self) -> Self {
     let pawns = self.pawns;
     // (y, y)
@@ -231,7 +231,7 @@ impl PawnList8 {
     Self { pawns: rotated }
   }
 
-  #[target_feature(enable = "ssse3")]
+  #[target_feature(enable = "sse4.1")]
   fn c_s1(&self) -> Self {
     let pawns = self.pawns;
     // (x, x)
@@ -243,14 +243,14 @@ impl PawnList8 {
     Self { pawns: rotated }
   }
 
-  #[target_feature(enable = "ssse3")]
+  #[target_feature(enable = "sse4.1")]
   fn c_s2(&self) -> Self {
     Self {
       pawns: Self::swap_xy(self.pawns),
     }
   }
 
-  #[target_feature(enable = "ssse3")]
+  #[target_feature(enable = "sse4.1")]
   fn c_s3(&self) -> Self {
     let pawns = self.pawns;
     // (y, y)
@@ -262,7 +262,7 @@ impl PawnList8 {
     Self { pawns: rotated }
   }
 
-  #[target_feature(enable = "ssse3")]
+  #[target_feature(enable = "sse4.1")]
   fn c_s4(&self) -> Self {
     let pawns = self.pawns;
     // (x, x)
@@ -274,7 +274,7 @@ impl PawnList8 {
     Self { pawns: rotated }
   }
 
-  #[target_feature(enable = "ssse3")]
+  #[target_feature(enable = "sse4.1")]
   fn c_s5(&self) -> Self {
     let pawns = self.pawns;
     // (y, x)
@@ -284,7 +284,7 @@ impl PawnList8 {
     Self { pawns: rotated }
   }
 
-  #[target_feature(enable = "ssse3")]
+  #[target_feature(enable = "sse4.1")]
   fn apply_d6_c_sse(&self, op: &D6) -> Self {
     match op {
       D6::Rot(0) => *self,
@@ -307,7 +307,7 @@ impl PawnList8 {
     unsafe { self.apply_d6_c_sse(op) }
   }
 
-  #[target_feature(enable = "ssse3")]
+  #[target_feature(enable = "sse4.1")]
   fn v_r2(&self) -> Self {
     let pawns = self.pawns;
     // (y, y)
@@ -319,7 +319,7 @@ impl PawnList8 {
     Self { pawns: rotated }
   }
 
-  #[target_feature(enable = "ssse3")]
+  #[target_feature(enable = "sse4.1")]
   fn v_r4(&self) -> Self {
     let pawns = self.pawns;
     // (x, x)
@@ -331,7 +331,7 @@ impl PawnList8 {
     Self { pawns: rotated }
   }
 
-  #[target_feature(enable = "ssse3")]
+  #[target_feature(enable = "sse4.1")]
   fn v_s1(&self) -> Self {
     let pawns = self.pawns;
     // (x, x)
@@ -343,7 +343,7 @@ impl PawnList8 {
     Self { pawns: rotated }
   }
 
-  #[target_feature(enable = "ssse3")]
+  #[target_feature(enable = "sse4.1")]
   fn v_s3(&self) -> Self {
     let pawns = self.pawns;
     // (y, y)
@@ -355,7 +355,7 @@ impl PawnList8 {
     Self { pawns: rotated }
   }
 
-  #[target_feature(enable = "ssse3")]
+  #[target_feature(enable = "sse4.1")]
   fn v_s5(&self) -> Self {
     let pawns = self.pawns;
     // (y, x)
@@ -365,7 +365,7 @@ impl PawnList8 {
     Self { pawns: rotated }
   }
 
-  #[target_feature(enable = "ssse3")]
+  #[target_feature(enable = "sse4.1")]
   fn apply_d3_v_sse(&self, op: &D3) -> Self {
     match op {
       D3::Rot(0) => *self,
@@ -382,7 +382,7 @@ impl PawnList8 {
     unsafe { self.apply_d3_v_sse(op) }
   }
 
-  #[target_feature(enable = "ssse3")]
+  #[target_feature(enable = "sse4.1")]
   fn e_s0(&self) -> Self {
     let pawns = self.pawns;
     // (y, y)
@@ -394,7 +394,7 @@ impl PawnList8 {
     Self { pawns: rotated }
   }
 
-  #[target_feature(enable = "ssse3")]
+  #[target_feature(enable = "sse4.1")]
   fn e_s3(&self) -> Self {
     let pawns = self.pawns;
     // (y, y)
@@ -406,7 +406,7 @@ impl PawnList8 {
     Self { pawns: rotated }
   }
 
-  #[target_feature(enable = "ssse3")]
+  #[target_feature(enable = "sse4.1")]
   fn e_r3(&self) -> Self {
     let pawns = self.pawns;
     // (1 - x, -y)
@@ -414,7 +414,7 @@ impl PawnList8 {
     Self { pawns: rotated }
   }
 
-  #[target_feature(enable = "ssse3")]
+  #[target_feature(enable = "sse4.1")]
   fn apply_k4_e_sse(&self, op: &K4) -> Self {
     match (op.left(), op.right()) {
       (Cyclic::<2>(0), Cyclic::<2>(0)) => *self,
@@ -429,7 +429,7 @@ impl PawnList8 {
     unsafe { self.apply_k4_e_sse(op) }
   }
 
-  #[target_feature(enable = "ssse3")]
+  #[target_feature(enable = "sse4.1")]
   fn apply_c2_cv_sse(&self, op: &C2) -> Self {
     match op {
       Cyclic::<2>(0) => *self,
@@ -442,7 +442,7 @@ impl PawnList8 {
     unsafe { self.apply_c2_cv_sse(op) }
   }
 
-  #[target_feature(enable = "ssse3")]
+  #[target_feature(enable = "sse4.1")]
   fn apply_c2_ce_sse(&self, op: &C2) -> Self {
     match op {
       Cyclic::<2>(0) => *self,
@@ -455,7 +455,7 @@ impl PawnList8 {
     unsafe { self.apply_c2_ce_sse(op) }
   }
 
-  #[target_feature(enable = "ssse3")]
+  #[target_feature(enable = "sse4.1")]
   fn apply_c2_ev_sse(&self, op: &C2) -> Self {
     match op {
       Cyclic::<2>(0) => *self,
@@ -472,14 +472,55 @@ impl PawnList8 {
     *self
   }
 
+  #[target_feature(enable = "sse4.1")]
+  fn sort_epi32_pairs<const SHUFFLE_MASK: i32>(
+    pawns: __m128i,
+    lower_positions: __m128i,
+  ) -> __m128i {
+    let shuffled = _mm_shuffle_epi32::<SHUFFLE_MASK>(pawns);
+    let cmp = _mm_cmplt_epi16(pawns, shuffled);
+    let select = _mm_add_epi8(cmp, lower_positions);
+    _mm_blendv_epi8(pawns, shuffled, select)
+  }
+
+  #[target_feature(enable = "sse4.1")]
+  fn sort_pawns(pawns: __m128i) -> __m128i {
+    // Implemented using the optimal sorting network for size = 8:
+    // [(0,2),(1,3),(4,6),(5,7)]
+    // shuffled: [2, 3, 0, 1, 6, 7, 4, 5]
+    let pawns =
+      Self::sort_epi32_pairs::<0b10_11_00_01>(pawns, _mm_set1_epi64x(0x0000_0000_8080_8080));
+
+    // [(0,4),(1,5),(2,6),(3,7)]
+    // shuffled: [4, 5, 6, 7, 0, 1, 2, 3]
+    let pawns = Self::sort_epi32_pairs::<0b01_00_11_10>(
+      pawns,
+      _mm_set_epi64x(0, 0x8080_8080_8080_8080u64 as i64),
+    );
+    // [(0,1),(2,3),(4,5),(6,7)]
+    // [(2,4),(3,5)]
+    // [(1,4),(3,6)]
+    // [(1,2),(3,4),(5,6)]
+    pawns
+  }
+
   /// Returns true if the two pawn lists are equal ignoring the order of the
   /// elements.
+  #[target_feature(enable = "sse4.1")]
+  fn equal_ignoring_order_sse(&self, other: PawnList8) -> bool {
+    let sorted1 = Self::sort_pawns(self.pawns);
+    let sorted2 = Self::sort_pawns(other.pawns);
+    let eq_masks = _mm_cmpeq_epi16(sorted1, sorted2);
+    let eq_bitv = _mm_movemask_epi8(eq_masks);
+    eq_bitv == 0xffff
+  }
+
   pub fn equal_ignoring_order(&self, other: PawnList8) -> bool {
-    false
+    unsafe { self.equal_ignoring_order_sse(other) }
   }
 }
 
-#[cfg(not(target_feature = "ssse3"))]
+#[cfg(not(target_feature = "sse4.1"))]
 impl PawnList8 {
   pub fn extract_black_pawns(pawn_poses: &[PackedIdx; N], origin: HexPos) -> Self {
     let pawns = [
@@ -587,8 +628,8 @@ mod tests {
     pawn_list::{N, PawnList8},
   };
 
-  #[cfg(target_feature = "ssse3")]
-  #[target_feature(enable = "ssse3")]
+  #[cfg(target_feature = "sse4.1")]
+  #[target_feature(enable = "sse4.1")]
   fn pos_at_sse(pawn_list: &PawnList8, idx: usize) -> HexPosOffset {
     debug_assert!(idx < 8);
     let pawns = match idx {
@@ -606,17 +647,17 @@ mod tests {
     HexPosOffset::new((pos & 0xff) as i8 as i32, ((pos >> 8) & 0xff) as i8 as i32)
   }
 
-  #[cfg(not(target_feature = "ssse3"))]
+  #[cfg(not(target_feature = "sse4.1"))]
   fn pos_at_slow(pawn_list: &PawnList8, idx: usize) -> HexPosOffset {
     pawn_list.pawns[idx]
   }
 
   fn pos_at(pawn_list: &PawnList8, idx: usize) -> HexPosOffset {
-    #[cfg(target_feature = "ssse3")]
+    #[cfg(target_feature = "sse4.1")]
     unsafe {
       pos_at_sse(pawn_list, idx)
     }
-    #[cfg(not(target_feature = "ssse3"))]
+    #[cfg(not(target_feature = "sse4.1"))]
     pos_at_slow(pawn_list, idx)
   }
 
