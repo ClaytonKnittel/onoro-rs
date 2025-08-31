@@ -1,3 +1,4 @@
+#[cfg(target_feature = "sse4.1")]
 use std::arch::x86_64::*;
 
 #[cfg(target_feature = "sse4.1")]
@@ -18,12 +19,17 @@ use crate::{PackedIdx, util::unreachable};
 
 const N: usize = 16;
 
+#[cfg(target_feature = "sse4.1")]
 #[derive(Clone, Copy)]
 pub struct PawnList8 {
   /// Stores 8 pawns, with x- and y- coordinates in back-to-back epi8 channels.
-  #[cfg(target_feature = "sse4.1")]
   pawns: __m128i,
-  #[cfg(not(target_feature = "sse4.1"))]
+  zero_poses: __m128i,
+}
+
+#[cfg(not(target_feature = "sse4.1"))]
+#[derive(Clone, Copy)]
+pub struct PawnList8 {
   pawns: [HexPosOffset; 8],
 }
 
@@ -41,11 +47,13 @@ impl PawnList8 {
     let y_coords = _mm_slli_epi16::<4>(y_coords);
 
     let pawns = _mm_or_si128(x_coords, y_coords);
+    let zero_poses = _mm_cmpeq_epi16(pawns, _mm_setzero_si128());
 
     let centered_pawns = Self::centered_by(pawns, origin);
 
     Self {
       pawns: centered_pawns,
+      zero_poses,
     }
   }
 
@@ -62,11 +70,13 @@ impl PawnList8 {
     let y_coords = _mm_srli_epi16::<4>(y_coords);
 
     let pawns = _mm_or_si128(x_coords, y_coords);
+    let zero_poses = _mm_cmpeq_epi16(pawns, _mm_setzero_si128());
 
     let centered_pawns = Self::centered_by(pawns, origin);
 
     Self {
       pawns: centered_pawns,
+      zero_poses,
     }
   }
 
@@ -156,7 +166,10 @@ impl PawnList8 {
     let yz = Self::move_y_to_x(pawns);
     // (x - y, x)
     let rotated = _mm_sub_epi8(xx, yz);
-    Self { pawns: rotated }
+    Self {
+      pawns: rotated,
+      ..*self
+    }
   }
 
   #[target_feature(enable = "sse4.1")]
@@ -168,13 +181,17 @@ impl PawnList8 {
     let zx = Self::move_x_to_y(pawns);
     // (-y, x - y)
     let rotated = _mm_sub_epi8(zx, yy);
-    Self { pawns: rotated }
+    Self {
+      pawns: rotated,
+      ..*self
+    }
   }
 
   #[target_feature(enable = "sse4.1")]
   fn c_r3(&self) -> Self {
     Self {
       pawns: Self::negate_xy(self.pawns),
+      ..*self
     }
   }
 
@@ -187,7 +204,10 @@ impl PawnList8 {
     let yz = Self::move_y_to_x(pawns);
     // (y - x, -x)
     let rotated = _mm_sub_epi8(yz, xx);
-    Self { pawns: rotated }
+    Self {
+      pawns: rotated,
+      ..*self
+    }
   }
 
   #[target_feature(enable = "sse4.1")]
@@ -199,7 +219,10 @@ impl PawnList8 {
     let zx = Self::move_x_to_y(pawns);
     // (y, y - x)
     let rotated = _mm_sub_epi8(yy, zx);
-    Self { pawns: rotated }
+    Self {
+      pawns: rotated,
+      ..*self
+    }
   }
 
   #[target_feature(enable = "sse4.1")]
@@ -211,7 +234,10 @@ impl PawnList8 {
     let xz = Self::isolate_x(pawns);
     // (x - y, -y)
     let rotated = _mm_sub_epi8(xz, yy);
-    Self { pawns: rotated }
+    Self {
+      pawns: rotated,
+      ..*self
+    }
   }
 
   #[target_feature(enable = "sse4.1")]
@@ -223,13 +249,17 @@ impl PawnList8 {
     let zy = Self::isolate_y(pawns);
     // (x, x - y)
     let rotated = _mm_sub_epi8(xx, zy);
-    Self { pawns: rotated }
+    Self {
+      pawns: rotated,
+      ..*self
+    }
   }
 
   #[target_feature(enable = "sse4.1")]
   fn c_s2(&self) -> Self {
     Self {
       pawns: Self::swap_xy(self.pawns),
+      ..*self
     }
   }
 
@@ -242,7 +272,10 @@ impl PawnList8 {
     let xz = Self::isolate_x(pawns);
     // (y - x, y)
     let rotated = _mm_sub_epi8(yy, xz);
-    Self { pawns: rotated }
+    Self {
+      pawns: rotated,
+      ..*self
+    }
   }
 
   #[target_feature(enable = "sse4.1")]
@@ -254,7 +287,10 @@ impl PawnList8 {
     let zy = Self::isolate_y(pawns);
     // (-x, y - x)
     let rotated = _mm_sub_epi8(zy, xx);
-    Self { pawns: rotated }
+    Self {
+      pawns: rotated,
+      ..*self
+    }
   }
 
   #[target_feature(enable = "sse4.1")]
@@ -264,7 +300,10 @@ impl PawnList8 {
     let yx = Self::swap_xy(pawns);
     // (-y, -x)
     let rotated = Self::negate_xy(yx);
-    Self { pawns: rotated }
+    Self {
+      pawns: rotated,
+      ..*self
+    }
   }
 
   #[target_feature(enable = "sse4.1")]
@@ -299,7 +338,10 @@ impl PawnList8 {
     let zx = Self::move_x_to_y(pawns);
     // (1 - y, x - y)
     let rotated = _mm_sub_epi8(_mm_add_epi8(zx, Self::x_ones()), yy);
-    Self { pawns: rotated }
+    Self {
+      pawns: rotated,
+      ..*self
+    }
   }
 
   #[target_feature(enable = "sse4.1")]
@@ -311,7 +353,10 @@ impl PawnList8 {
     let yz = Self::move_y_to_x(pawns);
     // (y + 1 - x, 1 - x)
     let rotated = _mm_sub_epi8(_mm_add_epi8(yz, Self::xy_ones()), xx);
-    Self { pawns: rotated }
+    Self {
+      pawns: rotated,
+      ..*self
+    }
   }
 
   #[target_feature(enable = "sse4.1")]
@@ -323,7 +368,10 @@ impl PawnList8 {
     let zy = Self::isolate_y(pawns);
     // (x, x - y)
     let rotated = _mm_sub_epi8(xx, zy);
-    Self { pawns: rotated }
+    Self {
+      pawns: rotated,
+      ..*self
+    }
   }
 
   #[target_feature(enable = "sse4.1")]
@@ -335,7 +383,10 @@ impl PawnList8 {
     let xz = Self::isolate_x(pawns);
     // (y + 1 - x, y)
     let rotated = _mm_sub_epi8(_mm_add_epi8(yy, Self::x_ones()), xz);
-    Self { pawns: rotated }
+    Self {
+      pawns: rotated,
+      ..*self
+    }
   }
 
   #[target_feature(enable = "sse4.1")]
@@ -345,7 +396,10 @@ impl PawnList8 {
     let yx = Self::swap_xy(pawns);
     // (1 - y, 1 - x)
     let rotated = _mm_sub_epi8(Self::xy_ones(), yx);
-    Self { pawns: rotated }
+    Self {
+      pawns: rotated,
+      ..*self
+    }
   }
 
   #[target_feature(enable = "sse4.1")]
@@ -374,7 +428,10 @@ impl PawnList8 {
     let xz = Self::isolate_x(pawns);
     // (x - y, -y)
     let rotated = _mm_sub_epi8(xz, yy);
-    Self { pawns: rotated }
+    Self {
+      pawns: rotated,
+      ..*self
+    }
   }
 
   #[target_feature(enable = "sse4.1")]
@@ -386,7 +443,10 @@ impl PawnList8 {
     let xz = Self::isolate_x(pawns);
     // (y + 1 - x, y)
     let rotated = _mm_sub_epi8(_mm_add_epi8(yy, Self::x_ones()), xz);
-    Self { pawns: rotated }
+    Self {
+      pawns: rotated,
+      ..*self
+    }
   }
 
   #[target_feature(enable = "sse4.1")]
@@ -394,7 +454,10 @@ impl PawnList8 {
     let pawns = self.pawns;
     // (1 - x, -y)
     let rotated = _mm_sub_epi8(Self::x_ones(), pawns);
-    Self { pawns: rotated }
+    Self {
+      pawns: rotated,
+      ..*self
+    }
   }
 
   #[target_feature(enable = "sse4.1")]
@@ -455,12 +518,17 @@ impl PawnList8 {
     *self
   }
 
+  #[target_feature(enable = "sse4.1")]
+  fn masked_pawns(&self) -> __m128i {
+    _mm_andnot_si128(self.zero_poses, self.pawns)
+  }
+
   /// Returns true if the two pawn lists are equal ignoring the order of the
   /// elements.
   #[target_feature(enable = "sse4.1")]
   fn equal_ignoring_order_sse(&self, other: PawnList8) -> bool {
-    let sorted1 = sort_epi16(self.pawns);
-    let sorted2 = sort_epi16(other.pawns);
+    let sorted1 = sort_epi16(self.masked_pawns());
+    let sorted2 = sort_epi16(other.masked_pawns());
     let eq_masks = _mm_cmpeq_epi16(sorted1, sorted2);
     let eq_bitv = _mm_movemask_epi8(eq_masks);
     eq_bitv == 0xffff
