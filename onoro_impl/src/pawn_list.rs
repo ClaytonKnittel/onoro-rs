@@ -13,8 +13,6 @@ use onoro::{
   hex_pos::HexPos,
 };
 
-#[cfg(target_feature = "sse4.1")]
-use crate::util::sort_epi16;
 use crate::{PackedIdx, util::unreachable};
 
 const N: usize = 16;
@@ -523,15 +521,37 @@ impl PawnList8 {
     _mm_andnot_si128(self.zero_poses, self.pawns)
   }
 
-  /// Returns true if the two pawn lists are equal ignoring the order of the
+  /// Returns true if the two pawn lists are equal, ignoring the order of the
   /// elements.
   #[target_feature(enable = "sse4.1")]
   fn equal_ignoring_order_sse(&self, other: PawnList8) -> bool {
-    let sorted1 = sort_epi16(self.masked_pawns());
-    let sorted2 = sort_epi16(other.masked_pawns());
-    let eq_masks = _mm_cmpeq_epi16(sorted1, sorted2);
-    let eq_bitv = _mm_movemask_epi8(eq_masks);
-    eq_bitv == 0xffff
+    let pawns1 = self.masked_pawns();
+    let pawns2 = other.masked_pawns();
+
+    let lo_pawns1 = _mm_cvtsi128_si64x(pawns1) as u64;
+    let pawns1 = _mm_unpackhi_epi64(pawns1, pawns1);
+    let hi_pawns1 = _mm_cvtsi128_si64x(pawns1) as u64;
+
+    let eq_poses = |needle: i16| {
+      let search_mask = _mm_set1_epi16(needle);
+      _mm_cmpeq_epi16(pawns2, search_mask)
+    };
+
+    let total = [
+      lo_pawns1 as i16,
+      (lo_pawns1 >> 16) as i16,
+      (lo_pawns1 >> 32) as i16,
+      (lo_pawns1 >> 48) as i16,
+      hi_pawns1 as i16,
+      (hi_pawns1 >> 16) as i16,
+      (hi_pawns1 >> 32) as i16,
+      (hi_pawns1 >> 48) as i16,
+    ]
+    .into_iter()
+    .map(eq_poses)
+    .reduce(|l, r| _mm_add_epi16(l, r));
+
+    _mm_movemask_epi8(unsafe { total.unwrap_unchecked() }) == 0xffff
   }
 
   pub fn equal_ignoring_order(&self, other: PawnList8) -> bool {
@@ -801,6 +821,50 @@ mod tests {
         .collect_vec()
   }
 
+  fn gen_unique_poses<R: Rng>(count: usize, rng: &mut R) -> impl Iterator<Item = PackedIdx> {
+    let mut poses = Vec::with_capacity(count);
+    for _ in 0..count {
+      let pos = loop {
+        let pos = PackedIdx::new(rng.gen_range(1..15), rng.gen_range(1..15));
+        if poses.contains(&pos) {
+          continue;
+        }
+
+        break pos;
+      };
+
+      poses.push(pos);
+    }
+
+    poses.into_iter()
+  }
+
+  fn randomly_mutate<R: Rng>(poses: &mut [PackedIdx], rng: &mut R) {
+    let to_change = (0..poses.len()).map(|_| rng.gen_bool(0.4)).collect_vec();
+    for (i, _) in to_change
+      .iter()
+      .cloned()
+      .enumerate()
+      .filter(|&(_, to_change)| to_change)
+    {
+      let pos = loop {
+        let pos = PackedIdx::new(rng.gen_range(1..15), rng.gen_range(1..15));
+        if poses
+          .iter()
+          .enumerate()
+          .find(|&(_, &p)| pos == p)
+          .is_some_and(|(idx, _)| idx < i || !to_change[idx])
+        {
+          continue;
+        }
+
+        break pos;
+      };
+
+      poses[i] = pos;
+    }
+  }
+
   #[test]
   fn fuzz_equals_ignoring_order() {
     const ITERATIONS: u32 = 10_000;
@@ -812,28 +876,20 @@ mod tests {
 
       let mut poses1 = [PackedIdx::null(); N];
       let mut poses2 = [PackedIdx::null(); N];
+      for ((pos1, pos2), random_pos) in poses1
+        .iter_mut()
+        .zip(poses2.iter_mut())
+        .zip(gen_unique_poses(N, &mut rng))
+      {
+        *pos1 = random_pos;
+        *pos2 = random_pos;
+      }
 
       let (black_equal, white_equal) = if rng.gen_bool(0.5) {
-        // Generate equal positions.
-        for (pos1, pos2) in poses1.iter_mut().zip(poses2.iter_mut()) {
-          let pos = PackedIdx::new(rng.gen_range(1..15), rng.gen_range(1..15));
-          *pos1 = pos;
-          *pos2 = pos;
-        }
-
         (true, true)
       } else {
         // Generate different positions.
-        for (pos1, pos2) in poses1.iter_mut().zip(poses2.iter_mut()) {
-          let pos = PackedIdx::new(rng.gen_range(1..15), rng.gen_range(1..15));
-          *pos1 = pos;
-
-          *pos2 = if rng.gen_bool(0.4) {
-            PackedIdx::new(rng.gen_range(1..15), rng.gen_range(1..15))
-          } else {
-            pos
-          };
-        }
+        randomly_mutate(&mut poses2, &mut rng);
 
         (
           equal_ignoring_order(poses1.iter().step_by(2), poses2.iter().step_by(2)),
