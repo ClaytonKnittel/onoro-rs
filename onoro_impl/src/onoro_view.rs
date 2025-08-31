@@ -18,7 +18,7 @@ use onoro::{
 };
 
 use crate::{
-  MoveGenerator, OnoroImpl,
+  MoveGenerator, OnoroImpl, PackedIdx,
   canonical_view::CanonicalView,
   canonicalize::board_symm_state,
   r#move::Move,
@@ -76,11 +76,11 @@ impl<const N: usize> OnoroView<N> {
       let normalized_pos2 = apply_view_transform(&normalized_pos1);
       let pos2 = normalized_pos2.apply_d6_c(&denormalizing_op2) + origin2;
 
-      if !(1..15).contains(&pos2.x()) || !(1..15).contains(&pos2.y()) {
+      let Some(pos2) = PackedIdx::maybe_from(pos2) else {
         return false;
-      }
+      };
 
-      match onoro2.get_tile(pos2.into()) {
+      match onoro2.get_tile(pos2) {
         TileState::Black => {
           if same_color_turn {
             pawn.color == PawnColor::Black

@@ -5,7 +5,7 @@ use onoro::{
 };
 use onoro_impl::{
   benchmark_util::{board_symm_state, random_unfinished_state, TestOnlyCompareViewsIgnoringHash},
-  Onoro16, OnoroView,
+  Onoro16, OnoroView, PackedIdx,
 };
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use rstest::rstest;
@@ -99,9 +99,8 @@ fn equal_slow(onoro1: &Onoro16, onoro2: &Onoro16) -> bool {
       let relative_pos = HexPos::from(pawn.pos) - origin1;
       let onoro2_pos = relative_pos + origin2;
 
-      (1..15).contains(&onoro2_pos.x())
-        && (1..15).contains(&onoro2_pos.y())
-        && TileState::from(pawn.color) == onoro2.get_tile(onoro2_pos.into())
+      PackedIdx::maybe_from(onoro2_pos)
+        .is_some_and(|pos| TileState::from(pawn.color) == onoro2.get_tile(pos))
     })
   })
 }

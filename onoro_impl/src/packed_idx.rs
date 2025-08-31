@@ -98,6 +98,16 @@ impl PackedIdx {
   const fn on_perimeter(&self) -> bool {
     self.x() == 0 || self.x() == Self::MAX_VAL - 1 || self.y() == 0 || self.y() == Self::MAX_VAL - 1
   }
+
+  /// Attempts to turn a `HexPos` into a `PackedIdx`, returning `None` if the
+  /// `HexPos` is out of bounds.
+  pub fn maybe_from(hex_pos: HexPos) -> Option<Self> {
+    if !(0..Self::MAX_VAL).contains(&hex_pos.x()) || !(0..Self::MAX_VAL).contains(&hex_pos.y()) {
+      return None;
+    }
+
+    Some(hex_pos.into())
+  }
 }
 
 impl OnoroIndex for PackedIdx {
