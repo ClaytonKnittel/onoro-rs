@@ -1,15 +1,18 @@
 #[cfg(target_feature = "sse4.1")]
 use std::arch::x86_64::*;
 
-#[cfg(target_feature = "sse4.1")]
-use algebra::group::Cyclic;
+#[cfg(not(target_feature = "sse4.1"))]
 use algebra::group::Trivial;
+use algebra::ordinal::Ordinal;
 #[cfg(not(target_feature = "sse4.1"))]
 use itertools::Itertools;
 #[cfg(not(target_feature = "sse4.1"))]
-use onoro::hex_pos::HexPosOffset;
 use onoro::{
-  groups::{C2, D3, D6, K4},
+  groups::{C2, D3, K4},
+  hex_pos::HexPosOffset,
+};
+use onoro::{
+  groups::{D6, SymmetryClass},
   hex_pos::HexPos,
 };
 
@@ -18,6 +21,7 @@ use crate::{PackedIdx, util::unreachable};
 const N: usize = 16;
 
 #[cfg(target_feature = "sse4.1")]
+#[derive(Clone, Copy)]
 #[repr(align(16))]
 struct MM128Contents([i8; 16]);
 
@@ -28,39 +32,51 @@ impl MM128Contents {
     unsafe { _mm_load_si128(self.0.as_ptr() as *const _) }
   }
 
-  const fn noop_mask() -> MM128Contents {
+  const fn zero() -> MM128Contents {
+    MM128Contents([0; 16])
+  }
+
+  const fn x_ones() -> MM128Contents {
+    MM128Contents([1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0])
+  }
+
+  const fn xy_ones() -> MM128Contents {
+    MM128Contents([1; 16])
+  }
+
+  const fn noop_shuffle() -> MM128Contents {
     MM128Contents([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15])
   }
 
-  const fn zero_mask() -> MM128Contents {
+  const fn zero_shuffle() -> MM128Contents {
     MM128Contents([-1; 16])
   }
 
-  const fn swap_xy_mask() -> MM128Contents {
+  const fn swap_xy_shuffle() -> MM128Contents {
     MM128Contents([1, 0, 3, 2, 5, 4, 7, 6, 9, 8, 11, 10, 13, 12, 15, 14])
   }
 
-  const fn isolate_x_mask() -> MM128Contents {
+  const fn isolate_x_shuffle() -> MM128Contents {
     MM128Contents([0, -1, 2, -1, 4, -1, 6, -1, 8, -1, 10, -1, 12, -1, 14, -1])
   }
 
-  const fn isolate_y_mask() -> MM128Contents {
+  const fn isolate_y_shuffle() -> MM128Contents {
     MM128Contents([-1, 1, -1, 3, -1, 5, -1, 7, -1, 9, -1, 11, -1, 13, -1, 15])
   }
 
-  const fn duplicate_x_mask() -> MM128Contents {
+  const fn duplicate_x_shuffle() -> MM128Contents {
     MM128Contents([0, 0, 2, 2, 4, 4, 6, 6, 8, 8, 10, 10, 12, 12, 14, 14])
   }
 
-  const fn duplicate_y_mask() -> MM128Contents {
+  const fn duplicate_y_shuffle() -> MM128Contents {
     MM128Contents([1, 1, 3, 3, 5, 5, 7, 7, 9, 9, 11, 11, 13, 13, 15, 15])
   }
 
-  const fn move_x_to_y_mask() -> MM128Contents {
+  const fn move_x_to_y_shuffle() -> MM128Contents {
     MM128Contents([-1, 0, -1, 2, -1, 4, -1, 6, -1, 8, -1, 10, -1, 12, -1, 14])
   }
 
-  const fn move_y_to_x_mask() -> MM128Contents {
+  const fn move_y_to_x_shuffle() -> MM128Contents {
     MM128Contents([1, -1, 3, -1, 5, -1, 7, -1, 9, -1, 11, -1, 13, -1, 15, -1])
   }
 }
@@ -75,6 +91,164 @@ pub struct PawnList8 {
 
 #[cfg(target_feature = "sse4.1")]
 impl PawnList8 {
+  const D6_POSITIVE_MASKS: [MM128Contents; 12] = [
+    MM128Contents::noop_shuffle(),
+    MM128Contents::duplicate_x_shuffle(),
+    MM128Contents::move_x_to_y_shuffle(),
+    MM128Contents::zero_shuffle(),
+    MM128Contents::move_y_to_x_shuffle(),
+    MM128Contents::duplicate_y_shuffle(),
+    MM128Contents::isolate_x_shuffle(),
+    MM128Contents::duplicate_x_shuffle(),
+    MM128Contents::swap_xy_shuffle(),
+    MM128Contents::duplicate_y_shuffle(),
+    MM128Contents::isolate_y_shuffle(),
+    MM128Contents::zero_shuffle(),
+  ];
+  const D6_NEGATIVE_MASKS: [MM128Contents; 12] = [
+    MM128Contents::zero_shuffle(),
+    MM128Contents::move_y_to_x_shuffle(),
+    MM128Contents::duplicate_y_shuffle(),
+    MM128Contents::noop_shuffle(),
+    MM128Contents::duplicate_x_shuffle(),
+    MM128Contents::move_x_to_y_shuffle(),
+    MM128Contents::duplicate_y_shuffle(),
+    MM128Contents::isolate_y_shuffle(),
+    MM128Contents::zero_shuffle(),
+    MM128Contents::isolate_x_shuffle(),
+    MM128Contents::duplicate_x_shuffle(),
+    MM128Contents::swap_xy_shuffle(),
+  ];
+
+  // TODO: Try 2-level map? this will be a table of u8 indices into another
+  // table with all of the masks.
+  const ONES_MASKS: [MM128Contents; 29] = [
+    // Trivial
+    MM128Contents::zero(),
+    // EV
+    MM128Contents::zero(),
+    MM128Contents::x_ones(),
+    // CE
+    MM128Contents::zero(),
+    MM128Contents::zero(),
+    // CV
+    MM128Contents::zero(),
+    MM128Contents::zero(),
+    // E
+    MM128Contents::zero(),
+    MM128Contents::zero(),
+    MM128Contents::x_ones(),
+    MM128Contents::x_ones(),
+    // V
+    MM128Contents::zero(),
+    MM128Contents::x_ones(),
+    MM128Contents::xy_ones(),
+    MM128Contents::zero(),
+    MM128Contents::x_ones(),
+    MM128Contents::xy_ones(),
+    // C
+    MM128Contents::zero(),
+    MM128Contents::zero(),
+    MM128Contents::zero(),
+    MM128Contents::zero(),
+    MM128Contents::zero(),
+    MM128Contents::zero(),
+    MM128Contents::zero(),
+    MM128Contents::zero(),
+    MM128Contents::zero(),
+    MM128Contents::zero(),
+    MM128Contents::zero(),
+    MM128Contents::zero(),
+  ];
+  const POSITIVE_MASKS: [MM128Contents; 29] = [
+    // Trivial
+    MM128Contents::noop_shuffle(),
+    // EV
+    MM128Contents::noop_shuffle(),
+    MM128Contents::duplicate_y_shuffle(),
+    // CE
+    MM128Contents::noop_shuffle(),
+    MM128Contents::isolate_x_shuffle(),
+    // CV
+    MM128Contents::noop_shuffle(),
+    MM128Contents::duplicate_x_shuffle(),
+    // E
+    MM128Contents::noop_shuffle(),
+    MM128Contents::isolate_x_shuffle(),
+    MM128Contents::duplicate_y_shuffle(),
+    MM128Contents::zero_shuffle(),
+    // V
+    MM128Contents::noop_shuffle(),
+    MM128Contents::move_x_to_y_shuffle(),
+    MM128Contents::move_y_to_x_shuffle(),
+    MM128Contents::duplicate_x_shuffle(),
+    MM128Contents::duplicate_y_shuffle(),
+    MM128Contents::zero_shuffle(),
+    // C
+    Self::D6_POSITIVE_MASKS[0],
+    Self::D6_POSITIVE_MASKS[1],
+    Self::D6_POSITIVE_MASKS[2],
+    Self::D6_POSITIVE_MASKS[3],
+    Self::D6_POSITIVE_MASKS[4],
+    Self::D6_POSITIVE_MASKS[5],
+    Self::D6_POSITIVE_MASKS[6],
+    Self::D6_POSITIVE_MASKS[7],
+    Self::D6_POSITIVE_MASKS[8],
+    Self::D6_POSITIVE_MASKS[9],
+    Self::D6_POSITIVE_MASKS[10],
+    Self::D6_POSITIVE_MASKS[11],
+  ];
+  const NEGATIVE_MASKS: [MM128Contents; 29] = [
+    // Trivial
+    MM128Contents::zero_shuffle(),
+    // EV
+    MM128Contents::zero_shuffle(),
+    MM128Contents::isolate_x_shuffle(),
+    // CE
+    MM128Contents::zero_shuffle(),
+    MM128Contents::duplicate_y_shuffle(),
+    // CV
+    MM128Contents::zero_shuffle(),
+    MM128Contents::isolate_y_shuffle(),
+    // E
+    MM128Contents::zero_shuffle(),
+    MM128Contents::duplicate_y_shuffle(),
+    MM128Contents::isolate_x_shuffle(),
+    MM128Contents::noop_shuffle(),
+    // V
+    MM128Contents::zero_shuffle(),
+    MM128Contents::duplicate_y_shuffle(),
+    MM128Contents::duplicate_x_shuffle(),
+    MM128Contents::isolate_y_shuffle(),
+    MM128Contents::isolate_x_shuffle(),
+    MM128Contents::swap_xy_shuffle(),
+    // C
+    Self::D6_NEGATIVE_MASKS[0],
+    Self::D6_NEGATIVE_MASKS[1],
+    Self::D6_NEGATIVE_MASKS[2],
+    Self::D6_NEGATIVE_MASKS[3],
+    Self::D6_NEGATIVE_MASKS[4],
+    Self::D6_NEGATIVE_MASKS[5],
+    Self::D6_NEGATIVE_MASKS[6],
+    Self::D6_NEGATIVE_MASKS[7],
+    Self::D6_NEGATIVE_MASKS[8],
+    Self::D6_NEGATIVE_MASKS[9],
+    Self::D6_NEGATIVE_MASKS[10],
+    Self::D6_NEGATIVE_MASKS[11],
+  ];
+
+  const fn symmetry_class_offset(symm_class: SymmetryClass) -> usize {
+    match symm_class {
+      SymmetryClass::Trivial => 0,
+      SymmetryClass::EV => 1,
+      SymmetryClass::CE => 3,
+      SymmetryClass::CV => 5,
+      SymmetryClass::E => 7,
+      SymmetryClass::V => 11,
+      SymmetryClass::C => 17,
+    }
+  }
+
   #[target_feature(enable = "sse4.1")]
   fn extract_black_pawns_sse(pawn_poses: &[PackedIdx; N], origin: HexPos) -> Self {
     let pawns = unsafe { _mm_loadu_si128(pawn_poses.as_ptr() as *const _) };
@@ -141,246 +315,9 @@ impl PawnList8 {
   }
 
   #[target_feature(enable = "sse4.1")]
-  fn xy_ones() -> __m128i {
-    _mm_set1_epi8(0x01)
-  }
-
-  #[target_feature(enable = "sse4.1")]
-  fn x_ones() -> __m128i {
-    _mm_set1_epi16(0x0001)
-  }
-
-  #[target_feature(enable = "sse4.1")]
-  fn negate_xy(pawns: __m128i) -> __m128i {
-    _mm_sub_epi8(_mm_setzero_si128(), pawns)
-  }
-
-  #[target_feature(enable = "sse4.1")]
-  fn swap_xy(pawns: __m128i) -> __m128i {
-    let shuffle_indexes = _mm_set_epi8(14, 15, 12, 13, 10, 11, 8, 9, 6, 7, 4, 5, 2, 3, 0, 1);
-    _mm_shuffle_epi8(pawns, shuffle_indexes)
-  }
-
-  #[target_feature(enable = "sse4.1")]
-  fn isolate_x(pawns: __m128i) -> __m128i {
-    let mask = _mm_set1_epi16(0x00ff);
-    _mm_and_si128(pawns, mask)
-  }
-
-  #[target_feature(enable = "sse4.1")]
-  fn isolate_y(pawns: __m128i) -> __m128i {
-    let mask = _mm_set1_epi16(0xff00u16 as i16);
-    _mm_and_si128(pawns, mask)
-  }
-
-  #[target_feature(enable = "sse4.1")]
-  fn duplicate_x(pawns: __m128i) -> __m128i {
-    let shuffle_indexes = _mm_set_epi8(14, 14, 12, 12, 10, 10, 8, 8, 6, 6, 4, 4, 2, 2, 0, 0);
-    _mm_shuffle_epi8(pawns, shuffle_indexes)
-  }
-
-  #[target_feature(enable = "sse4.1")]
-  fn duplicate_y(pawns: __m128i) -> __m128i {
-    let shuffle_indexes = _mm_set_epi8(15, 15, 13, 13, 11, 11, 9, 9, 7, 7, 5, 5, 3, 3, 1, 1);
-    _mm_shuffle_epi8(pawns, shuffle_indexes)
-  }
-
-  #[target_feature(enable = "sse4.1")]
-  fn move_x_to_y(pawns: __m128i) -> __m128i {
-    let shuffle_indexes = _mm_set_epi8(14, -1, 12, -1, 10, -1, 8, -1, 6, -1, 4, -1, 2, -1, 0, -1);
-    _mm_shuffle_epi8(pawns, shuffle_indexes)
-  }
-
-  #[target_feature(enable = "sse4.1")]
-  fn move_y_to_x(pawns: __m128i) -> __m128i {
-    let shuffle_indexes = _mm_set_epi8(-1, 15, -1, 13, -1, 11, -1, 9, -1, 7, -1, 5, -1, 3, -1, 1);
-    _mm_shuffle_epi8(pawns, shuffle_indexes)
-  }
-
-  #[target_feature(enable = "sse4.1")]
-  fn c_r1(&self) -> Self {
-    let pawns = self.pawns;
-    // (x, x)
-    let xx = Self::duplicate_x(pawns);
-    // (y, 0)
-    let yz = Self::move_y_to_x(pawns);
-    // (x - y, x)
-    let rotated = _mm_sub_epi8(xx, yz);
-    Self {
-      pawns: rotated,
-      ..*self
-    }
-  }
-
-  #[target_feature(enable = "sse4.1")]
-  fn c_r2(&self) -> Self {
-    let pawns = self.pawns;
-    // (y, y)
-    let yy = Self::duplicate_y(pawns);
-    // (0, x)
-    let zx = Self::move_x_to_y(pawns);
-    // (-y, x - y)
-    let rotated = _mm_sub_epi8(zx, yy);
-    Self {
-      pawns: rotated,
-      ..*self
-    }
-  }
-
-  #[target_feature(enable = "sse4.1")]
-  fn c_r3(&self) -> Self {
-    Self {
-      pawns: Self::negate_xy(self.pawns),
-      ..*self
-    }
-  }
-
-  #[target_feature(enable = "sse4.1")]
-  fn c_r4(&self) -> Self {
-    let pawns = self.pawns;
-    // (x, x)
-    let xx = Self::duplicate_x(pawns);
-    // (y, 0)
-    let yz = Self::move_y_to_x(pawns);
-    // (y - x, -x)
-    let rotated = _mm_sub_epi8(yz, xx);
-    Self {
-      pawns: rotated,
-      ..*self
-    }
-  }
-
-  #[target_feature(enable = "sse4.1")]
-  fn c_r5(&self) -> Self {
-    let pawns = self.pawns;
-    // (y, y)
-    let yy = Self::duplicate_y(pawns);
-    // (0, x)
-    let zx = Self::move_x_to_y(pawns);
-    // (y, y - x)
-    let rotated = _mm_sub_epi8(yy, zx);
-    Self {
-      pawns: rotated,
-      ..*self
-    }
-  }
-
-  #[target_feature(enable = "sse4.1")]
-  fn c_s0(&self) -> Self {
-    let pawns = self.pawns;
-    // (y, y)
-    let yy = Self::duplicate_y(pawns);
-    // (x, 0)
-    let xz = Self::isolate_x(pawns);
-    // (x - y, -y)
-    let rotated = _mm_sub_epi8(xz, yy);
-    Self {
-      pawns: rotated,
-      ..*self
-    }
-  }
-
-  #[target_feature(enable = "sse4.1")]
-  fn c_s1(&self) -> Self {
-    let pawns = self.pawns;
-    // (x, x)
-    let xx = Self::duplicate_x(pawns);
-    // (0, y)
-    let zy = Self::isolate_y(pawns);
-    // (x, x - y)
-    let rotated = _mm_sub_epi8(xx, zy);
-    Self {
-      pawns: rotated,
-      ..*self
-    }
-  }
-
-  #[target_feature(enable = "sse4.1")]
-  fn c_s2(&self) -> Self {
-    Self {
-      pawns: Self::swap_xy(self.pawns),
-      ..*self
-    }
-  }
-
-  #[target_feature(enable = "sse4.1")]
-  fn c_s3(&self) -> Self {
-    let pawns = self.pawns;
-    // (y, y)
-    let yy = Self::duplicate_y(pawns);
-    // (x, 0)
-    let xz = Self::isolate_x(pawns);
-    // (y - x, y)
-    let rotated = _mm_sub_epi8(yy, xz);
-    Self {
-      pawns: rotated,
-      ..*self
-    }
-  }
-
-  #[target_feature(enable = "sse4.1")]
-  fn c_s4(&self) -> Self {
-    let pawns = self.pawns;
-    // (x, x)
-    let xx = Self::duplicate_x(pawns);
-    // (0, y)
-    let zy = Self::isolate_y(pawns);
-    // (-x, y - x)
-    let rotated = _mm_sub_epi8(zy, xx);
-    Self {
-      pawns: rotated,
-      ..*self
-    }
-  }
-
-  #[target_feature(enable = "sse4.1")]
-  fn c_s5(&self) -> Self {
-    let pawns = self.pawns;
-    // (y, x)
-    let yx = Self::swap_xy(pawns);
-    // (-y, -x)
-    let rotated = Self::negate_xy(yx);
-    Self {
-      pawns: rotated,
-      ..*self
-    }
-  }
-
-  #[target_feature(enable = "sse4.1")]
   fn apply_d6_c_sse(&self, op: &D6) -> Self {
-    use algebra::ordinal::Ordinal;
-
-    const POSITIVE_MASKS: [MM128Contents; 12] = [
-      MM128Contents::noop_mask(),
-      MM128Contents::duplicate_x_mask(),
-      MM128Contents::move_x_to_y_mask(),
-      MM128Contents::zero_mask(),
-      MM128Contents::move_y_to_x_mask(),
-      MM128Contents::duplicate_y_mask(),
-      MM128Contents::isolate_x_mask(),
-      MM128Contents::duplicate_x_mask(),
-      MM128Contents::swap_xy_mask(),
-      MM128Contents::duplicate_y_mask(),
-      MM128Contents::isolate_y_mask(),
-      MM128Contents::zero_mask(),
-    ];
-    const NEGATIVE_MASKS: [MM128Contents; 12] = [
-      MM128Contents::zero_mask(),
-      MM128Contents::move_y_to_x_mask(),
-      MM128Contents::duplicate_y_mask(),
-      MM128Contents::noop_mask(),
-      MM128Contents::duplicate_x_mask(),
-      MM128Contents::move_x_to_y_mask(),
-      MM128Contents::duplicate_y_mask(),
-      MM128Contents::isolate_y_mask(),
-      MM128Contents::zero_mask(),
-      MM128Contents::isolate_x_mask(),
-      MM128Contents::duplicate_x_mask(),
-      MM128Contents::swap_xy_mask(),
-    ];
-
-    let positive_mask = POSITIVE_MASKS[op.ord()].load();
-    let negative_mask = NEGATIVE_MASKS[op.ord()].load();
+    let positive_mask = Self::D6_POSITIVE_MASKS[op.ord()].load();
+    let negative_mask = Self::D6_NEGATIVE_MASKS[op.ord()].load();
     let positive = _mm_shuffle_epi8(self.pawns, positive_mask);
     let negative = _mm_shuffle_epi8(self.pawns, negative_mask);
     Self {
@@ -394,192 +331,22 @@ impl PawnList8 {
   }
 
   #[target_feature(enable = "sse4.1")]
-  fn v_r2(&self) -> Self {
-    let pawns = self.pawns;
-    // (y, y)
-    let yy = Self::duplicate_y(pawns);
-    // (0, x)
-    let zx = Self::move_x_to_y(pawns);
-    // (1 - y, x - y)
-    let rotated = _mm_sub_epi8(_mm_add_epi8(zx, Self::x_ones()), yy);
+  fn apply_sse(&self, symm_class: SymmetryClass, op_ord: u8) -> Self {
+    let idx = Self::symmetry_class_offset(symm_class) + op_ord as usize;
+    let ones = Self::ONES_MASKS[idx].load();
+    let positive_mask = Self::POSITIVE_MASKS[idx].load();
+    let negative_mask = Self::NEGATIVE_MASKS[idx].load();
+    let positive = _mm_shuffle_epi8(self.pawns, positive_mask);
+    let negative = _mm_shuffle_epi8(self.pawns, negative_mask);
+
     Self {
-      pawns: rotated,
+      pawns: _mm_sub_epi8(_mm_add_epi8(positive, ones), negative),
       ..*self
     }
   }
 
-  #[target_feature(enable = "sse4.1")]
-  fn v_r4(&self) -> Self {
-    let pawns = self.pawns;
-    // (x, x)
-    let xx = Self::duplicate_x(pawns);
-    // (y, 0)
-    let yz = Self::move_y_to_x(pawns);
-    // (y + 1 - x, 1 - x)
-    let rotated = _mm_sub_epi8(_mm_add_epi8(yz, Self::xy_ones()), xx);
-    Self {
-      pawns: rotated,
-      ..*self
-    }
-  }
-
-  #[target_feature(enable = "sse4.1")]
-  fn v_s1(&self) -> Self {
-    let pawns = self.pawns;
-    // (x, x)
-    let xx = Self::duplicate_x(pawns);
-    // (0, y)
-    let zy = Self::isolate_y(pawns);
-    // (x, x - y)
-    let rotated = _mm_sub_epi8(xx, zy);
-    Self {
-      pawns: rotated,
-      ..*self
-    }
-  }
-
-  #[target_feature(enable = "sse4.1")]
-  fn v_s3(&self) -> Self {
-    let pawns = self.pawns;
-    // (y, y)
-    let yy = Self::duplicate_y(pawns);
-    // (x, 0)
-    let xz = Self::isolate_x(pawns);
-    // (y + 1 - x, y)
-    let rotated = _mm_sub_epi8(_mm_add_epi8(yy, Self::x_ones()), xz);
-    Self {
-      pawns: rotated,
-      ..*self
-    }
-  }
-
-  #[target_feature(enable = "sse4.1")]
-  fn v_s5(&self) -> Self {
-    let pawns = self.pawns;
-    // (y, x)
-    let yx = Self::swap_xy(pawns);
-    // (1 - y, 1 - x)
-    let rotated = _mm_sub_epi8(Self::xy_ones(), yx);
-    Self {
-      pawns: rotated,
-      ..*self
-    }
-  }
-
-  #[target_feature(enable = "sse4.1")]
-  fn apply_d3_v_sse(&self, op: &D3) -> Self {
-    match op {
-      D3::Rot(0) => *self,
-      D3::Rot(1) => self.v_r2(),
-      D3::Rot(2) => self.v_r4(),
-      D3::Rfl(0) => self.v_s1(),
-      D3::Rfl(1) => self.v_s3(),
-      D3::Rfl(2) => self.v_s5(),
-      _ => unreachable(),
-    }
-  }
-
-  pub fn apply_d3_v(&self, op: &D3) -> Self {
-    unsafe { self.apply_d3_v_sse(op) }
-  }
-
-  #[target_feature(enable = "sse4.1")]
-  fn e_s0(&self) -> Self {
-    let pawns = self.pawns;
-    // (y, y)
-    let yy = Self::duplicate_y(pawns);
-    // (x, 0)
-    let xz = Self::isolate_x(pawns);
-    // (x - y, -y)
-    let rotated = _mm_sub_epi8(xz, yy);
-    Self {
-      pawns: rotated,
-      ..*self
-    }
-  }
-
-  #[target_feature(enable = "sse4.1")]
-  fn e_s3(&self) -> Self {
-    let pawns = self.pawns;
-    // (y, y)
-    let yy = Self::duplicate_y(pawns);
-    // (x, 0)
-    let xz = Self::isolate_x(pawns);
-    // (y + 1 - x, y)
-    let rotated = _mm_sub_epi8(_mm_add_epi8(yy, Self::x_ones()), xz);
-    Self {
-      pawns: rotated,
-      ..*self
-    }
-  }
-
-  #[target_feature(enable = "sse4.1")]
-  fn e_r3(&self) -> Self {
-    let pawns = self.pawns;
-    // (1 - x, -y)
-    let rotated = _mm_sub_epi8(Self::x_ones(), pawns);
-    Self {
-      pawns: rotated,
-      ..*self
-    }
-  }
-
-  #[target_feature(enable = "sse4.1")]
-  fn apply_k4_e_sse(&self, op: &K4) -> Self {
-    match (op.left(), op.right()) {
-      (Cyclic::<2>(0), Cyclic::<2>(0)) => *self,
-      (Cyclic::<2>(1), Cyclic::<2>(0)) => self.e_s0(),
-      (Cyclic::<2>(0), Cyclic::<2>(1)) => self.e_s3(),
-      (Cyclic::<2>(1), Cyclic::<2>(1)) => self.e_r3(),
-      _ => unreachable(),
-    }
-  }
-
-  pub fn apply_k4_e(&self, op: &K4) -> Self {
-    unsafe { self.apply_k4_e_sse(op) }
-  }
-
-  #[target_feature(enable = "sse4.1")]
-  fn apply_c2_cv_sse(&self, op: &C2) -> Self {
-    match op {
-      Cyclic::<2>(0) => *self,
-      Cyclic::<2>(1) => self.c_s1(),
-      _ => unreachable(),
-    }
-  }
-
-  pub fn apply_c2_cv(&self, op: &C2) -> Self {
-    unsafe { self.apply_c2_cv_sse(op) }
-  }
-
-  #[target_feature(enable = "sse4.1")]
-  fn apply_c2_ce_sse(&self, op: &C2) -> Self {
-    match op {
-      Cyclic::<2>(0) => *self,
-      Cyclic::<2>(1) => self.c_s0(),
-      _ => unreachable(),
-    }
-  }
-
-  pub fn apply_c2_ce(&self, op: &C2) -> Self {
-    unsafe { self.apply_c2_ce_sse(op) }
-  }
-
-  #[target_feature(enable = "sse4.1")]
-  fn apply_c2_ev_sse(&self, op: &C2) -> Self {
-    match op {
-      Cyclic::<2>(0) => *self,
-      Cyclic::<2>(1) => self.e_s3(),
-      _ => unreachable(),
-    }
-  }
-
-  pub fn apply_c2_ev(&self, op: &C2) -> Self {
-    unsafe { self.apply_c2_ev_sse(op) }
-  }
-
-  pub fn apply_trivial(&self, _op: &Trivial) -> Self {
-    *self
+  pub fn apply(&self, symm_class: SymmetryClass, op_ord: u8) -> Self {
+    unsafe { self.apply_sse(symm_class, op_ord) }
   }
 
   #[target_feature(enable = "sse4.1")]
@@ -667,38 +434,51 @@ impl PawnList8 {
     }
   }
 
-  pub fn apply_d3_v(&self, op: &D3) -> Self {
+  fn apply_d3_v(&self, op: &D3) -> Self {
     Self {
       pawns: self.pawns.map(|pos| pos.apply_d3_v(op)),
     }
   }
 
-  pub fn apply_k4_e(&self, op: &K4) -> Self {
+  fn apply_k4_e(&self, op: &K4) -> Self {
     Self {
       pawns: self.pawns.map(|pos| pos.apply_k4_e(op)),
     }
   }
 
-  pub fn apply_c2_cv(&self, op: &C2) -> Self {
+  fn apply_c2_cv(&self, op: &C2) -> Self {
     Self {
       pawns: self.pawns.map(|pos| pos.apply_c2_cv(op)),
     }
   }
 
-  pub fn apply_c2_ce(&self, op: &C2) -> Self {
+  fn apply_c2_ce(&self, op: &C2) -> Self {
     Self {
       pawns: self.pawns.map(|pos| pos.apply_c2_ce(op)),
     }
   }
 
-  pub fn apply_c2_ev(&self, op: &C2) -> Self {
+  fn apply_c2_ev(&self, op: &C2) -> Self {
     Self {
       pawns: self.pawns.map(|pos| pos.apply_c2_ev(op)),
     }
   }
 
-  pub fn apply_trivial(&self, op: &Trivial) -> Self {
+  fn apply_trivial(&self, op: &Trivial) -> Self {
     *self
+  }
+
+  pub fn apply(&self, symm_class: SymmetryClass, op_ord: u8) -> Self {
+    let op_ord = op_ord as usize;
+    match symm_class {
+      SymmetryClass::C => self.apply_d6_c(&D6::from_ord(op_ord)),
+      SymmetryClass::V => self.apply_d3_v(&D3::from_ord(op_ord)),
+      SymmetryClass::E => self.apply_k4_e(&K4::from_ord(op_ord)),
+      SymmetryClass::CV => self.apply_c2_cv(&C2::from_ord(op_ord)),
+      SymmetryClass::CE => self.apply_c2_ce(&C2::from_ord(op_ord)),
+      SymmetryClass::EV => self.apply_c2_ev(&C2::from_ord(op_ord)),
+      SymmetryClass::Trivial => self.apply_trivial(&Trivial::from_ord(op_ord)),
+    }
   }
 
   /// Returns true if the two pawn lists are equal ignoring the order of the
@@ -712,11 +492,11 @@ impl PawnList8 {
 mod tests {
   use std::arch::x86_64::{_mm_bsrli_si128, _mm_cvtsi128_si64x};
 
-  use algebra::{group::Trivial, semigroup::Semigroup};
+  use algebra::{group::Trivial, ordinal::Ordinal, semigroup::Semigroup};
   use googletest::{gtest, prelude::*};
   use itertools::Itertools;
   use onoro::{
-    groups::{C2, D3, D6, K4},
+    groups::{C2, D3, D6, K4, SymmetryClass},
     hex_pos::{HexPos, HexPosOffset},
   };
   use rand::{Rng, SeedableRng, rngs::StdRng};
@@ -812,7 +592,7 @@ mod tests {
   }
 
   macro_rules! test_rotate {
-    ($name:ident, $apply_op:ident, $op_t:ty) => {
+    ($name:ident, $apply_op:ident, $symm_class:expr, $op_t:ty) => {
       #[gtest]
       fn $name() {
         for y in 1..=15 {
@@ -826,8 +606,9 @@ mod tests {
           let white_pawns = PawnList8::extract_white_pawns(&poses, center);
 
           for op in <$op_t>::for_each() {
-            let rotated_black = black_pawns.$apply_op(&op);
-            let rotated_white = white_pawns.$apply_op(&op);
+            let op_ord = op.ord() as u8;
+            let rotated_black = black_pawns.apply($symm_class, op_ord);
+            let rotated_white = white_pawns.apply($symm_class, op_ord);
 
             let expected_black = poses
               .iter()
@@ -851,13 +632,18 @@ mod tests {
     };
   }
 
-  test_rotate!(test_rotate_d6_c, apply_d6_c, D6);
-  test_rotate!(test_rotate_d3_v, apply_d3_v, D3);
-  test_rotate!(test_rotate_k4_e, apply_k4_e, K4);
-  test_rotate!(test_rotate_c2_cv, apply_c2_cv, C2);
-  test_rotate!(test_rotate_c2_ce, apply_c2_ce, C2);
-  test_rotate!(test_rotate_c2_ev, apply_c2_ev, C2);
-  test_rotate!(test_rotate_trivial, apply_trivial, Trivial);
+  test_rotate!(test_rotate_d6_c, apply_d6_c, SymmetryClass::C, D6);
+  test_rotate!(test_rotate_d3_v, apply_d3_v, SymmetryClass::V, D3);
+  test_rotate!(test_rotate_k4_e, apply_k4_e, SymmetryClass::E, K4);
+  test_rotate!(test_rotate_c2_cv, apply_c2_cv, SymmetryClass::CV, C2);
+  test_rotate!(test_rotate_c2_ce, apply_c2_ce, SymmetryClass::CE, C2);
+  test_rotate!(test_rotate_c2_ev, apply_c2_ev, SymmetryClass::EV, C2);
+  test_rotate!(
+    test_rotate_trivial,
+    apply_trivial,
+    SymmetryClass::Trivial,
+    Trivial
+  );
 
   fn equal_ignoring_order<'a>(
     lhs: impl IntoIterator<Item = &'a PackedIdx>,
