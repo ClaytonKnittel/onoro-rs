@@ -102,6 +102,7 @@ impl<I: PrimInt> Default for MinAndMax<I> {
 }
 
 /// Sorts the 16-bit lanes of `vec`, returning the sorted result.
+#[allow(dead_code)]
 #[inline]
 #[target_feature(enable = "sse4.1")]
 pub fn sort_epi16(vec: __m128i) -> __m128i {
