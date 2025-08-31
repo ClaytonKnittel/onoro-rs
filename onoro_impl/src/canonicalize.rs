@@ -152,7 +152,7 @@ const fn symm_state_op(x: u32, y: u32, n_pawns: u32) -> D6 {
 /// `n_pawns` is the number of pawns currently in play.
 ///
 /// (x, y) are elements of {0, 1, ... n_pawns-1} x {0, 1, ... n_pawns-1}
-pub const fn symm_state_class(x: u32, y: u32, n_pawns: u32) -> SymmetryClass {
+const fn symm_state_class(x: u32, y: u32, n_pawns: u32) -> SymmetryClass {
   // (x2, y2) is (x, y) folded across the line y = x
   let x2 = max_u32(x, y);
   let y2 = min_u32(x, y);
@@ -181,7 +181,7 @@ pub const fn symm_state_class(x: u32, y: u32, n_pawns: u32) -> SymmetryClass {
 
 /// The purpose of the symmetry table is to provide a quick way to canonicalize
 /// boards when computing and checking for symmetries.
-pub const fn gen_symm_state_table<const N: usize>() -> [[BoardSymmetryState; N]; N] {
+const fn gen_symm_state_table<const N: usize>() -> [[BoardSymmetryState; N]; N] {
   // Populate the table with dummy values for `BoardSymmetryState`, which will
   // be overwritten below. This is because const initialization of arrays is
   // clunky in rust.
@@ -310,8 +310,13 @@ pub fn board_symm_state<const N: usize>(onoro: &OnoroImpl<N>) -> BoardSymmetrySt
   let sum_of_mass = onoro.sum_of_mass();
   let pawns_in_play = onoro.pawns_in_play();
 
-  // TODO: use table for pawns_in_play == N
-  // if pawns_in_play == N as u32 { ... }
+  if const { N == 16 } && pawns_in_play == N as u32 {
+    const SYMM_TABLE_16: [[BoardSymmetryState; 16]; 16] = gen_symm_state_table::<16>();
+
+    let x = sum_of_mass.x() as u32 % N as u32;
+    let y = sum_of_mass.y() as u32 % N as u32;
+    return SYMM_TABLE_16[y as usize][x as usize];
+  }
 
   let x = sum_of_mass.x() as u32 % pawns_in_play;
   let y = sum_of_mass.y() as u32 % pawns_in_play;
