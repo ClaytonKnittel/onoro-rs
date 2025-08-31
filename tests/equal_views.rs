@@ -1,7 +1,12 @@
 use algebra::semigroup::Semigroup;
 use googletest::gtest;
-use onoro::{error::OnoroResult, groups::D6, test_util::BOARD_POSITIONS, Onoro};
-use onoro_impl::{benchmark_util::random_unfinished_state, Onoro16, OnoroView};
+use onoro::{
+  error::OnoroResult, groups::D6, hex_pos::HexPos, test_util::BOARD_POSITIONS, Onoro, TileState,
+};
+use onoro_impl::{
+  benchmark_util::{board_symm_state, random_unfinished_state, TestOnlyCompareViewsIgnoringHash},
+  Onoro16, OnoroView, PackedIdx,
+};
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use rstest::rstest;
 use rstest_reuse::{apply, template};
@@ -70,6 +75,66 @@ fn test_equal_view(board_string: &str, seed: u64) -> OnoroResult {
         "Failed on iteration {i} for rotation {op}"
       );
       assert_eq!(view1, view2, "Failed on iteration {i} for rotation {op}");
+    }
+  }
+
+  Ok(())
+}
+
+fn equal_slow(onoro1: &Onoro16, onoro2: &Onoro16) -> bool {
+  if onoro1.pawns_in_play() != onoro2.pawns_in_play() {
+    return false;
+  }
+
+  let symm_state1 = board_symm_state(onoro1);
+  let origin1 = onoro1.origin(&symm_state1);
+
+  D6::for_each().any(|op| {
+    let onoro2 = onoro2.rotated_d6_c(op);
+
+    let symm_state2 = board_symm_state(&onoro2);
+    let origin2 = onoro2.origin(&symm_state2);
+
+    onoro1.pawns().all(|pawn| {
+      let relative_pos = HexPos::from(pawn.pos) - origin1;
+      let onoro2_pos = relative_pos + origin2;
+
+      PackedIdx::maybe_from(onoro2_pos)
+        .is_some_and(|pos| TileState::from(pawn.color) == onoro2.get_tile(pos))
+    })
+  })
+}
+
+#[apply(random_states)]
+#[gtest]
+fn test_inequal_view(board_string: &str, seed: u64) -> OnoroResult {
+  let onoro = Onoro16::from_board_string(board_string)?;
+  let mut rng = StdRng::seed_from_u64(seed);
+
+  for i in 0..64 {
+    // Make between 1-30 random moves, preferring more moves.
+    let num_moves = rng.gen_range(1..=30).max(rng.gen_range(1..=30));
+    let onoro = random_unfinished_state(&onoro, num_moves, &mut rng)?;
+    // Make 1 - 4 more random moves.
+    let onoro2 = random_unfinished_state(&onoro, rng.gen_range(1..=4), &mut rng)?;
+
+    // Try comparing all rotations of the board.
+    for op in D6::for_each() {
+      let rotated = onoro2.rotated_d6_c(op);
+      let are_equal = equal_slow(&onoro, &rotated);
+
+      let view1 = OnoroView::new(onoro.clone());
+      let view2 = OnoroView::new(rotated);
+
+      if are_equal {
+        assert_eq!(view1, view2, "Failed on iteration {i} for rotation {op}");
+      } else {
+        assert_ne!(view1, view2, "Failed on iteration {i} for rotation {op}");
+        assert!(
+          !view1.cmp_views_ignoring_hash(&view2),
+          "Failed on iteration {i} for rotation {op}"
+        );
+      }
     }
   }
 

@@ -101,6 +101,63 @@ impl<I: PrimInt> Default for MinAndMax<I> {
   }
 }
 
+/// Sorts the 16-bit lanes of `vec`, returning the sorted result.
+#[allow(dead_code)]
+#[inline]
+#[target_feature(enable = "sse4.1")]
+pub fn sort_epi16(vec: __m128i) -> __m128i {
+  #[target_feature(enable = "sse4.1")]
+  fn sort_epi32_pairs<const SHUFFLE_MASK: i32>(vec: __m128i, lower_positions: __m128i) -> __m128i {
+    let shuffled = _mm_shuffle_epi32::<SHUFFLE_MASK>(vec);
+    let cmp = _mm_cmplt_epi16(vec, shuffled);
+    let select = _mm_add_epi8(cmp, lower_positions);
+    _mm_blendv_epi8(vec, shuffled, select)
+  }
+
+  #[target_feature(enable = "sse4.1")]
+  fn sort_epi8_pairs(vec: __m128i, shuffle_mask: __m128i, lower_positions: __m128i) -> __m128i {
+    let shuffled = _mm_shuffle_epi8(vec, shuffle_mask);
+    let cmp = _mm_cmplt_epi16(vec, shuffled);
+    let select = _mm_add_epi8(cmp, lower_positions);
+    _mm_blendv_epi8(vec, shuffled, select)
+  }
+
+  // Implemented using the optimal sorting network for size = 8:
+  // [(0,2),(1,3),(4,6),(5,7)]
+  // shuffled: [2, 3, 0, 1, 6, 7, 4, 5]
+  let vec = sort_epi32_pairs::<0b10_11_00_01>(vec, _mm_set1_epi64x(0x0000_0000_8080_8080));
+
+  // [(0,4),(1,5),(2,6),(3,7)]
+  // shuffled: [4, 5, 6, 7, 0, 1, 2, 3]
+  let vec =
+    sort_epi32_pairs::<0b01_00_11_10>(vec, _mm_set_epi64x(0, 0x8080_8080_8080_8080u64 as i64));
+
+  // [(0,1),(2,3),(4,5),(6,7)]
+  let vec = sort_epi8_pairs(
+    vec,
+    _mm_set_epi64x(0x0d0c_0f0e_0908_0b0a, 0x0504_0706_0100_0302),
+    _mm_set1_epi32(0x0000_8080),
+  );
+
+  // [(2,4),(3,5)]
+  let vec =
+    sort_epi32_pairs::<0b11_01_10_00>(vec, _mm_set1_epi64x(0x8080_8080_0000_0000u64 as i64));
+
+  // [(1,4),(3,6)]
+  let vec = sort_epi8_pairs(
+    vec,
+    _mm_set_epi64x(0x0f0e_0706_0b0a_0302, 0x0d0c_0504_0908_0100),
+    _mm_set1_epi32(0x8080_0000u32 as i32),
+  );
+
+  // [(1,2),(3,4),(5,6)]
+  sort_epi8_pairs(
+    vec,
+    _mm_set_epi64x(0x0f0e_0b0a_0d0c_0706, 0x0908_0302_0504_0100),
+    _mm_set1_epi32(0x8080_0000u32 as i32),
+  )
+}
+
 #[inline]
 #[target_feature(enable = "ssse3")]
 unsafe fn packed_positions_to_mask_sse3(packed_positions: u64) -> u64 {
@@ -340,9 +397,20 @@ pub fn packed_positions_coord_limits<const N: usize>(pawn_poses: &[PackedIdx; N]
 
 #[cfg(test)]
 mod tests {
+  #[cfg(target_feature = "sse4.1")]
+  use std::arch::x86_64::*;
+
+  #[cfg(target_feature = "sse4.1")]
+  use googletest::{gtest, prelude::*};
+  #[cfg(target_feature = "sse4.1")]
+  use itertools::Itertools;
+  #[cfg(target_feature = "sse4.1")]
+  use rand::{Rng, SeedableRng, rngs::StdRng};
   use rstest::rstest;
   use rstest_reuse::{apply, template};
 
+  #[cfg(target_feature = "sse4.1")]
+  use crate::util::sort_epi16;
   use crate::{
     PackedIdx,
     test_util::PawnPoses,
@@ -351,6 +419,52 @@ mod tests {
       packed_positions_coord_limits_slow, packed_positions_to_mask, packed_positions_to_mask_slow,
     },
   };
+
+  #[cfg(target_feature = "sse4.1")]
+  #[target_feature(enable = "sse4.1")]
+  fn pos_at_epi16(vec: __m128i, idx: usize) -> i16 {
+    debug_assert!(idx < 8);
+    let pawns = match idx {
+      0 => _mm_bsrli_si128::<0>(vec),
+      1 => _mm_bsrli_si128::<2>(vec),
+      2 => _mm_bsrli_si128::<4>(vec),
+      3 => _mm_bsrli_si128::<6>(vec),
+      4 => _mm_bsrli_si128::<8>(vec),
+      5 => _mm_bsrli_si128::<10>(vec),
+      6 => _mm_bsrli_si128::<12>(vec),
+      7 => _mm_bsrli_si128::<14>(vec),
+      _ => unreachable!(),
+    };
+    _mm_cvtsi128_si64x(pawns) as i16
+  }
+
+  #[cfg(target_feature = "sse4.1")]
+  #[gtest]
+  fn fuzz_sort_epi16() {
+    const ITERATIONS: u32 = 10_000;
+
+    let mut rng = StdRng::seed_from_u64(393990259);
+
+    for t in 0..ITERATIONS {
+      let list = (0..8).map(|_| rng.r#gen::<i16>()).collect_vec();
+      let expected_sorted_list = list.iter().cloned().sorted().collect_vec();
+
+      let sorted = unsafe {
+        sort_epi16(_mm_set_epi16(
+          list[7], list[6], list[5], list[4], list[3], list[2], list[1], list[0],
+        ))
+      };
+      let sorted_list = (0..8)
+        .map(|i| unsafe { pos_at_epi16(sorted, i) })
+        .collect_vec();
+
+      assert_that!(
+        sorted_list,
+        container_eq(expected_sorted_list),
+        "Failed on iteration {t}"
+      );
+    }
+  }
 
   #[template]
   #[rstest]
