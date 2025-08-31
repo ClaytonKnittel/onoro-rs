@@ -6,7 +6,7 @@ use onoro::{
 };
 use rand::Rng;
 
-use crate::{Move, Onoro16, OnoroImpl, canonical_view};
+use crate::{Move, Onoro16, OnoroImpl, OnoroView, canonical_view};
 
 pub type BenchCanonicalView = canonical_view::CanonicalView;
 
@@ -19,6 +19,16 @@ pub trait CheckWinBenchmark {
 impl<const N: usize> CheckWinBenchmark for OnoroImpl<N> {
   fn bench_check_win(&self, last_move: HexPos) -> bool {
     self.check_win(last_move)
+  }
+}
+
+pub trait TestOnlyCompareViewsIgnoringHash {
+  fn cmp_views_ignoring_hash(&self, other: &Self) -> bool;
+}
+
+impl<const N: usize> TestOnlyCompareViewsIgnoringHash for OnoroView<N> {
+  fn cmp_views_ignoring_hash(&self, other: &Self) -> bool {
+    self.cmp_views(other)
   }
 }
 

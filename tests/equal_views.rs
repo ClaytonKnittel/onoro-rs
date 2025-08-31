@@ -4,7 +4,7 @@ use onoro::{
   error::OnoroResult, groups::D6, hex_pos::HexPos, test_util::BOARD_POSITIONS, Onoro, TileState,
 };
 use onoro_impl::{
-  benchmark_util::{board_symm_state, random_unfinished_state},
+  benchmark_util::{board_symm_state, random_unfinished_state, TestOnlyCompareViewsIgnoringHash},
   Onoro16, OnoroView,
 };
 use rand::{rngs::StdRng, Rng, SeedableRng};
@@ -131,6 +131,10 @@ fn test_inequal_view(board_string: &str, seed: u64) -> OnoroResult {
         assert_eq!(view1, view2, "Failed on iteration {i} for rotation {op}");
       } else {
         assert_ne!(view1, view2, "Failed on iteration {i} for rotation {op}");
+        assert!(
+          !view1.cmp_views_ignoring_hash(&view2),
+          "Failed on iteration {i} for rotation {op}"
+        );
       }
     }
   }

@@ -76,6 +76,10 @@ impl<const N: usize> OnoroView<N> {
       let normalized_pos2 = apply_view_transform(&normalized_pos1);
       let pos2 = normalized_pos2.apply_d6_c(&denormalizing_op2) + origin2;
 
+      if !(1..15).contains(&pos2.x()) || !(1..15).contains(&pos2.y()) {
+        return false;
+      }
+
       match onoro2.get_tile(pos2.into()) {
         TileState::Black => {
           if same_color_turn {
@@ -96,7 +100,7 @@ impl<const N: usize> OnoroView<N> {
     })
   }
 
-  fn cmp_views<G: Group + Ordinal + Clone + Display, F>(
+  fn cmp_views_in_symm_class<G: Group + Ordinal + Clone + Display, F>(
     view1: &OnoroView<N>,
     view2: &OnoroView<N>,
     mut apply_view_transform: F,
@@ -131,25 +135,33 @@ impl<const N: usize> OnoroView<N> {
 
     pawns_equal
   }
-}
 
-impl<const N: usize> PartialEq for OnoroView<N> {
-  fn eq(&self, other: &Self) -> bool {
-    if self.canon_view().hash() != other.canon_view().hash()
-      || self.canon_view().symm_class() != other.canon_view().symm_class()
-    {
+  pub(crate) fn cmp_views(&self, other: &Self) -> bool {
+    if self.canon_view().symm_class() != other.canon_view().symm_class() {
       return false;
     }
 
     match self.canon_view().symm_class() {
-      SymmetryClass::C => Self::cmp_views(self, other, HexPosOffset::apply_d6_c),
-      SymmetryClass::V => Self::cmp_views(self, other, HexPosOffset::apply_d3_v),
-      SymmetryClass::E => Self::cmp_views(self, other, HexPosOffset::apply_k4_e),
-      SymmetryClass::CV => Self::cmp_views(self, other, HexPosOffset::apply_c2_cv),
-      SymmetryClass::CE => Self::cmp_views(self, other, HexPosOffset::apply_c2_ce),
-      SymmetryClass::EV => Self::cmp_views(self, other, HexPosOffset::apply_c2_ev),
-      SymmetryClass::Trivial => Self::cmp_views(self, other, HexPosOffset::apply_trivial),
+      SymmetryClass::C => Self::cmp_views_in_symm_class(self, other, HexPosOffset::apply_d6_c),
+      SymmetryClass::V => Self::cmp_views_in_symm_class(self, other, HexPosOffset::apply_d3_v),
+      SymmetryClass::E => Self::cmp_views_in_symm_class(self, other, HexPosOffset::apply_k4_e),
+      SymmetryClass::CV => Self::cmp_views_in_symm_class(self, other, HexPosOffset::apply_c2_cv),
+      SymmetryClass::CE => Self::cmp_views_in_symm_class(self, other, HexPosOffset::apply_c2_ce),
+      SymmetryClass::EV => Self::cmp_views_in_symm_class(self, other, HexPosOffset::apply_c2_ev),
+      SymmetryClass::Trivial => {
+        Self::cmp_views_in_symm_class(self, other, HexPosOffset::apply_trivial)
+      }
     }
+  }
+}
+
+impl<const N: usize> PartialEq for OnoroView<N> {
+  fn eq(&self, other: &Self) -> bool {
+    if self.canon_view().hash() != other.canon_view().hash() {
+      return false;
+    }
+
+    self.cmp_views(other)
   }
 }
 
