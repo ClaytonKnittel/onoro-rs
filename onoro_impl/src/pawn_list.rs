@@ -101,25 +101,6 @@ impl PawnList8 {
   }
 
   #[target_feature(enable = "sse4.1")]
-  fn y_ones() -> __m128i {
-    _mm_set1_epi16(0x0100)
-  }
-
-  #[target_feature(enable = "sse4.1")]
-  fn negate_x(pawns: __m128i) -> __m128i {
-    let x_mask = _mm_set1_epi16(0x00ff);
-    let add_x_mask = Self::x_ones();
-    _mm_add_epi8(_mm_xor_si128(pawns, x_mask), add_x_mask)
-  }
-
-  #[target_feature(enable = "sse4.1")]
-  fn negate_y(pawns: __m128i) -> __m128i {
-    let y_mask = _mm_set1_epi16(0xff00u16 as i16);
-    let add_y_mask = Self::y_ones();
-    _mm_add_epi8(_mm_xor_si128(pawns, y_mask), add_y_mask)
-  }
-
-  #[target_feature(enable = "sse4.1")]
   fn negate_xy(pawns: __m128i) -> __m128i {
     _mm_sub_epi8(_mm_setzero_si128(), pawns)
   }

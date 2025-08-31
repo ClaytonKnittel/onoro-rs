@@ -23,7 +23,8 @@ use crate::{
   canonicalize::board_symm_state,
   r#move::Move,
   onoro_defs::{Onoro16, Onoro16View},
-  util::unlikely,
+  pawn_list::PawnList8,
+  util::{unlikely, unreachable},
 };
 
 /// A wrapper over Onoro states that caches the hash of the game state and it's
@@ -100,6 +101,50 @@ impl<const N: usize> OnoroView<N> {
     })
   }
 
+  #[target_feature(enable = "sse4.1")]
+  fn pawns_equal_with_transform_fast<F>(
+    onoro1: &OnoroImpl<N>,
+    onoro2: &OnoroImpl<N>,
+    mut apply_to_view2_transform: F,
+  ) -> bool
+  where
+    F: FnMut(&PawnList8) -> PawnList8,
+  {
+    if const { N != 16 } {
+      unreachable()
+    }
+
+    let symm_state1 = board_symm_state(onoro1);
+    let symm_state2 = board_symm_state(onoro2);
+    let normalizing_op1 = symm_state1.op;
+    let normalizing_op2 = symm_state2.op;
+    let origin1 = onoro1.origin(&symm_state1);
+    let origin2 = onoro2.origin(&symm_state2);
+
+    let pawn_poses1: &[PackedIdx; 16] =
+      unsafe { (onoro1.pawn_poses() as &[_]).try_into().unwrap_unchecked() };
+    let pawn_poses2: &[PackedIdx; 16] =
+      unsafe { (onoro2.pawn_poses() as &[_]).try_into().unwrap_unchecked() };
+    let black_pawns1 = PawnList8::extract_black_pawns(pawn_poses1, origin1);
+    let white_pawns1 = PawnList8::extract_white_pawns(pawn_poses1, origin1);
+    let black_pawns2 = PawnList8::extract_black_pawns(pawn_poses2, origin2);
+    let white_pawns2 = PawnList8::extract_white_pawns(pawn_poses2, origin2);
+
+    let black_pawns1 = apply_to_view2_transform(&black_pawns1.apply_d6_c(&normalizing_op1));
+    let white_pawns1 = apply_to_view2_transform(&white_pawns1.apply_d6_c(&normalizing_op1));
+    let black_pawns2 = black_pawns2.apply_d6_c(&normalizing_op2);
+    let white_pawns2 = white_pawns2.apply_d6_c(&normalizing_op2);
+
+    let (black_pawns2, white_pawns2) = if onoro1.player_color() == onoro2.player_color() {
+      (black_pawns2, white_pawns2)
+    } else {
+      (white_pawns2, black_pawns2)
+    };
+
+    black_pawns1.equal_ignoring_order(black_pawns2)
+      && white_pawns1.equal_ignoring_order(white_pawns2)
+  }
+
   fn cmp_views_in_symm_class<G: Group + Ordinal + Clone + Display, F>(
     view1: &OnoroView<N>,
     view2: &OnoroView<N>,
@@ -136,11 +181,47 @@ impl<const N: usize> OnoroView<N> {
     pawns_equal
   }
 
-  pub(crate) fn cmp_views(&self, other: &Self) -> bool {
-    if self.canon_view().symm_class() != other.canon_view().symm_class() {
+  #[target_feature(enable = "sse4.1")]
+  fn cmp_views_in_symm_class_fast<G: Group + Ordinal + Clone + Display, F>(
+    view1: &OnoroView<N>,
+    view2: &OnoroView<N>,
+    mut apply_view_transform: F,
+  ) -> bool
+  where
+    F: FnMut(&PawnList8, &G) -> PawnList8,
+  {
+    let onoro1 = &view1.onoro;
+    let onoro2 = &view2.onoro;
+
+    if onoro1.pawns_in_play() != onoro2.pawns_in_play() {
       return false;
     }
 
+    let canon_op1 = G::from_ord(view1.canon_view().op_ord() as usize);
+    let canon_op2 = G::from_ord(view2.canon_view().op_ord() as usize);
+    let to_view2 = canon_op2.inverse() * canon_op1;
+
+    let pawns_equal = Self::pawns_equal_with_transform_fast(onoro1, onoro2, |pawn_list| {
+      apply_view_transform(pawn_list, &to_view2)
+    });
+
+    // In the extremely unlikely case of a hash collision, the best-guess
+    // canonical orientations may not have produced equal orientations. As a
+    // fallback, we can simply check every other possible view transform.
+    if unlikely(!pawns_equal) {
+      return G::for_each().skip(1).any(|op| {
+        debug_assert!(op != G::identity());
+        let to_view2 = op * to_view2.clone();
+        Self::pawns_equal_with_transform_fast(onoro1, onoro2, |pawn_list| {
+          apply_view_transform(pawn_list, &to_view2)
+        })
+      });
+    }
+
+    pawns_equal
+  }
+
+  fn cmp_views_dispatch(&self, other: &Self) -> bool {
     match self.canon_view().symm_class() {
       SymmetryClass::C => Self::cmp_views_in_symm_class(self, other, HexPosOffset::apply_d6_c),
       SymmetryClass::V => Self::cmp_views_in_symm_class(self, other, HexPosOffset::apply_d3_v),
@@ -152,6 +233,33 @@ impl<const N: usize> OnoroView<N> {
         Self::cmp_views_in_symm_class(self, other, HexPosOffset::apply_trivial)
       }
     }
+  }
+
+  #[target_feature(enable = "sse4.1")]
+  fn cmp_views_fast_dispatch(&self, other: &Self) -> bool {
+    match self.canon_view().symm_class() {
+      SymmetryClass::C => Self::cmp_views_in_symm_class_fast(self, other, PawnList8::apply_d6_c),
+      SymmetryClass::V => Self::cmp_views_in_symm_class_fast(self, other, PawnList8::apply_d3_v),
+      SymmetryClass::E => Self::cmp_views_in_symm_class_fast(self, other, PawnList8::apply_k4_e),
+      SymmetryClass::CV => Self::cmp_views_in_symm_class_fast(self, other, PawnList8::apply_c2_cv),
+      SymmetryClass::CE => Self::cmp_views_in_symm_class_fast(self, other, PawnList8::apply_c2_ce),
+      SymmetryClass::EV => Self::cmp_views_in_symm_class_fast(self, other, PawnList8::apply_c2_ev),
+      SymmetryClass::Trivial => {
+        Self::cmp_views_in_symm_class_fast(self, other, PawnList8::apply_trivial)
+      }
+    }
+  }
+
+  pub(crate) fn cmp_views(&self, other: &Self) -> bool {
+    if self.canon_view().symm_class() != other.canon_view().symm_class() {
+      return false;
+    }
+
+    #[cfg(target_feature = "sse4.1")]
+    if const { N == 16 } {
+      return unsafe { self.cmp_views_fast_dispatch(other) };
+    }
+    self.cmp_views_dispatch(other)
   }
 }
 
