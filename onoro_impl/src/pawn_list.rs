@@ -18,6 +18,54 @@ use crate::{PackedIdx, util::unreachable};
 const N: usize = 16;
 
 #[cfg(target_feature = "sse4.1")]
+#[repr(align(16))]
+struct MM128Contents([i8; 16]);
+
+#[cfg(target_feature = "sse4.1")]
+impl MM128Contents {
+  #[target_feature(enable = "sse4.1")]
+  fn load(&self) -> __m128i {
+    unsafe { _mm_load_si128(self.0.as_ptr() as *const _) }
+  }
+
+  const fn noop_mask() -> MM128Contents {
+    MM128Contents([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15])
+  }
+
+  const fn zero_mask() -> MM128Contents {
+    MM128Contents([-1; 16])
+  }
+
+  const fn swap_xy_mask() -> MM128Contents {
+    MM128Contents([1, 0, 3, 2, 5, 4, 7, 6, 9, 8, 11, 10, 13, 12, 15, 14])
+  }
+
+  const fn isolate_x_mask() -> MM128Contents {
+    MM128Contents([0, -1, 2, -1, 4, -1, 6, -1, 8, -1, 10, -1, 12, -1, 14, -1])
+  }
+
+  const fn isolate_y_mask() -> MM128Contents {
+    MM128Contents([-1, 1, -1, 3, -1, 5, -1, 7, -1, 9, -1, 11, -1, 13, -1, 15])
+  }
+
+  const fn duplicate_x_mask() -> MM128Contents {
+    MM128Contents([0, 0, 2, 2, 4, 4, 6, 6, 8, 8, 10, 10, 12, 12, 14, 14])
+  }
+
+  const fn duplicate_y_mask() -> MM128Contents {
+    MM128Contents([1, 1, 3, 3, 5, 5, 7, 7, 9, 9, 11, 11, 13, 13, 15, 15])
+  }
+
+  const fn move_x_to_y_mask() -> MM128Contents {
+    MM128Contents([-1, 0, -1, 2, -1, 4, -1, 6, -1, 8, -1, 10, -1, 12, -1, 14])
+  }
+
+  const fn move_y_to_x_mask() -> MM128Contents {
+    MM128Contents([1, -1, 3, -1, 5, -1, 7, -1, 9, -1, 11, -1, 13, -1, 15, -1])
+  }
+}
+
+#[cfg(target_feature = "sse4.1")]
 #[derive(Clone, Copy)]
 pub struct PawnList8 {
   /// Stores 8 pawns, with x- and y- coordinates in back-to-back epi8 channels.
@@ -300,20 +348,44 @@ impl PawnList8 {
 
   #[target_feature(enable = "sse4.1")]
   fn apply_d6_c_sse(&self, op: &D6) -> Self {
-    match op {
-      D6::Rot(0) => *self,
-      D6::Rot(1) => self.c_r1(),
-      D6::Rot(2) => self.c_r2(),
-      D6::Rot(3) => self.c_r3(),
-      D6::Rot(4) => self.c_r4(),
-      D6::Rot(5) => self.c_r5(),
-      D6::Rfl(0) => self.c_s0(),
-      D6::Rfl(1) => self.c_s1(),
-      D6::Rfl(2) => self.c_s2(),
-      D6::Rfl(3) => self.c_s3(),
-      D6::Rfl(4) => self.c_s4(),
-      D6::Rfl(5) => self.c_s5(),
-      _ => unreachable(),
+    use algebra::ordinal::Ordinal;
+
+    const POSITIVE_MASKS: [MM128Contents; 12] = [
+      MM128Contents::noop_mask(),
+      MM128Contents::duplicate_x_mask(),
+      MM128Contents::move_x_to_y_mask(),
+      MM128Contents::zero_mask(),
+      MM128Contents::move_y_to_x_mask(),
+      MM128Contents::duplicate_y_mask(),
+      MM128Contents::isolate_x_mask(),
+      MM128Contents::duplicate_x_mask(),
+      MM128Contents::swap_xy_mask(),
+      MM128Contents::duplicate_y_mask(),
+      MM128Contents::isolate_y_mask(),
+      MM128Contents::zero_mask(),
+    ];
+    const NEGATIVE_MASKS: [MM128Contents; 12] = [
+      MM128Contents::zero_mask(),
+      MM128Contents::move_y_to_x_mask(),
+      MM128Contents::duplicate_y_mask(),
+      MM128Contents::noop_mask(),
+      MM128Contents::duplicate_x_mask(),
+      MM128Contents::move_x_to_y_mask(),
+      MM128Contents::duplicate_y_mask(),
+      MM128Contents::isolate_y_mask(),
+      MM128Contents::zero_mask(),
+      MM128Contents::isolate_x_mask(),
+      MM128Contents::duplicate_x_mask(),
+      MM128Contents::swap_xy_mask(),
+    ];
+
+    let positive_mask = POSITIVE_MASKS[op.ord()].load();
+    let negative_mask = NEGATIVE_MASKS[op.ord()].load();
+    let positive = _mm_shuffle_epi8(self.pawns, positive_mask);
+    let negative = _mm_shuffle_epi8(self.pawns, negative_mask);
+    Self {
+      pawns: _mm_sub_epi8(positive, negative),
+      ..*self
     }
   }
 
