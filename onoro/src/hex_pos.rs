@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::{fmt::Display, hint::unreachable_unchecked};
 
 use algebra::group::{Cyclic, Trivial};
 
@@ -264,7 +264,7 @@ impl HexPosOffset {
       D6::Rfl(3) => self.c_s3(),
       D6::Rfl(4) => self.c_s4(),
       D6::Rfl(5) => self.c_s5(),
-      _ => unreachable!(),
+      _ => unsafe { unreachable_unchecked() },
     }
   }
 
@@ -277,7 +277,7 @@ impl HexPosOffset {
       D3::Rfl(0) => self.v_s1(),
       D3::Rfl(1) => self.v_s3(),
       D3::Rfl(2) => self.v_s5(),
-      _ => unreachable!(),
+      _ => unsafe { unreachable_unchecked() },
     }
   }
 
@@ -289,7 +289,7 @@ impl HexPosOffset {
       (Cyclic::<2>(1), Cyclic::<2>(0)) => self.e_s0(),
       (Cyclic::<2>(0), Cyclic::<2>(1)) => self.e_s3(),
       (Cyclic::<2>(1), Cyclic::<2>(1)) => self.e_r3(),
-      _ => unreachable!(),
+      _ => unsafe { unreachable_unchecked() },
     }
   }
 
@@ -299,7 +299,7 @@ impl HexPosOffset {
     match op {
       Cyclic::<2>(0) => *self,
       Cyclic::<2>(1) => self.c_s1(),
-      _ => unreachable!(),
+      _ => unsafe { unreachable_unchecked() },
     }
   }
 
@@ -309,7 +309,7 @@ impl HexPosOffset {
     match op {
       Cyclic::<2>(0) => *self,
       Cyclic::<2>(1) => self.c_s0(),
-      _ => unreachable!(),
+      _ => unsafe { unreachable_unchecked() },
     }
   }
 
@@ -318,7 +318,7 @@ impl HexPosOffset {
     match op {
       Cyclic::<2>(0) => *self,
       Cyclic::<2>(1) => self.e_s3(),
-      _ => unreachable!(),
+      _ => unsafe { unreachable_unchecked() },
     }
   }
 

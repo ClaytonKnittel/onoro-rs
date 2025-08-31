@@ -4,6 +4,8 @@ use algebra::group::{Cyclic, Group};
 
 use onoro::groups::{C2, D3, D6, K4};
 
+use crate::util::unreachable;
+
 pub(crate) const C_MASK: u64 = 0x0fff_ffff_ffff_ffff;
 pub(crate) const V_MASK: u64 = 0x0fff_ffff_ffff_ffff;
 pub(crate) const E_MASK: u64 = 0xffff_ffff_ffff_ffff;
@@ -132,7 +134,7 @@ impl HashGroup<D6> {
       D6::Rfl(3) => Self::s3(self.hash),
       D6::Rfl(4) => Self::s4(self.hash),
       D6::Rfl(5) => Self::s5(self.hash),
-      _ => unreachable!(),
+      _ => unreachable(),
     })
   }
 
@@ -219,7 +221,7 @@ impl HashGroup<D6> {
       D6::Rot(0) | D6::Rot(2) | D6::Rot(3) | D6::Rot(4) | D6::Rot(5) => {
         panic!("Attempted to make D6 hash invariant under invalid rotation")
       }
-      _ => unreachable!(),
+      _ => unreachable(),
     })
   }
 }
@@ -269,7 +271,7 @@ impl HashGroup<D3> {
       D3::Rfl(0) => Self::s0(self.hash),
       D3::Rfl(1) => Self::s1(self.hash),
       D3::Rfl(2) => Self::s2(self.hash),
-      _ => unreachable!(),
+      _ => unreachable(),
     })
   }
 
@@ -313,7 +315,7 @@ impl HashGroup<D3> {
       D3::Rot(0) | D3::Rot(2) => {
         panic!("Attempted to make D3 hash invariant under invalid rotation.")
       }
-      _ => unreachable!(),
+      _ => unreachable(),
     })
   }
 }
@@ -344,7 +346,7 @@ impl HashGroup<K4> {
       (Cyclic::<2>(1), Cyclic::<2>(0)) => Self::a(self.hash),
       (Cyclic::<2>(0), Cyclic::<2>(1)) => Self::b(self.hash),
       (Cyclic::<2>(1), Cyclic::<2>(1)) => Self::c(self.hash),
-      _ => unreachable!(),
+      _ => unreachable(),
     })
   }
 
@@ -374,7 +376,7 @@ impl HashGroup<K4> {
       (Cyclic::<2>(0), Cyclic::<2>(0)) => {
         panic!("Attempted to make K4 hash invariant under invalid rotation.")
       }
-      _ => unreachable!(),
+      _ => unreachable(),
     })
   }
 }
@@ -388,7 +390,7 @@ impl HashGroup<C2> {
     Self::new(match op {
       Cyclic::<2>(0) => self.hash,
       Cyclic::<2>(1) => Self::a(self.hash),
-      _ => unreachable!(),
+      _ => unreachable(),
     })
   }
 
@@ -404,7 +406,7 @@ impl HashGroup<C2> {
       Cyclic::<2>(0) => {
         panic!("Attempted to make C2 hash invariant under identity op.")
       }
-      _ => unreachable!(),
+      _ => unreachable(),
     })
   }
 }

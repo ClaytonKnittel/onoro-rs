@@ -25,12 +25,6 @@ pub struct PawnList8 {
   zero_poses: __m128i,
 }
 
-#[cfg(not(target_feature = "sse4.1"))]
-#[derive(Clone, Copy)]
-pub struct PawnList8 {
-  pawns: [HexPosOffset; 8],
-}
-
 #[cfg(target_feature = "sse4.1")]
 impl PawnList8 {
   #[target_feature(enable = "sse4.1")]
@@ -560,6 +554,12 @@ impl PawnList8 {
 }
 
 #[cfg(not(target_feature = "sse4.1"))]
+#[derive(Clone, Copy)]
+pub struct PawnList8 {
+  pawns: [HexPosOffset; 8],
+}
+
+#[cfg(not(target_feature = "sse4.1"))]
 impl PawnList8 {
   pub fn extract_black_pawns(pawn_poses: &[PackedIdx; N], origin: HexPos) -> Self {
     let pawns = [
@@ -631,21 +631,8 @@ impl PawnList8 {
 
   /// Returns true if the two pawn lists are equal ignoring the order of the
   /// elements.
-  pub fn equal_ignoring_order(&self, other: PawnList8) -> bool {
-    let pawns1 = self
-      .pawns
-      .iter()
-      .map(|pos| (pos.x(), pos.y()))
-      .sorted()
-      .collect_vec();
-    let pawns2 = other
-      .pawns
-      .iter()
-      .map(|pos| (pos.x(), pos.y()))
-      .sorted()
-      .collect_vec();
-
-    pawns1 == pawns2
+  pub fn equal_ignoring_order(&self, other: Self) -> bool {
+    self.pawns.iter().all(|pos| other.pawns.contains(pos))
   }
 }
 
@@ -686,18 +673,13 @@ mod tests {
     HexPosOffset::new((pos & 0xff) as i8 as i32, ((pos >> 8) & 0xff) as i8 as i32)
   }
 
-  #[cfg(not(target_feature = "sse4.1"))]
-  fn pos_at_slow(pawn_list: &PawnList8, idx: usize) -> HexPosOffset {
-    pawn_list.pawns[idx]
-  }
-
   fn pos_at(pawn_list: &PawnList8, idx: usize) -> HexPosOffset {
     #[cfg(target_feature = "sse4.1")]
     unsafe {
       pos_at_sse(pawn_list, idx)
     }
     #[cfg(not(target_feature = "sse4.1"))]
-    pos_at_slow(pawn_list, idx)
+    pawn_list.pawns[idx]
   }
 
   fn positions(pawn_list: &PawnList8) -> Vec<HexPosOffset> {
