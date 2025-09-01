@@ -463,18 +463,21 @@ impl PawnList8 {
     }
   }
 
+  #[target_feature(enable = "sse4.1")]
+  fn broadcast_hex_pos(pos: HexPos) -> __m128i {
+    let x = pos.x();
+    let y = pos.y();
+    if x > u8::MAX as u32 || y > u8::MAX as u32 {
+      unreachable();
+    }
+    _mm_set1_epi16((x | (y << 8)) as i16)
+  }
+
   /// Subtracts `origin` from each coordinate pair in adjacent epi8 lanes of
   /// `pawns`, making each coordinate relative to `origin`.
   #[target_feature(enable = "sse4.1")]
   fn centered_by(pawns: __m128i, origin: HexPos) -> __m128i {
-    let x = origin.x();
-    let y = origin.y();
-    if x > u8::MAX as u32 || y > u8::MAX as u32 {
-      unreachable();
-    }
-    // Broadcast origin to all epi16 lanes.
-    let origin_array = _mm_set1_epi16((x | (y << 8)) as i16);
-
+    let origin_array = Self::broadcast_hex_pos(origin);
     _mm_sub_epi8(pawns, origin_array)
   }
 
@@ -519,7 +522,7 @@ impl PawnList8 {
   /// pawns array when the coordinates were extracted. This is an impossible
   /// relative coordinate given we are playing with 16 pawns)
   #[target_feature(enable = "sse4.1")]
-  fn masked_pawns(&self) -> __m128i {
+  fn remove_null_pawns(&self) -> __m128i {
     let impossible_coords = _mm_set1_epi8(i8::MAX);
     _mm_blendv_epi8(self.pawns, impossible_coords, self.null_mask)
   }
@@ -533,8 +536,8 @@ impl PawnList8 {
       _mm_movemask_epi8(other.null_mask).count_ones()
     );
 
-    let pawns1 = self.masked_pawns();
-    let pawns2 = other.masked_pawns();
+    let pawns1 = self.remove_null_pawns();
+    let pawns2 = other.remove_null_pawns();
 
     // Replicate each of the lower/higher four epi16 channels into adjacent
     // pairs of channels.
@@ -566,6 +569,45 @@ impl PawnList8 {
   /// order.
   pub fn equal_ignoring_order(&self, other: PawnList8) -> bool {
     unsafe { self.equal_ignoring_order_sse(other) }
+  }
+
+  #[target_feature(enable = "sse4.1")]
+  fn zero_null_pawns(&self, pawns: __m128i) -> __m128i {
+    _mm_andnot_si128(self.null_mask, pawns)
+  }
+
+  #[target_feature(enable = "sse4.1")]
+  fn pawn_indices_sse<const N: usize>(&self, origin: HexPos) -> impl Iterator<Item = usize> {
+    use crate::util::MM128Iter;
+
+    debug_assert!(N.is_power_of_two());
+
+    let origin_array = Self::broadcast_hex_pos(origin);
+    let absolute_pawns = _mm_add_epi8(self.pawns, origin_array);
+    let x_coords_mask = _mm_set1_epi16(0x00_ff);
+    let x_coords = _mm_and_si128(absolute_pawns, x_coords_mask);
+
+    let y_coords_mask = _mm_set1_epi16(0xff_00u16 as i16);
+    let y_coords = _mm_and_si128(absolute_pawns, y_coords_mask);
+
+    let y_shifted = match 8 - N.trailing_zeros() {
+      0 => _mm_srli_epi16::<0>(y_coords),
+      1 => _mm_srli_epi16::<1>(y_coords),
+      2 => _mm_srli_epi16::<2>(y_coords),
+      3 => _mm_srli_epi16::<3>(y_coords),
+      4 => _mm_srli_epi16::<4>(y_coords),
+      5 => _mm_srli_epi16::<5>(y_coords),
+      6 => _mm_srli_epi16::<6>(y_coords),
+      7 => _mm_srli_epi16::<7>(y_coords),
+      _ => unreachable(),
+    };
+
+    let indices = _mm_add_epi16(x_coords, y_shifted);
+    indices.iter_epi16().map(|i| i as usize)
+  }
+
+  pub fn pawn_indices<const N: usize>(&self, origin: HexPos) -> impl Iterator<Item = usize> {
+    unsafe { self.pawn_indices_sse::<N>(origin) }
   }
 }
 
@@ -960,5 +1002,27 @@ mod tests {
     let black_pawns1 = PawnList8::extract_black_pawns(&poses1, origin);
     let black_pawns2 = PawnList8::extract_black_pawns(&poses2, origin);
     assert!(!black_pawns1.equal_ignoring_order(black_pawns2));
+  }
+
+  #[gtest]
+  fn test_pawn_indices() {
+    for y in 1..=15 {
+      let mut poses = [PackedIdx::null(); N];
+      for (x, pos) in poses.iter_mut().step_by(2).enumerate() {
+        *pos = PackedIdx::new(x as u32 + 1, y);
+      }
+
+      let center = HexPos::new(6, 10);
+      let pawns = PawnList8::extract_black_pawns(&poses, center);
+
+      let expected_indices = poses
+        .iter()
+        .step_by(2)
+        .map(|&idx| idx.x() as usize + idx.y() as usize * N)
+        .collect_vec();
+
+      let indices = pawns.pawn_indices::<N>(center).collect_vec();
+      assert_that!(indices, container_eq(expected_indices));
+    }
   }
 }

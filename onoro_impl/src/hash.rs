@@ -19,6 +19,8 @@ use crate::{
   const_rand::Xoroshiro128,
   tile_hash::{C_MASK, E_MASK, TileHash, V_MASK},
 };
+#[cfg(target_feature = "sse4.1")]
+use crate::{PackedIdx, pawn_list::PawnList8};
 
 #[derive(Debug)]
 struct ConstTable<T, const N: usize> {
@@ -70,7 +72,56 @@ impl<const N: usize, G: Group> HashTable<N, G> {
     onoro: &OnoroImpl<ONORO_N>,
     symm_state: &BoardSymmetryState,
   ) -> u64 {
+    debug_assert!(ONORO_N <= N);
+
+    #[cfg(target_feature = "sse4.1")]
+    if const { ONORO_N == 16 } {
+      return self.hash_fast(onoro, symm_state);
+    }
+
     let origin = onoro.origin(symm_state);
+    onoro.pawns().fold(0u64, |hash, pawn| {
+      // The position of the pawn relative to the rotation-invariant origin of
+      // the board.
+      let pos = HexPos::from(pawn.pos) - origin;
+      // The position of the pawn normalized to align board states on all
+      // symmetry axes which the board isn't possibly symmetric about itself.
+      let normalized_pos = pos.apply_d6_c(&D6::from_ord(symm_state.op_ord()));
+      // The position of the pawn in table space, relative to the center of the
+      // hash table.
+      let table_pos = normalized_pos + Self::center();
+      // The index of the tile this pawn is on.
+      let table_idx = Self::hex_pos_ord(&table_pos);
+      let tile_hash = &self[table_idx];
+
+      let pawn_hash = if pawn.color == onoro.player_color() {
+        tile_hash.cur_player_hash()
+      } else {
+        tile_hash.other_player_hash()
+      };
+
+      // Zobrist hashing accumulates all hashes with xor.
+      hash ^ pawn_hash
+    })
+  }
+
+  #[cfg(target_feature = "sse4.1")]
+  #[inline]
+  pub fn hash_fast<const ONORO_N: usize>(
+    &self,
+    onoro: &OnoroImpl<ONORO_N>,
+    symm_state: &BoardSymmetryState,
+  ) -> u64 {
+    let origin = onoro.origin(symm_state);
+
+    let pawn_poses: &[PackedIdx; 16] =
+      unsafe { (onoro.pawn_poses() as &[_]).try_into().unwrap_unchecked() };
+    let black_pawns = PawnList8::extract_black_pawns(pawn_poses, origin);
+    let white_pawns = PawnList8::extract_white_pawns(pawn_poses, origin);
+
+    let black_pawns = black_pawns.apply_d6_c(symm_state.op_ord());
+    let white_pawns = white_pawns.apply_d6_c(symm_state.op_ord());
+
     onoro.pawns().fold(0u64, |hash, pawn| {
       // The position of the pawn relative to the rotation-invariant origin of
       // the board.
