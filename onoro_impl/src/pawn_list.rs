@@ -1,12 +1,12 @@
-#[cfg(target_feature = "sse4.1")]
+#[cfg(target_feature = "ssse3")]
 use std::arch::x86_64::*;
 
-#[cfg(not(target_feature = "sse4.1"))]
+#[cfg(not(target_feature = "ssse3"))]
 use algebra::{group::Trivial, ordinal::Ordinal};
-#[cfg(not(target_feature = "sse4.1"))]
+#[cfg(not(target_feature = "ssse3"))]
 use itertools::Itertools;
 use onoro::{groups::SymmetryClass, hex_pos::HexPos};
-#[cfg(not(target_feature = "sse4.1"))]
+#[cfg(not(target_feature = "ssse3"))]
 use onoro::{
   groups::{C2, D3, D6, K4},
   hex_pos::HexPosOffset,
@@ -16,14 +16,14 @@ use crate::{PackedIdx, util::unreachable};
 
 const N: usize = 16;
 
-#[cfg(target_feature = "sse4.1")]
+#[cfg(target_feature = "ssse3")]
 #[derive(Clone, Copy)]
 #[repr(align(16))]
 struct MM128Contents([i8; 16]);
 
-#[cfg(target_feature = "sse4.1")]
+#[cfg(target_feature = "ssse3")]
 impl MM128Contents {
-  #[target_feature(enable = "sse4.1")]
+  #[target_feature(enable = "ssse3")]
   fn load(&self) -> __m128i {
     unsafe { _mm_load_si128(self.0.as_ptr() as *const _) }
   }
@@ -98,7 +98,7 @@ impl MM128Contents {
   }
 }
 
-#[cfg(target_feature = "sse4.1")]
+#[cfg(target_feature = "ssse3")]
 mod rotate_impl {
   use std::arch::x86_64::*;
 
@@ -178,7 +178,7 @@ mod rotate_impl {
 
   /// Applies the `D6` symmetry operation to every pair of epi8 lanes, treated as
   /// coordinate pairs centered at (0, 0).
-  #[target_feature(enable = "sse4.1")]
+  #[target_feature(enable = "ssse3")]
   #[inline]
   pub fn apply_d6_c_sse(pawns: __m128i, op_ord: usize) -> __m128i {
     let positive_mask = unsafe { D6_POSITIVE_MASKS.get_unchecked(op_ord) }.load();
@@ -374,7 +374,7 @@ mod rotate_impl {
   /// lanes, treated as coordinate pairs centered at (0, 0), per the provided
   /// symmetry class and operation ordinal (whose interpretation is determined
   /// by the symmetry class).
-  #[target_feature(enable = "sse4.1")]
+  #[target_feature(enable = "ssse3")]
   #[inline]
   pub fn apply_sse(pawns: __m128i, symm_class: SymmetryClass, op_ord: usize) -> __m128i {
     let idx = symmetry_class_offset(symm_class) + op_ord;
@@ -390,17 +390,18 @@ mod rotate_impl {
 
 /// Stores a list of 8 pawns in an __m128i register, with each adjacent pair of
 /// epi8 lanes containing the origin-relative x- and y- coordinates of a pawn.
-#[cfg(target_feature = "sse4.1")]
+#[cfg(target_feature = "ssse3")]
 #[derive(Clone, Copy)]
 pub struct PawnList8 {
   /// Stores 8 pawns, with x- and y- coordinates in back-to-back epi8 channels.
   pawns: __m128i,
-  zero_poses: __m128i,
+  /// A mask of the pawns in `pawns` which were originally `PackedIdx::null()`.
+  null_poses: __m128i,
 }
 
-#[cfg(target_feature = "sse4.1")]
+#[cfg(target_feature = "ssse3")]
 impl PawnList8 {
-  #[target_feature(enable = "sse4.1")]
+  #[target_feature(enable = "ssse3")]
   fn extract_black_pawns_sse(pawn_poses: &[PackedIdx; N], origin: HexPos) -> Self {
     let pawns = unsafe { _mm_loadu_si128(pawn_poses.as_ptr() as *const _) };
 
@@ -412,17 +413,17 @@ impl PawnList8 {
     let y_coords = _mm_slli_epi16::<4>(y_coords);
 
     let pawns = _mm_or_si128(x_coords, y_coords);
-    let zero_poses = _mm_cmpeq_epi16(pawns, _mm_setzero_si128());
+    let null_poses = _mm_cmpeq_epi16(pawns, _mm_setzero_si128());
 
     let centered_pawns = Self::centered_by(pawns, origin);
 
     Self {
       pawns: centered_pawns,
-      zero_poses,
+      null_poses,
     }
   }
 
-  #[target_feature(enable = "sse4.1")]
+  #[target_feature(enable = "ssse3")]
   fn extract_white_pawns_sse(pawn_poses: &[PackedIdx; N], origin: HexPos) -> Self {
     let pawns = unsafe { _mm_loadu_si128(pawn_poses.as_ptr() as *const _) };
 
@@ -435,17 +436,17 @@ impl PawnList8 {
     let y_coords = _mm_srli_epi16::<4>(y_coords);
 
     let pawns = _mm_or_si128(x_coords, y_coords);
-    let zero_poses = _mm_cmpeq_epi16(pawns, _mm_setzero_si128());
+    let null_poses = _mm_cmpeq_epi16(pawns, _mm_setzero_si128());
 
     let centered_pawns = Self::centered_by(pawns, origin);
 
     Self {
       pawns: centered_pawns,
-      zero_poses,
+      null_poses,
     }
   }
 
-  #[target_feature(enable = "sse4.1")]
+  #[target_feature(enable = "ssse3")]
   fn centered_by(pawns: __m128i, origin: HexPos) -> __m128i {
     let x = origin.x();
     let y = origin.y();
@@ -469,7 +470,7 @@ impl PawnList8 {
     unsafe { Self::extract_white_pawns_sse(pawn_poses, origin) }
   }
 
-  #[target_feature(enable = "sse4.1")]
+  #[target_feature(enable = "ssse3")]
   fn apply_d6_c_sse(&self, op_ord: usize) -> Self {
     Self {
       pawns: rotate_impl::apply_d6_c_sse(self.pawns, op_ord),
@@ -481,7 +482,7 @@ impl PawnList8 {
     unsafe { self.apply_d6_c_sse(op_ord) }
   }
 
-  #[target_feature(enable = "sse4.1")]
+  #[target_feature(enable = "ssse3")]
   fn apply_sse(&self, symm_class: SymmetryClass, op_ord: usize) -> Self {
     Self {
       pawns: rotate_impl::apply_sse(self.pawns, symm_class, op_ord),
@@ -493,14 +494,14 @@ impl PawnList8 {
     unsafe { self.apply_sse(symm_class, op_ord) }
   }
 
-  #[target_feature(enable = "sse4.1")]
+  #[target_feature(enable = "ssse3")]
   fn masked_pawns(&self) -> __m128i {
-    _mm_andnot_si128(self.zero_poses, self.pawns)
+    _mm_andnot_si128(self.null_poses, self.pawns)
   }
 
   /// Returns true if the two pawn lists are equal, ignoring the order of the
   /// elements.
-  #[target_feature(enable = "sse4.1")]
+  #[target_feature(enable = "ssse3")]
   fn equal_ignoring_order_sse(&self, other: PawnList8) -> bool {
     let pawns1 = self.masked_pawns();
     let pawns2 = other.masked_pawns();
@@ -530,13 +531,13 @@ impl PawnList8 {
   }
 }
 
-#[cfg(not(target_feature = "sse4.1"))]
+#[cfg(not(target_feature = "ssse3"))]
 #[derive(Clone, Copy)]
 pub struct PawnList8 {
   pawns: [HexPosOffset; 8],
 }
 
-#[cfg(not(target_feature = "sse4.1"))]
+#[cfg(not(target_feature = "ssse3"))]
 impl PawnList8 {
   pub fn extract_black_pawns(pawn_poses: &[PackedIdx; N], origin: HexPos) -> Self {
     let pawns = [
@@ -643,8 +644,8 @@ mod tests {
     pawn_list::{N, PawnList8},
   };
 
-  #[cfg(target_feature = "sse4.1")]
-  #[target_feature(enable = "sse4.1")]
+  #[cfg(target_feature = "ssse3")]
+  #[target_feature(enable = "ssse3")]
   fn pos_at_sse(pawn_list: &PawnList8, idx: usize) -> HexPosOffset {
     debug_assert!(idx < 8);
     let pawns = match idx {
@@ -663,11 +664,11 @@ mod tests {
   }
 
   fn pos_at(pawn_list: &PawnList8, idx: usize) -> HexPosOffset {
-    #[cfg(target_feature = "sse4.1")]
+    #[cfg(target_feature = "ssse3")]
     unsafe {
       pos_at_sse(pawn_list, idx)
     }
-    #[cfg(not(target_feature = "sse4.1"))]
+    #[cfg(not(target_feature = "ssse3"))]
     pawn_list.pawns[idx]
   }
 
