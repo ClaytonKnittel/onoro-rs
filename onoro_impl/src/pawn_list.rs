@@ -550,6 +550,8 @@ impl PawnList8 {
     _mm_movemask_epi8(unsafe { total.unwrap_unchecked() }) == 0xffff
   }
 
+  /// Returns true if `self` and `other` contain the same coordinates in some
+  /// order.
   pub fn equal_ignoring_order(&self, other: PawnList8) -> bool {
     unsafe { self.equal_ignoring_order_sse(other) }
   }
@@ -643,8 +645,8 @@ impl PawnList8 {
     }
   }
 
-  /// Returns true if the two pawn lists are equal ignoring the order of the
-  /// elements.
+  /// Returns true if `self` and `other` contain the same coordinates in some
+  /// order.
   pub fn equal_ignoring_order(&self, other: Self) -> bool {
     self.pawns.iter().all(|pos| other.pawns.contains(pos))
   }
