@@ -388,6 +388,8 @@ mod rotate_impl {
   }
 }
 
+/// Stores a list of 8 pawns in an __m128i register, with each adjacent pair of
+/// epi8 lanes containing the origin-relative x- and y- coordinates of a pawn.
 #[cfg(target_feature = "sse4.1")]
 #[derive(Clone, Copy)]
 pub struct PawnList8 {
@@ -455,10 +457,14 @@ impl PawnList8 {
     _mm_sub_epi8(pawns, origin_array)
   }
 
+  /// Given the pawn_poses from the Onoro state, extracts just the 8 black
+  /// pawns and packs them into a __m128i register. `null` indexes are ignored.
   pub fn extract_black_pawns(pawn_poses: &[PackedIdx; N], origin: HexPos) -> Self {
     unsafe { Self::extract_black_pawns_sse(pawn_poses, origin) }
   }
 
+  /// Given the pawn_poses from the Onoro state, extracts just the 8 white
+  /// pawns and packs them into a __m128i register. `null` indexes are ignored.
   pub fn extract_white_pawns(pawn_poses: &[PackedIdx; N], origin: HexPos) -> Self {
     unsafe { Self::extract_white_pawns_sse(pawn_poses, origin) }
   }
