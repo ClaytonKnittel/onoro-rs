@@ -139,7 +139,8 @@ mod rotate_impl {
   // Since the instructions we will use for every group operation are the
   // same, with the only difference being the shuffle mask, we can construct a
   // lookup table mapping group operation ordinals to shuffle masks for the
-  // positive and negative components.
+  // positive and negative components, then all operations can share the same
+  // code path.
 
   /// The shuffle mask to select the positive component of the difference
   /// operation, indexed by group operation ordinal.
@@ -175,8 +176,65 @@ mod rotate_impl {
     MM128Contents::swap_xy_shuffle(),
   ];
 
-  // TODO: Leave comment
+  /// Applies the `D6` symmetry operation to every pair of epi8 lanes, treated as
+  /// coordinate pairs centered at (0, 0).
+  #[target_feature(enable = "sse4.1")]
+  #[inline]
+  pub fn apply_d6_c_sse(pawns: __m128i, op_ord: usize) -> __m128i {
+    let positive_mask = unsafe { D6_POSITIVE_MASKS.get_unchecked(op_ord) }.load();
+    let negative_mask = unsafe { D6_NEGATIVE_MASKS.get_unchecked(op_ord) }.load();
+    let positive = _mm_shuffle_epi8(pawns, positive_mask);
+    let negative = _mm_shuffle_epi8(pawns, negative_mask);
+    _mm_sub_epi8(positive, negative)
+  }
 
+  // All rotation/reflection operations for the 7 possible symmetry classes of
+  // Onoro boards (see `SymmetryClass`) on (x, y) coordinate pairs can be
+  // expressed as a sum/difference/assignment of x, y, and/or the constant 1
+  // for each coordinate.
+  //
+  // Here are the mappings of transformations for each element of each symmetry
+  // class:
+  // C (D6): same as above
+  // V (D3):
+  //   r0 => (x, y)
+  //   r1 => (1 - y, x - y)
+  //   r2 => (1 + y - x, 1 - x)
+  //   s0 => (x, x - y)
+  //   s1 => (1 + y - x, y)
+  //   s2 => (1 - y, 1 - x)
+  // E (K4):
+  //   (r0, r0) => (x, y)
+  //   (r1, r0) => (x - y, -y)
+  //   (r0, r1) => (1 + y - x, y)
+  //   (r1, r1) => (1 - x, -y)
+  // CV (C2):
+  //   r0 => (x, y)
+  //   r1 => (x, x - y)
+  // CE (C2):
+  //   r0 => (x, y)
+  //   r1 => (x - y, -y)
+  // EV (C2):
+  //   r0 => (x, y)
+  //   r1 => (1 + y - x, y)
+  // Trivial:
+  //   r0 => (x, y)
+  //
+  // As you can see, all expressions have the form
+  // [0 or 1] + [x or y or 0] - [x or y or 0].
+  //
+  // We will use a trick similar to the one above, where we will shuffle the
+  // input 128-bit vector register according to a shuffle mask which is
+  // dependent on the operation being applied. However we will need to add a
+  // constant value to the result, which is also dependent on the operation
+  // being applied, since some expressions contain a 1.
+  //
+  // We will again use a lookup table mapping group operation ordinals to a
+  // constant value and shuffle masks for the positive and negative components,
+  // then all operations can share the same code path.
+
+  /// A map from (SymmetryClass, rotation/reflection ordinal) to a constant
+  /// value.
   const ONES_MASKS: [MM128Contents; 29] = [
     // Trivial
     MM128Contents::zero(),
@@ -215,6 +273,9 @@ mod rotate_impl {
     MM128Contents::zero(),
     MM128Contents::zero(),
   ];
+
+  /// The shuffle mask to select the positive component of the expression,
+  /// indexed by SymmetryClass and group operation ordinal.
   const POSITIVE_MASKS: [MM128Contents; 29] = [
     // Trivial
     MM128Contents::noop_shuffle(),
@@ -253,6 +314,9 @@ mod rotate_impl {
     D6_POSITIVE_MASKS[10],
     D6_POSITIVE_MASKS[11],
   ];
+
+  /// The shuffle mask to select the negative component of the expression,
+  /// indexed by SymmetryClass and group operation ordinal.
   const NEGATIVE_MASKS: [MM128Contents; 29] = [
     // Trivial
     MM128Contents::zero_shuffle(),
@@ -292,6 +356,8 @@ mod rotate_impl {
     D6_NEGATIVE_MASKS[11],
   ];
 
+  /// Given a SymmetryClass, returns the offset in the above tables we should
+  /// index from for group operations in that symmetry class.
   const fn symmetry_class_offset(symm_class: SymmetryClass) -> usize {
     match symm_class {
       SymmetryClass::Trivial => 0,
@@ -304,18 +370,10 @@ mod rotate_impl {
     }
   }
 
-  /// Applies the `D6` symmetry operation to every pair of epi8 lanes, treated as
-  /// coordinate pairs centered at (0, 0).
-  #[target_feature(enable = "sse4.1")]
-  #[inline]
-  pub fn apply_d6_c_sse(pawns: __m128i, op_ord: usize) -> __m128i {
-    let positive_mask = unsafe { D6_POSITIVE_MASKS.get_unchecked(op_ord) }.load();
-    let negative_mask = unsafe { D6_NEGATIVE_MASKS.get_unchecked(op_ord) }.load();
-    let positive = _mm_shuffle_epi8(pawns, positive_mask);
-    let negative = _mm_shuffle_epi8(pawns, negative_mask);
-    _mm_sub_epi8(positive, negative)
-  }
-
+  /// Applies a particular rotation/reflection operation to every pair of epi8
+  /// lanes, treated as coordinate pairs centered at (0, 0), per the provided
+  /// symmetry class and operation ordinal (whose interpretation is determined
+  /// by the symmetry class).
   #[target_feature(enable = "sse4.1")]
   #[inline]
   pub fn apply_sse(pawns: __m128i, symm_class: SymmetryClass, op_ord: usize) -> __m128i {
