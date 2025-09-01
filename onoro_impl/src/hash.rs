@@ -3,6 +3,7 @@ use std::ops::{Index, IndexMut};
 use algebra::{
   finite::Finite,
   group::{Cyclic, Group, Trivial},
+  ordinal::Ordinal,
 };
 use const_random::const_random;
 
@@ -76,7 +77,7 @@ impl<const N: usize, G: Group> HashTable<N, G> {
       let pos = HexPos::from(pawn.pos) - origin;
       // The position of the pawn normalized to align board states on all
       // symmetry axes which the board isn't possibly symmetric about itself.
-      let normalized_pos = pos.apply_d6_c(&symm_state.op);
+      let normalized_pos = pos.apply_d6_c(&D6::from_ord(symm_state.op_ord()));
       // The position of the pawn in table space, relative to the center of the
       // hash table.
       let table_pos = normalized_pos + Self::center();

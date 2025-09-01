@@ -14,33 +14,69 @@ use crate::{
 /// canonicalize the state for hash computation.
 #[derive(Clone, Copy, Debug)]
 pub struct BoardSymmetryState {
-  /// The group operation to perform on the board before calculating the hash.
-  /// This is used to align board states on all symmetry axes which the board
-  /// isn't possibly symmetric about itself.
-  pub op: D6,
+  /// Both canonicalizing op_ord and COM offset packed into a `u8`.
+  ///
+  /// op_ord is the group operation to perform on the board before calculating
+  /// the hash. This is used to align board states on all symmetry axes which
+  /// the board isn't possibly symmetric about itself.
+  ///
+  /// COM offset is the offset to apply when calculating the
+  /// integer-coordinate, symmetry invariant "center of mass"
+  ///
+  /// ```text
+  ///   7   6   5   -   4   3   -   0
+  /// +-------+-----------+-----------+
+  /// | 0 | 0 | COMOffset | D6 op ord |
+  /// +---+---+-----------+-----------+
+  /// ```
+  com_offset_op_ord: u8,
 
   /// The symmetry class this board state belongs in, which depends on where the
   /// center of mass lies. If the location of the center of mass is symmetric to
   /// itself under some group operations, then those symmetries must be checked
   /// when looking up in the hash table.
   pub symm_class: SymmetryClass,
-
-  /// The offset to apply when calculating the integer-coordinate, symmetry
-  /// invariant "center of mass"
-  center_offset: COMOffset,
 }
 
 impl BoardSymmetryState {
+  const OP_ORD_MASK: u8 = 0xf;
+  const COM_OFFSET_START: u8 = 0x10;
+  const COM_OFFSET_MASK: u8 = 0xf0;
+
   const fn blank() -> Self {
     Self {
-      op: D6::const_identity(),
+      com_offset_op_ord: 0,
       symm_class: SymmetryClass::C,
-      center_offset: COMOffset::X0Y0,
+    }
+  }
+
+  const fn new(op: D6, com_offset: COMOffset, symm_class: SymmetryClass) -> Self {
+    Self {
+      com_offset_op_ord: Self::pack_op_ord_com_offset(op, com_offset),
+      symm_class,
+    }
+  }
+
+  const fn pack_op_ord_com_offset(op: D6, com_offset: COMOffset) -> u8 {
+    (op.const_ord() as u8) + (com_offset as u8) * Self::COM_OFFSET_START
+  }
+
+  pub const fn op_ord(&self) -> usize {
+    (self.com_offset_op_ord & Self::OP_ORD_MASK) as usize
+  }
+
+  const fn center_offset_type(&self) -> COMOffset {
+    match self.com_offset_op_ord & Self::COM_OFFSET_MASK {
+      0b0000_0000 => COMOffset::X0Y0,
+      0b0001_0000 => COMOffset::X1Y0,
+      0b0010_0000 => COMOffset::X0Y1,
+      0b0011_0000 => COMOffset::X1Y1,
+      _ => unreachable(),
     }
   }
 
   pub const fn center_offset(&self) -> HexPosOffset {
-    match self.center_offset {
+    match self.center_offset_type() {
       COMOffset::X0Y0 => HexPosOffset::new(0, 0),
       COMOffset::X1Y0 => HexPosOffset::new(1, 0),
       COMOffset::X0Y1 => HexPosOffset::new(0, 1),
@@ -194,11 +230,11 @@ const fn gen_symm_state_table<const N: usize>() -> [[BoardSymmetryState; N]; N] 
     while x < N {
       let op = symm_state_op(x as u32, y as u32, N as u32);
       let center_offset = board_symm_state_op_to_com_offset(op);
-      table[y][x] = BoardSymmetryState {
+      table[y][x] = BoardSymmetryState::new(
         op,
-        symm_class: symm_state_class(x as u32, y as u32, N as u32),
         center_offset,
-      };
+        symm_state_class(x as u32, y as u32, N as u32),
+      );
 
       x += 1;
     }
@@ -217,11 +253,7 @@ fn compute_board_symm_state(sum_of_mass: PackedHexPos, pawns_in_play: u32) -> Bo
   let symm_class = symm_state_class(x, y, pawns_in_play);
   let center_offset = board_symm_state_op_to_com_offset(op);
 
-  BoardSymmetryState {
-    op,
-    symm_class,
-    center_offset,
-  }
+  BoardSymmetryState::new(op, center_offset, symm_class)
 }
 
 /// The purpose of the symmetry state is to provide a quick way to canonicalize

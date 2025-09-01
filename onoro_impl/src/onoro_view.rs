@@ -66,8 +66,8 @@ impl<const N: usize> OnoroView<N> {
   {
     let symm_state1 = board_symm_state(onoro1);
     let symm_state2 = board_symm_state(onoro2);
-    let normalizing_op1 = symm_state1.op;
-    let denormalizing_op2 = symm_state2.op.inverse();
+    let normalizing_op1 = D6::from_ord(symm_state1.op_ord());
+    let denormalizing_op2 = D6::from_ord(symm_state2.op_ord()).inverse();
     let origin1 = onoro1.origin(&symm_state1);
     let origin2 = onoro2.origin(&symm_state2);
 
@@ -107,8 +107,8 @@ impl<const N: usize> OnoroView<N> {
     onoro1: &OnoroImpl<N>,
     onoro2: &OnoroImpl<N>,
     symm_class: SymmetryClass,
-    norm_view1: u8,
-    norm_view2: u8,
+    norm_view1: usize,
+    norm_view2: usize,
   ) -> bool {
     if const { N != 16 } {
       unreachable()
@@ -116,8 +116,8 @@ impl<const N: usize> OnoroView<N> {
 
     let symm_state1 = board_symm_state(onoro1);
     let symm_state2 = board_symm_state(onoro2);
-    let normalizing_op1 = symm_state1.op;
-    let normalizing_op2 = symm_state2.op;
+    let normalizing_op1 = symm_state1.op_ord();
+    let normalizing_op2 = symm_state2.op_ord();
     let origin1 = onoro1.origin(&symm_state1);
     let origin2 = onoro2.origin(&symm_state2);
 
@@ -132,12 +132,12 @@ impl<const N: usize> OnoroView<N> {
 
     let normalize_view1 = |pawns: PawnList8| {
       pawns
-        .apply_d6_c(&normalizing_op1)
+        .apply_d6_c(normalizing_op1)
         .apply(symm_class, norm_view1)
     };
     let normalize_view2 = |pawns: PawnList8| {
       pawns
-        .apply_d6_c(&normalizing_op2)
+        .apply_d6_c(normalizing_op2)
         .apply(symm_class, norm_view2)
     };
 
@@ -171,8 +171,8 @@ impl<const N: usize> OnoroView<N> {
       return false;
     }
 
-    let canon_op1 = G::from_ord(view1.canon_view().op_ord() as usize);
-    let canon_op2 = G::from_ord(view2.canon_view().op_ord() as usize);
+    let canon_op1 = G::from_ord(view1.canon_view().op_ord());
+    let canon_op2 = G::from_ord(view2.canon_view().op_ord());
     let to_view2 = canon_op2.inverse() * canon_op1;
 
     let pawns_equal =
@@ -223,7 +223,7 @@ impl<const N: usize> OnoroView<N> {
           onoro2,
           symm_class,
           op1,
-          ((op2 as usize + i) % group_size) as u8,
+          (op2 + i) % group_size,
         )
       });
     }
@@ -279,14 +279,14 @@ impl<const N: usize> Hash for OnoroView<N> {
 impl<const N: usize> Display for OnoroView<N> {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     let symm_state = board_symm_state(self.onoro());
-    let rotated = self.onoro().rotated_d6_c(symm_state.op);
+    let rotated = self.onoro().rotated_d6_c(D6::from_ord(symm_state.op_ord()));
     let _rotated = match self.canon_view().symm_class() {
-      SymmetryClass::C => rotated.rotated_d6_c(D6::from_ord(self.canon_view().op_ord() as usize)),
-      SymmetryClass::V => rotated.rotated_d3_v(D3::from_ord(self.canon_view().op_ord() as usize)),
-      SymmetryClass::E => rotated.rotated_k4_e(K4::from_ord(self.canon_view().op_ord() as usize)),
-      SymmetryClass::CV => rotated.rotated_c2_cv(C2::from_ord(self.canon_view().op_ord() as usize)),
-      SymmetryClass::CE => rotated.rotated_c2_ce(C2::from_ord(self.canon_view().op_ord() as usize)),
-      SymmetryClass::EV => rotated.rotated_c2_ev(C2::from_ord(self.canon_view().op_ord() as usize)),
+      SymmetryClass::C => rotated.rotated_d6_c(D6::from_ord(self.canon_view().op_ord())),
+      SymmetryClass::V => rotated.rotated_d3_v(D3::from_ord(self.canon_view().op_ord())),
+      SymmetryClass::E => rotated.rotated_k4_e(K4::from_ord(self.canon_view().op_ord())),
+      SymmetryClass::CV => rotated.rotated_c2_cv(C2::from_ord(self.canon_view().op_ord())),
+      SymmetryClass::CE => rotated.rotated_c2_ce(C2::from_ord(self.canon_view().op_ord())),
+      SymmetryClass::EV => rotated.rotated_c2_ev(C2::from_ord(self.canon_view().op_ord())),
       SymmetryClass::Trivial => rotated,
     };
 
@@ -295,15 +295,14 @@ impl<const N: usize> Display for OnoroView<N> {
       "{}\n{:?}: canon: {}, normalize: {} ({:#018x?})",
       self.onoro,
       self.canon_view().symm_class(),
-      symm_state.op,
+      D6::from_ord(symm_state.op_ord()),
       match self.canon_view().symm_class() {
-        SymmetryClass::C => D6::from_ord(self.canon_view().op_ord() as usize).to_string(),
-        SymmetryClass::V => D3::from_ord(self.canon_view().op_ord() as usize).to_string(),
-        SymmetryClass::E => K4::from_ord(self.canon_view().op_ord() as usize).to_string(),
+        SymmetryClass::C => D6::from_ord(self.canon_view().op_ord()).to_string(),
+        SymmetryClass::V => D3::from_ord(self.canon_view().op_ord()).to_string(),
+        SymmetryClass::E => K4::from_ord(self.canon_view().op_ord()).to_string(),
         SymmetryClass::CV | SymmetryClass::CE | SymmetryClass::EV =>
-          C2::from_ord(self.canon_view().op_ord() as usize).to_string(),
-        SymmetryClass::Trivial =>
-          Trivial::from_ord(self.canon_view().op_ord() as usize).to_string(),
+          C2::from_ord(self.canon_view().op_ord()).to_string(),
+        SymmetryClass::Trivial => Trivial::from_ord(self.canon_view().op_ord()).to_string(),
       },
       self.canon_view().hash()
     )

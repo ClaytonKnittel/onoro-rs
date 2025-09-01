@@ -2,18 +2,14 @@
 use std::arch::x86_64::*;
 
 #[cfg(not(target_feature = "sse4.1"))]
-use algebra::group::Trivial;
-use algebra::ordinal::Ordinal;
+use algebra::{group::Trivial, ordinal::Ordinal};
 #[cfg(not(target_feature = "sse4.1"))]
 use itertools::Itertools;
+use onoro::{groups::SymmetryClass, hex_pos::HexPos};
 #[cfg(not(target_feature = "sse4.1"))]
 use onoro::{
-  groups::{C2, D3, K4},
+  groups::{C2, D3, D6, K4},
   hex_pos::HexPosOffset,
-};
-use onoro::{
-  groups::{D6, SymmetryClass},
-  hex_pos::HexPos,
 };
 
 use crate::{PackedIdx, util::unreachable};
@@ -315,9 +311,9 @@ impl PawnList8 {
   }
 
   #[target_feature(enable = "sse4.1")]
-  fn apply_d6_c_sse(&self, op: &D6) -> Self {
-    let positive_mask = Self::D6_POSITIVE_MASKS[op.ord()].load();
-    let negative_mask = Self::D6_NEGATIVE_MASKS[op.ord()].load();
+  fn apply_d6_c_sse(&self, op_ord: usize) -> Self {
+    let positive_mask = Self::D6_POSITIVE_MASKS[op_ord].load();
+    let negative_mask = Self::D6_NEGATIVE_MASKS[op_ord].load();
     let positive = _mm_shuffle_epi8(self.pawns, positive_mask);
     let negative = _mm_shuffle_epi8(self.pawns, negative_mask);
     Self {
@@ -326,13 +322,13 @@ impl PawnList8 {
     }
   }
 
-  pub fn apply_d6_c(&self, op: &D6) -> Self {
-    unsafe { self.apply_d6_c_sse(op) }
+  pub fn apply_d6_c(&self, op_ord: usize) -> Self {
+    unsafe { self.apply_d6_c_sse(op_ord) }
   }
 
   #[target_feature(enable = "sse4.1")]
-  fn apply_sse(&self, symm_class: SymmetryClass, op_ord: u8) -> Self {
-    let idx = Self::symmetry_class_offset(symm_class) + op_ord as usize;
+  fn apply_sse(&self, symm_class: SymmetryClass, op_ord: usize) -> Self {
+    let idx = Self::symmetry_class_offset(symm_class) + op_ord;
     let ones = Self::ONES_MASKS[idx].load();
     let positive_mask = Self::POSITIVE_MASKS[idx].load();
     let negative_mask = Self::NEGATIVE_MASKS[idx].load();
@@ -345,7 +341,7 @@ impl PawnList8 {
     }
   }
 
-  pub fn apply(&self, symm_class: SymmetryClass, op_ord: u8) -> Self {
+  pub fn apply(&self, symm_class: SymmetryClass, op_ord: usize) -> Self {
     unsafe { self.apply_sse(symm_class, op_ord) }
   }
 
@@ -422,9 +418,9 @@ impl PawnList8 {
     Self { pawns }
   }
 
-  pub fn apply_d6_c(&self, op: &D6) -> Self {
+  pub fn apply_d6_c(&self, op_ord: usize) -> Self {
     Self {
-      pawns: self.pawns.map(|pos| pos.apply_d6_c(op)),
+      pawns: self.pawns.map(|pos| pos.apply_d6_c(&D6::from_ord(op_ord))),
     }
   }
 
@@ -462,10 +458,9 @@ impl PawnList8 {
     *self
   }
 
-  pub fn apply(&self, symm_class: SymmetryClass, op_ord: u8) -> Self {
-    let op_ord = op_ord as usize;
+  pub fn apply(&self, symm_class: SymmetryClass, op_ord: usize) -> Self {
     match symm_class {
-      SymmetryClass::C => self.apply_d6_c(&D6::from_ord(op_ord)),
+      SymmetryClass::C => self.apply_d6_c(op_ord),
       SymmetryClass::V => self.apply_d3_v(&D3::from_ord(op_ord)),
       SymmetryClass::E => self.apply_k4_e(&K4::from_ord(op_ord)),
       SymmetryClass::CV => self.apply_c2_cv(&C2::from_ord(op_ord)),
@@ -600,7 +595,7 @@ mod tests {
           let white_pawns = PawnList8::extract_white_pawns(&poses, center);
 
           for op in <$op_t>::for_each() {
-            let op_ord = op.ord() as u8;
+            let op_ord = op.ord();
             let rotated_black = black_pawns.apply($symm_class, op_ord);
             let rotated_white = white_pawns.apply($symm_class, op_ord);
 
