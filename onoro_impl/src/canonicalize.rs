@@ -6,7 +6,8 @@ use onoro::{
 
 use crate::{
   OnoroImpl,
-  util::{max_u32, min_u32, unreachable},
+  packed_hex_pos::PackedHexPos,
+  util::{likely, max_u32, min_u32, unreachable},
 };
 
 /// Describes the layout of the game state, and provides enough information to
@@ -208,6 +209,21 @@ const fn gen_symm_state_table<const N: usize>() -> [[BoardSymmetryState; N]; N] 
   table
 }
 
+fn compute_board_symm_state(sum_of_mass: PackedHexPos, pawns_in_play: u32) -> BoardSymmetryState {
+  let x = sum_of_mass.x() as u32 % pawns_in_play;
+  let y = sum_of_mass.y() as u32 % pawns_in_play;
+
+  let op = symm_state_op(x, y, pawns_in_play);
+  let symm_class = symm_state_class(x, y, pawns_in_play);
+  let center_offset = board_symm_state_op_to_com_offset(op);
+
+  BoardSymmetryState {
+    op,
+    symm_class,
+    center_offset,
+  }
+}
+
 /// The purpose of the symmetry state is to provide a quick way to canonicalize
 /// boards when computing and checking for symmetries. Since the center of mass
 /// transforms the same as tiles under symmetry operations, we can use the
@@ -306,11 +322,12 @@ const fn gen_symm_state_table<const N: usize>() -> [[BoardSymmetryState; N]; N] 
 /// that it does not matter which of the 4 group operations we choose to apply
 /// to the game state when canonicalizing if the center of mass lies on an e,
 /// since they are symmetries of each other in this K4 group.
+#[inline(always)]
 pub fn board_symm_state<const N: usize>(onoro: &OnoroImpl<N>) -> BoardSymmetryState {
   let sum_of_mass = onoro.sum_of_mass();
   let pawns_in_play = onoro.pawns_in_play();
 
-  if const { N == 16 } && pawns_in_play == N as u32 {
+  if const { N == 16 } && likely(pawns_in_play == N as u32) {
     const SYMM_TABLE_16: [[BoardSymmetryState; 16]; 16] = gen_symm_state_table::<16>();
 
     let x = sum_of_mass.x() as u32 % N as u32;
@@ -318,18 +335,7 @@ pub fn board_symm_state<const N: usize>(onoro: &OnoroImpl<N>) -> BoardSymmetrySt
     return SYMM_TABLE_16[y as usize][x as usize];
   }
 
-  let x = sum_of_mass.x() as u32 % pawns_in_play;
-  let y = sum_of_mass.y() as u32 % pawns_in_play;
-
-  let op = symm_state_op(x, y, pawns_in_play);
-  let symm_class = symm_state_class(x, y, pawns_in_play);
-  let center_offset = board_symm_state_op_to_com_offset(op);
-
-  BoardSymmetryState {
-    op,
-    symm_class,
-    center_offset,
-  }
+  compute_board_symm_state(sum_of_mass, pawns_in_play)
 }
 
 #[cfg(test)]
