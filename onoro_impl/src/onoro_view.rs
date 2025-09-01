@@ -107,7 +107,8 @@ impl<const N: usize> OnoroView<N> {
     onoro1: &OnoroImpl<N>,
     onoro2: &OnoroImpl<N>,
     symm_class: SymmetryClass,
-    to_view2: u8,
+    norm_view1: u8,
+    norm_view2: u8,
   ) -> bool {
     if const { N != 16 } {
       unreachable()
@@ -129,14 +130,21 @@ impl<const N: usize> OnoroView<N> {
     let black_pawns2 = PawnList8::extract_black_pawns(pawn_poses2, origin2);
     let white_pawns2 = PawnList8::extract_white_pawns(pawn_poses2, origin2);
 
-    let black_pawns1 = black_pawns1
-      .apply_d6_c(&normalizing_op1)
-      .apply(symm_class, to_view2);
-    let white_pawns1 = white_pawns1
-      .apply_d6_c(&normalizing_op1)
-      .apply(symm_class, to_view2);
-    let black_pawns2 = black_pawns2.apply_d6_c(&normalizing_op2);
-    let white_pawns2 = white_pawns2.apply_d6_c(&normalizing_op2);
+    let normalize_view1 = |pawns: PawnList8| {
+      pawns
+        .apply_d6_c(&normalizing_op1)
+        .apply(symm_class, norm_view1)
+    };
+    let normalize_view2 = |pawns: PawnList8| {
+      pawns
+        .apply_d6_c(&normalizing_op2)
+        .apply(symm_class, norm_view2)
+    };
+
+    let black_pawns1 = normalize_view1(black_pawns1);
+    let white_pawns1 = normalize_view1(white_pawns1);
+    let black_pawns2 = normalize_view2(black_pawns2);
+    let white_pawns2 = normalize_view2(white_pawns2);
 
     let (black_pawns2, white_pawns2) = if onoro1.player_color() == onoro2.player_color() {
       (black_pawns2, white_pawns2)
@@ -193,21 +201,10 @@ impl<const N: usize> OnoroView<N> {
       return false;
     }
 
-    let op1 = view1.canon_view().op_ord() as usize;
-    let op2 = view2.canon_view().op_ord() as usize;
+    let op1 = view1.canon_view().op_ord();
+    let op2 = view2.canon_view().op_ord();
     let symm_class = view1.canon_view().symm_class();
-    let to_view2 = match symm_class {
-      SymmetryClass::C => (D6::from_ord(op2).inverse() * D6::from_ord(op1)).ord(),
-      SymmetryClass::V => (D3::from_ord(op2).inverse() * D3::from_ord(op1)).ord(),
-      SymmetryClass::E => (K4::from_ord(op2).inverse() * K4::from_ord(op1)).ord(),
-      SymmetryClass::CV | SymmetryClass::CE | SymmetryClass::EV => {
-        (C2::from_ord(op2).inverse() * C2::from_ord(op1)).ord()
-      }
-      SymmetryClass::Trivial => 0,
-    };
-
-    let pawns_equal =
-      Self::pawns_equal_with_transform_fast(onoro1, onoro2, symm_class, to_view2 as u8);
+    let pawns_equal = Self::pawns_equal_with_transform_fast(onoro1, onoro2, symm_class, op1, op2);
 
     // In the extremely unlikely case of a hash collision, the best-guess
     // canonical orientations may not have produced equal orientations. As a
@@ -221,8 +218,13 @@ impl<const N: usize> OnoroView<N> {
         SymmetryClass::Trivial => Trivial::SIZE,
       };
       return (1..group_size).any(|i| {
-        let to_view2 = (to_view2 + i) % group_size;
-        Self::pawns_equal_with_transform_fast(onoro1, onoro2, symm_class, to_view2 as u8)
+        Self::pawns_equal_with_transform_fast(
+          onoro1,
+          onoro2,
+          symm_class,
+          op1,
+          ((op2 as usize + i) % group_size) as u8,
+        )
       });
     }
 
