@@ -1,4 +1,4 @@
-use std::ops::{Index, IndexMut};
+use std::ops::Index;
 
 use algebra::{
   finite::Finite,
@@ -52,13 +52,8 @@ impl<T, const N: usize> Index<usize> for ConstTable<T, N> {
   type Output = T;
 
   fn index(&self, index: usize) -> &Self::Output {
-    self.get(index)
-  }
-}
-
-impl<T, const N: usize> IndexMut<usize> for ConstTable<T, N> {
-  fn index_mut(&mut self, index: usize) -> &mut Self::Output {
-    self.get_mut(index)
+    debug_assert!(index < N * N);
+    unsafe { self.table.get_unchecked(index / N).get_unchecked(index % N) }
   }
 }
 
@@ -108,7 +103,7 @@ impl<const N: usize, G: Group> HashTable<N, G> {
   }
 
   #[cfg(target_feature = "sse4.1")]
-  #[inline]
+  #[inline(never)]
   pub fn hash_fast<const ONORO_N: usize>(
     &self,
     onoro: &OnoroImpl<ONORO_N>,
@@ -132,12 +127,11 @@ impl<const N: usize, G: Group> HashTable<N, G> {
     cur_pawns
       .pawn_indices::<N>(Self::center())
       .map(|cur_pawn_idx| self[cur_pawn_idx].cur_player_hash())
-      .chain(
-        other_pawns
-          .pawn_indices::<N>(Self::center())
-          .map(|other_pawn_idx| self[other_pawn_idx].other_player_hash()),
-      )
       .fold(0, |acc, hash| acc ^ hash)
+      ^ other_pawns
+        .pawn_indices::<N>(Self::center())
+        .map(|other_pawn_idx| self[other_pawn_idx].other_player_hash())
+        .fold(0, |acc, hash| acc ^ hash)
   }
 
   const fn center() -> HexPos {
