@@ -21,7 +21,7 @@ use onoro::{
 use crate::{
   MoveGenerator, OnoroImpl, PackedIdx,
   canonical_view::CanonicalView,
-  canonicalize::board_symm_state,
+  canonicalize::{board_symm_state, board_symm_state_with_pawns_in_play},
   r#move::Move,
   onoro_defs::{Onoro16, Onoro16View},
   pawn_list::PawnList8,
@@ -114,12 +114,15 @@ impl<const N: usize> OnoroView<N> {
       unreachable()
     }
 
-    let symm_state1 = board_symm_state(onoro1);
-    let symm_state2 = board_symm_state(onoro2);
+    let pawns_in_play = onoro1.pawns_in_play();
+    debug_assert_eq!(onoro2.pawns_in_play(), pawns_in_play);
+
+    let symm_state1 = board_symm_state_with_pawns_in_play(onoro1, pawns_in_play);
+    let symm_state2 = board_symm_state_with_pawns_in_play(onoro2, pawns_in_play);
     let normalizing_op1 = symm_state1.op_ord();
     let normalizing_op2 = symm_state2.op_ord();
-    let origin1 = onoro1.origin(&symm_state1);
-    let origin2 = onoro2.origin(&symm_state2);
+    let origin1 = onoro1.origin_with_pawns_in_play(&symm_state1, pawns_in_play);
+    let origin2 = onoro2.origin_with_pawns_in_play(&symm_state2, pawns_in_play);
 
     let pawn_poses1: &[PackedIdx; 16] =
       unsafe { (onoro1.pawn_poses() as &[_]).try_into().unwrap_unchecked() };

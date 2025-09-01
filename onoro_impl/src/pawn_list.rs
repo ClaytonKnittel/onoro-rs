@@ -312,8 +312,8 @@ impl PawnList8 {
 
   #[target_feature(enable = "sse4.1")]
   fn apply_d6_c_sse(&self, op_ord: usize) -> Self {
-    let positive_mask = Self::D6_POSITIVE_MASKS[op_ord].load();
-    let negative_mask = Self::D6_NEGATIVE_MASKS[op_ord].load();
+    let positive_mask = unsafe { Self::D6_POSITIVE_MASKS.get_unchecked(op_ord) }.load();
+    let negative_mask = unsafe { Self::D6_NEGATIVE_MASKS.get_unchecked(op_ord) }.load();
     let positive = _mm_shuffle_epi8(self.pawns, positive_mask);
     let negative = _mm_shuffle_epi8(self.pawns, negative_mask);
     Self {
@@ -329,9 +329,9 @@ impl PawnList8 {
   #[target_feature(enable = "sse4.1")]
   fn apply_sse(&self, symm_class: SymmetryClass, op_ord: usize) -> Self {
     let idx = Self::symmetry_class_offset(symm_class) + op_ord;
-    let ones = Self::ONES_MASKS[idx].load();
-    let positive_mask = Self::POSITIVE_MASKS[idx].load();
-    let negative_mask = Self::NEGATIVE_MASKS[idx].load();
+    let ones = unsafe { Self::ONES_MASKS.get_unchecked(idx) }.load();
+    let positive_mask = unsafe { Self::POSITIVE_MASKS.get_unchecked(idx) }.load();
+    let negative_mask = unsafe { Self::NEGATIVE_MASKS.get_unchecked(idx) }.load();
     let positive = _mm_shuffle_epi8(self.pawns, positive_mask);
     let negative = _mm_shuffle_epi8(self.pawns, negative_mask);
 

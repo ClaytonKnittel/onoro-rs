@@ -256,6 +256,25 @@ fn compute_board_symm_state(sum_of_mass: PackedHexPos, pawns_in_play: u32) -> Bo
   BoardSymmetryState::new(op, center_offset, symm_class)
 }
 
+#[inline(always)]
+pub fn board_symm_state_with_pawns_in_play<const N: usize>(
+  onoro: &OnoroImpl<N>,
+  pawns_in_play: u32,
+) -> BoardSymmetryState {
+  let sum_of_mass = onoro.sum_of_mass();
+  debug_assert_eq!(onoro.pawns_in_play(), pawns_in_play);
+
+  if const { N == 16 } && likely(pawns_in_play == N as u32) {
+    const SYMM_TABLE_16: [[BoardSymmetryState; 16]; 16] = gen_symm_state_table::<16>();
+
+    let x = sum_of_mass.x() as u32 % N as u32;
+    let y = sum_of_mass.y() as u32 % N as u32;
+    return SYMM_TABLE_16[y as usize][x as usize];
+  }
+
+  compute_board_symm_state(sum_of_mass, pawns_in_play)
+}
+
 /// The purpose of the symmetry state is to provide a quick way to canonicalize
 /// boards when computing and checking for symmetries. Since the center of mass
 /// transforms the same as tiles under symmetry operations, we can use the
@@ -356,18 +375,7 @@ fn compute_board_symm_state(sum_of_mass: PackedHexPos, pawns_in_play: u32) -> Bo
 /// since they are symmetries of each other in this K4 group.
 #[inline(always)]
 pub fn board_symm_state<const N: usize>(onoro: &OnoroImpl<N>) -> BoardSymmetryState {
-  let sum_of_mass = onoro.sum_of_mass();
-  let pawns_in_play = onoro.pawns_in_play();
-
-  if const { N == 16 } && likely(pawns_in_play == N as u32) {
-    const SYMM_TABLE_16: [[BoardSymmetryState; 16]; 16] = gen_symm_state_table::<16>();
-
-    let x = sum_of_mass.x() as u32 % N as u32;
-    let y = sum_of_mass.y() as u32 % N as u32;
-    return SYMM_TABLE_16[y as usize][x as usize];
-  }
-
-  compute_board_symm_state(sum_of_mass, pawns_in_play)
+  board_symm_state_with_pawns_in_play::<N>(onoro, onoro.pawns_in_play())
 }
 
 #[cfg(test)]

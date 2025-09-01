@@ -230,20 +230,28 @@ impl<const N: usize> OnoroImpl<N> {
     self.sum_of_mass
   }
 
-  /// Returns the origin tile, which all group operations operate with respect
-  /// to. This is orientation-invariant, meaning for any symmetry of this board
-  /// state, the same origin tile will be chosen.
-  pub fn origin(&self, symm_state: &BoardSymmetryState) -> HexPos {
+  pub fn origin_with_pawns_in_play(
+    &self,
+    symm_state: &BoardSymmetryState,
+    pawns_in_play: u32,
+  ) -> HexPos {
+    debug_assert_eq!(self.pawns_in_play(), pawns_in_play);
     let x = self.sum_of_mass.x() as u32;
     let y = self.sum_of_mass.y() as u32;
 
-    let pawns_in_play = self.pawns_in_play();
     let truncated_com = if likely(pawns_in_play == N as u32) {
       HexPos::new(x / N as u32, y / N as u32)
     } else {
       HexPos::new(x / self.pawns_in_play(), y / self.pawns_in_play())
     };
     truncated_com + symm_state.center_offset()
+  }
+
+  /// Returns the origin tile, which all group operations operate with respect
+  /// to. This is orientation-invariant, meaning for any symmetry of this board
+  /// state, the same origin tile will be chosen.
+  pub fn origin(&self, symm_state: &BoardSymmetryState) -> HexPos {
+    self.origin_with_pawns_in_play(symm_state, self.pawns_in_play())
   }
 
   pub const fn symm_state_table_width() -> usize {
