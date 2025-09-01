@@ -116,8 +116,6 @@ impl PawnList8 {
     MM128Contents::swap_xy_shuffle(),
   ];
 
-  // TODO: Try 2-level map? this will be a table of u8 indices into another
-  // table with all of the masks.
   const ONES_MASKS: [MM128Contents; 29] = [
     // Trivial
     MM128Contents::zero(),
