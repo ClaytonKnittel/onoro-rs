@@ -504,15 +504,20 @@ impl<const N: usize, G: Group> Index<usize> for HashTable<N, G> {
 
 #[cfg(test)]
 mod test {
-  use algebra::{finite::Finite, group::Cyclic, monoid::Monoid};
+  use algebra::{
+    finite::Finite,
+    group::{Cyclic, Trivial},
+    monoid::Monoid,
+  };
   use onoro::groups::{C2, D3, D6, K4};
 
-  use crate::hash::HashTable;
+  use crate::{hash::HashTable, tile_hash::TileHash};
 
   type HD6 = HashTable<16, D6>;
   type HD3 = HashTable<16, D3>;
   type HK4 = HashTable<16, K4>;
   type HC2 = HashTable<16, C2>;
+  type HT = HashTable<16, Trivial>;
 
   #[test]
   fn test_d6_table() {
@@ -524,6 +529,10 @@ mod test {
       let mut s = pos;
       let mut op = D6::identity();
       let hash = D6T[i];
+
+      if i == 0 {
+        assert_eq!(hash, TileHash::new(0, 0));
+      }
 
       for _ in 0..5 {
         s = s.apply_d6_c(&D6::Rot(1));
@@ -566,6 +575,10 @@ mod test {
       let mut op = D3::identity();
       let hash = D3T[i];
 
+      if i == 0 {
+        assert_eq!(hash, TileHash::new(0, 0));
+      }
+
       for _ in 0..2 {
         s = s.apply_d3_v(&D3::Rot(1));
         op = D3::Rot(1) * op;
@@ -604,6 +617,10 @@ mod test {
       let pos = HK4::ord_to_hex_pos(i) - HK4::center();
       let hash = K4T[i];
 
+      if i == 0 {
+        assert_eq!(hash, TileHash::new(0, 0));
+      }
+
       let mut op_ord = 1;
       while op_ord < K4::SIZE {
         let op = K4::const_from_ord(op_ord);
@@ -628,6 +645,10 @@ mod test {
       let pos = HC2::ord_to_hex_pos(i) - HC2::center();
       let hash = C2T[i];
 
+      if i == 0 {
+        assert_eq!(hash, TileHash::new(0, 0));
+      }
+
       let symm_pos = pos.apply_c2_cv(&Cyclic(1)) + HC2::center();
       if HC2::in_bounds(&symm_pos) {
         let ord = HC2::hex_pos_ord(&symm_pos);
@@ -645,6 +666,10 @@ mod test {
     for i in 0..256 {
       let pos = HC2::ord_to_hex_pos(i) - HC2::center();
       let hash = C2T[i];
+
+      if i == 0 {
+        assert_eq!(hash, TileHash::new(0, 0));
+      }
 
       let symm_pos = pos.apply_c2_ce(&Cyclic(1)) + HC2::center();
       if HC2::in_bounds(&symm_pos) {
@@ -664,6 +689,10 @@ mod test {
       let pos = HC2::ord_to_hex_pos(i) - HC2::center();
       let hash = C2T[i];
 
+      if i == 0 {
+        assert_eq!(hash, TileHash::new(0, 0));
+      }
+
       let symm_pos = pos.apply_c2_ev(&Cyclic(1)) + HC2::center();
       if HC2::in_bounds(&symm_pos) {
         let ord = HC2::hex_pos_ord(&symm_pos);
@@ -672,5 +701,11 @@ mod test {
         assert_eq!(symm_hash, hash.apply(&Cyclic(1)));
       }
     }
+  }
+
+  #[test]
+  fn test_trivial_table() {
+    const TT: HT = HashTable::new_trivial();
+    assert_eq!(TT[0], TileHash::new(0, 0));
   }
 }
