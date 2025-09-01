@@ -12,6 +12,8 @@ use onoro::{
   hex_pos::HexPosOffset,
 };
 
+#[cfg(target_feature = "sse4.1")]
+use crate::util::MM128Iter;
 use crate::{PackedIdx, util::unreachable};
 
 const N: usize = 16;
@@ -578,8 +580,6 @@ impl PawnList8 {
 
   #[target_feature(enable = "sse4.1")]
   fn pawn_indices_sse<const N: usize>(&self, origin: HexPos) -> impl Iterator<Item = usize> {
-    use crate::util::MM128Iter;
-
     debug_assert!(N.is_power_of_two());
 
     let origin_array = Self::broadcast_hex_pos(origin);
@@ -590,7 +590,7 @@ impl PawnList8 {
     let y_coords_mask = _mm_set1_epi16(0xff_00u16 as i16);
     let y_coords = _mm_and_si128(absolute_pawns, y_coords_mask);
 
-    let y_shifted = match 8 - N.trailing_zeros() {
+    let y_shifted = match const { 8 - N.trailing_zeros() } {
       0 => _mm_srli_epi16::<0>(y_coords),
       1 => _mm_srli_epi16::<1>(y_coords),
       2 => _mm_srli_epi16::<2>(y_coords),
@@ -602,7 +602,7 @@ impl PawnList8 {
       _ => unreachable(),
     };
 
-    let indices = _mm_add_epi16(x_coords, y_shifted);
+    let indices = self.zero_null_pawns(_mm_add_epi16(x_coords, y_shifted));
     indices.iter_epi16().map(|i| i as usize)
   }
 
@@ -614,72 +614,106 @@ impl PawnList8 {
 #[cfg(not(target_feature = "sse4.1"))]
 #[derive(Clone, Copy)]
 pub struct PawnList8 {
-  pawns: [HexPosOffset; 8],
+  pawns: [Option<HexPosOffset>; 8],
 }
 
 #[cfg(not(target_feature = "sse4.1"))]
 impl PawnList8 {
   pub fn extract_black_pawns(pawn_poses: &[PackedIdx; N], origin: HexPos) -> Self {
     let pawns = [
-      HexPos::from(pawn_poses[0]) - origin,
-      HexPos::from(pawn_poses[2]) - origin,
-      HexPos::from(pawn_poses[4]) - origin,
-      HexPos::from(pawn_poses[6]) - origin,
-      HexPos::from(pawn_poses[8]) - origin,
-      HexPos::from(pawn_poses[10]) - origin,
-      HexPos::from(pawn_poses[12]) - origin,
-      HexPos::from(pawn_poses[14]) - origin,
+      pawn_poses[0]
+        .is_nonnull()
+        .then_some(HexPos::from(pawn_poses[0]) - origin),
+      pawn_poses[2]
+        .is_nonnull()
+        .then_some(HexPos::from(pawn_poses[2]) - origin),
+      pawn_poses[4]
+        .is_nonnull()
+        .then_some(HexPos::from(pawn_poses[4]) - origin),
+      pawn_poses[6]
+        .is_nonnull()
+        .then_some(HexPos::from(pawn_poses[6]) - origin),
+      pawn_poses[8]
+        .is_nonnull()
+        .then_some(HexPos::from(pawn_poses[8]) - origin),
+      pawn_poses[10]
+        .is_nonnull()
+        .then_some(HexPos::from(pawn_poses[10]) - origin),
+      pawn_poses[12]
+        .is_nonnull()
+        .then_some(HexPos::from(pawn_poses[12]) - origin),
+      pawn_poses[14]
+        .is_nonnull()
+        .then_some(HexPos::from(pawn_poses[14]) - origin),
     ];
     Self { pawns }
   }
 
   pub fn extract_white_pawns(pawn_poses: &[PackedIdx; N], origin: HexPos) -> Self {
     let pawns = [
-      HexPos::from(pawn_poses[1]) - origin,
-      HexPos::from(pawn_poses[3]) - origin,
-      HexPos::from(pawn_poses[5]) - origin,
-      HexPos::from(pawn_poses[7]) - origin,
-      HexPos::from(pawn_poses[9]) - origin,
-      HexPos::from(pawn_poses[11]) - origin,
-      HexPos::from(pawn_poses[13]) - origin,
-      HexPos::from(pawn_poses[15]) - origin,
+      pawn_poses[1]
+        .is_nonnull()
+        .then_some(HexPos::from(pawn_poses[1]) - origin),
+      pawn_poses[3]
+        .is_nonnull()
+        .then_some(HexPos::from(pawn_poses[3]) - origin),
+      pawn_poses[5]
+        .is_nonnull()
+        .then_some(HexPos::from(pawn_poses[5]) - origin),
+      pawn_poses[7]
+        .is_nonnull()
+        .then_some(HexPos::from(pawn_poses[7]) - origin),
+      pawn_poses[9]
+        .is_nonnull()
+        .then_some(HexPos::from(pawn_poses[9]) - origin),
+      pawn_poses[11]
+        .is_nonnull()
+        .then_some(HexPos::from(pawn_poses[11]) - origin),
+      pawn_poses[13]
+        .is_nonnull()
+        .then_some(HexPos::from(pawn_poses[13]) - origin),
+      pawn_poses[15]
+        .is_nonnull()
+        .then_some(HexPos::from(pawn_poses[15]) - origin),
     ];
     Self { pawns }
   }
 
   pub fn apply_d6_c(&self, op_ord: usize) -> Self {
     Self {
-      pawns: self.pawns.map(|pos| pos.apply_d6_c(&D6::from_ord(op_ord))),
+      pawns: self
+        .pawns
+        .map(|pos| pos.map(|pos| pos.apply_d6_c(&D6::from_ord(op_ord)))),
     }
   }
 
   fn apply_d3_v(&self, op: &D3) -> Self {
     Self {
-      pawns: self.pawns.map(|pos| pos.apply_d3_v(op)),
+      pawns: self.pawns.map(|pos| pos.map(|pos| pos.apply_d3_v(op))),
     }
   }
 
   fn apply_k4_e(&self, op: &K4) -> Self {
     Self {
-      pawns: self.pawns.map(|pos| pos.apply_k4_e(op)),
+      pawns: self.pawns.map(|pos| pos.map(|pos| pos.apply_k4_e(op))),
     }
   }
 
   fn apply_c2_cv(&self, op: &C2) -> Self {
     Self {
-      pawns: self.pawns.map(|pos| pos.apply_c2_cv(op)),
+      pawns: self.pawns.map(|pos| pos.map(|pos| pos.apply_c2_cv(op))),
     }
   }
 
   fn apply_c2_ce(&self, op: &C2) -> Self {
     Self {
-      pawns: self.pawns.map(|pos| pos.apply_c2_ce(op)),
+      pawns: self.pawns.map(|pos| pos.map(|pos| pos.apply_c2_ce(op))),
     }
   }
 
   fn apply_c2_ev(&self, op: &C2) -> Self {
     Self {
-      pawns: self.pawns.map(|pos| pos.apply_c2_ev(op)),
+      pawns: self.pawns.map(|pos| pos.map(|pos| pos.apply_c2_ev(op))),
     }
   }
 
@@ -702,12 +736,28 @@ impl PawnList8 {
   /// Returns true if `self` and `other` contain the same coordinates in some
   /// order.
   pub fn equal_ignoring_order(&self, other: Self) -> bool {
-    self.pawns.iter().all(|pos| other.pawns.contains(pos))
+    self
+      .pawns
+      .iter()
+      .all(|pos| pos.is_none_or(|pos| other.pawns.contains(&Some(pos))))
+  }
+
+  pub fn pawn_indices<const N: usize>(&self, origin: HexPos) -> impl Iterator<Item = usize> {
+    self.pawns.iter().map(move |&pos| {
+      if let Some(pos) = pos {
+        let pos = origin + pos;
+        debug_assert!(pos.x() < N as u32 && pos.y() < N as u32);
+        pos.x() as usize + pos.y() as usize * N
+      } else {
+        0
+      }
+    })
   }
 }
 
 #[cfg(test)]
 mod tests {
+  #[cfg(target_feature = "sse4.1")]
   use std::arch::x86_64::{_mm_bsrli_si128, _mm_cvtsi128_si64x};
 
   use algebra::{group::Trivial, ordinal::Ordinal, semigroup::Semigroup};
@@ -749,7 +799,7 @@ mod tests {
       pos_at_sse(pawn_list, idx)
     }
     #[cfg(not(target_feature = "sse4.1"))]
-    pawn_list.pawns[idx]
+    pawn_list.pawns[idx].unwrap()
   }
 
   fn positions(pawn_list: &PawnList8) -> Vec<HexPosOffset> {
@@ -1007,22 +1057,30 @@ mod tests {
   #[gtest]
   fn test_pawn_indices() {
     for y in 1..=15 {
-      let mut poses = [PackedIdx::null(); N];
-      for (x, pos) in poses.iter_mut().step_by(2).enumerate() {
-        *pos = PackedIdx::new(x as u32 + 1, y);
+      for l in 1..=8 {
+        let mut poses = [PackedIdx::null(); N];
+        for (x, pos) in poses.iter_mut().step_by(2).take(l).enumerate() {
+          *pos = PackedIdx::new(x as u32 + 1, y);
+        }
+
+        let center = HexPos::new(N as u32 / 2 + 1, y);
+        let pawns = PawnList8::extract_black_pawns(&poses, center);
+
+        let other_center = HexPos::new(9, 8);
+        let expected_indices = poses
+          .iter()
+          .step_by(2)
+          .take(l)
+          .map(|&idx| {
+            let pos = HexPos::from(idx) - center + other_center;
+            pos.x() as usize + pos.y() as usize * N
+          })
+          .chain(std::iter::once(0).cycle().take(8 - l))
+          .collect_vec();
+
+        let indices = pawns.pawn_indices::<N>(other_center).collect_vec();
+        assert_that!(indices, container_eq(expected_indices), "y = {y}, l = {l}");
       }
-
-      let center = HexPos::new(6, 10);
-      let pawns = PawnList8::extract_black_pawns(&poses, center);
-
-      let expected_indices = poses
-        .iter()
-        .step_by(2)
-        .map(|&idx| idx.x() as usize + idx.y() as usize * N)
-        .collect_vec();
-
-      let indices = pawns.pawn_indices::<N>(center).collect_vec();
-      assert_that!(indices, container_eq(expected_indices));
     }
   }
 }
