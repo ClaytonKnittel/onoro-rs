@@ -174,6 +174,12 @@ impl<const N: usize> HashTable<N, D6> {
 
     let mut i = 0usize;
     'tile_loop: while i < N * N {
+      if i == 0 {
+        *table.get_mut(i) = TileHash::<D6>::new(0, 0);
+        i += 1;
+        continue;
+      }
+
       let pos = Self::ord_to_hex_pos(i);
 
       // Normalize coordinates to the center.
@@ -258,6 +264,12 @@ impl<const N: usize> HashTable<N, D3> {
 
     let mut i = 0usize;
     'tile_loop: while i < N * N {
+      if i == 0 {
+        *table.get_mut(i) = TileHash::<D3>::new(0, 0);
+        i += 1;
+        continue;
+      }
+
       let pos = Self::ord_to_hex_pos(i);
 
       // Normalize coordinates to the center.
@@ -336,6 +348,12 @@ impl<const N: usize> HashTable<N, K4> {
 
     let mut i = 0usize;
     'tile_loop: while i < N * N {
+      if i == 0 {
+        *table.get_mut(i) = TileHash::<K4>::new(0, 0);
+        i += 1;
+        continue;
+      }
+
       let pos = Self::ord_to_hex_pos(i);
 
       // Normalize coordinates to the center.
@@ -394,6 +412,12 @@ impl<const N: usize> HashTable<N, C2> {
 
     let mut i = 0usize;
     while i < N * N {
+      if i == 0 {
+        *table.get_mut(i) = TileHash::<C2>::new(0, 0);
+        i += 1;
+        continue;
+      }
+
       let pos = Self::ord_to_hex_pos(i);
 
       // Normalize coordinates to the center.
@@ -453,6 +477,12 @@ impl<const N: usize> HashTable<N, Trivial> {
 
     let mut i = 0usize;
     while i < N * N {
+      if i == 0 {
+        *table.get_mut(i) = TileHash::<Trivial>::new(0, 0);
+        i += 1;
+        continue;
+      }
+
       let (new_rng, h_cur) = rng.next_u64();
       let (new_rng, h_oth) = new_rng.next_u64();
       rng = new_rng;
@@ -504,13 +534,7 @@ mod test {
           let ord = HD6::hex_pos_ord(&symm_pos);
           let symm_hash = D6T[ord];
 
-          assert_eq!(
-            symm_hash,
-            hash.apply(&op),
-            "Expected equality of:\n  left: {}\n right: {}",
-            symm_hash,
-            hash.apply(&op)
-          );
+          assert_eq!(symm_hash, hash.apply(&op));
         }
       }
 
@@ -522,13 +546,7 @@ mod test {
           let ord = HD6::hex_pos_ord(&symm_pos);
           let symm_hash = D6T[ord];
 
-          assert_eq!(
-            symm_hash,
-            hash.apply(&op),
-            "Expected equality of:\n  left: {}\n right: {}",
-            symm_hash,
-            hash.apply(&op)
-          );
+          assert_eq!(symm_hash, hash.apply(&op));
         }
 
         s = s.apply_d6_c(&D6::Rot(1));
