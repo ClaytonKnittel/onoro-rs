@@ -28,65 +28,121 @@ impl MM128Contents {
     unsafe { _mm_load_si128(self.0.as_ptr() as *const _) }
   }
 
+  /// A vector register with all zero lanes.
   const fn zero() -> MM128Contents {
     MM128Contents([0; 16])
   }
 
+  /// A vector register with 1's in the x-coordinate lanes.
   const fn x_ones() -> MM128Contents {
     MM128Contents([1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0])
   }
 
+  /// A vector register with 1's in the x- and y-coordinate lanes.
   const fn xy_ones() -> MM128Contents {
     MM128Contents([1; 16])
   }
 
+  // The following *_shuffle methods produce shuffle control masks for
+  // `_mm_shuffle_epi8`.
+
+  /// This simply copies the input operand.
   const fn noop_shuffle() -> MM128Contents {
     MM128Contents([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15])
   }
 
+  /// This forces the result of the shuffle to be zero, since all highest-order
+  /// bits of the control mask lanes are 1.
   const fn zero_shuffle() -> MM128Contents {
     MM128Contents([-1; 16])
   }
 
+  /// This swaps adjacent pairs of epi8 lanes, which swaps the x and y
+  /// coordinates of each coordinate pair.
   const fn swap_xy_shuffle() -> MM128Contents {
     MM128Contents([1, 0, 3, 2, 5, 4, 7, 6, 9, 8, 11, 10, 13, 12, 15, 14])
   }
 
+  /// This preserves the x-coordinate lanes and sets the y-coordinate lanes to
+  /// 0.
   const fn isolate_x_shuffle() -> MM128Contents {
     MM128Contents([0, -1, 2, -1, 4, -1, 6, -1, 8, -1, 10, -1, 12, -1, 14, -1])
   }
 
+  /// This preserves the y-coordinate lanes and sets the x-coordinate lanes to
+  /// 0.
   const fn isolate_y_shuffle() -> MM128Contents {
     MM128Contents([-1, 1, -1, 3, -1, 5, -1, 7, -1, 9, -1, 11, -1, 13, -1, 15])
   }
 
+  /// This copies all x-coordinate lanes to their corresponding y-coordinates.
   const fn duplicate_x_shuffle() -> MM128Contents {
     MM128Contents([0, 0, 2, 2, 4, 4, 6, 6, 8, 8, 10, 10, 12, 12, 14, 14])
   }
 
+  /// This copies all y-coordinate lanes to their corresponding x-coordinates.
   const fn duplicate_y_shuffle() -> MM128Contents {
     MM128Contents([1, 1, 3, 3, 5, 5, 7, 7, 9, 9, 11, 11, 13, 13, 15, 15])
   }
 
+  /// This copies all x-coordinate lanes to their corresponding y-coordinates
+  /// and zeros out all x-coordinate lanes.
   const fn move_x_to_y_shuffle() -> MM128Contents {
     MM128Contents([-1, 0, -1, 2, -1, 4, -1, 6, -1, 8, -1, 10, -1, 12, -1, 14])
   }
 
+  /// This copies all y-coordinate lanes to their corresponding x-coordinates
+  /// and zeros out all y-coordinate lanes.
   const fn move_y_to_x_shuffle() -> MM128Contents {
     MM128Contents([1, -1, 3, -1, 5, -1, 7, -1, 9, -1, 11, -1, 13, -1, 15, -1])
   }
 }
 
 #[cfg(target_feature = "sse4.1")]
-#[derive(Clone, Copy)]
-pub struct PawnList8 {
-  /// Stores 8 pawns, with x- and y- coordinates in back-to-back epi8 channels.
-  pawns: __m128i,
-  zero_poses: __m128i,
-}
+mod rotate_impl {
+  use std::arch::x86_64::*;
 
-#[cfg(target_feature = "sse4.1")]
-impl PawnList8 {
+  use onoro::groups::SymmetryClass;
+
+  use crate::pawn_list::MM128Contents;
+
+  // All D6 rotation/reflection operations on (x, y) coordinate pairs can be
+  // expressed as a sum/difference/assignment of x and/or y for each
+  // coordinate.
+  //
+  // Here are the mappings of transformations for each element of D6:
+  // ```text
+  // r0 => (x, y)
+  // r1 => (x - y, y)
+  // r2 => (-y, x - y)
+  // r3 => (-x, -y)
+  // r4 => (y - x, -x)
+  // r5 => (y, y - x)
+  // s0 => (x - y, -y)
+  // s1 => (x, x - y)
+  // s2 => (y, x)
+  // s3 => (y - x, y)
+  // s4 => (-x, y - x)
+  // s5 => (-y, -x)
+  // ```
+  //
+  // We can rewrite each of these expressions as `a - b`, where `a` and `b`
+  // are one of `x`, `y`, or 0.
+  //
+  // If we have a 128-bit vector register with 16 epi8 channels containing 8
+  // coordinate pairs, then we can apply a particular group operation to every
+  // element of the vector register simultaneously using shuffles. The trick
+  // is that we can select the positive and negative components of the
+  // difference expression for the operation for each coordinate with two
+  // _mm_shuffle_epi8 calls, then compute the difference with _mm_sub_epi8.
+  //
+  // Since the instructions we will use for every group operation are the
+  // same, with the only difference being the shuffle mask, we can construct a
+  // lookup table mapping group operation ordinals to shuffle masks for the
+  // positive and negative components.
+
+  /// The shuffle mask to select the positive component of the difference
+  /// operation, indexed by group operation ordinal.
   const D6_POSITIVE_MASKS: [MM128Contents; 12] = [
     MM128Contents::noop_shuffle(),
     MM128Contents::duplicate_x_shuffle(),
@@ -101,6 +157,9 @@ impl PawnList8 {
     MM128Contents::isolate_y_shuffle(),
     MM128Contents::zero_shuffle(),
   ];
+
+  /// The shuffle mask to select the negative component of the difference
+  /// operation, indexed by group operation ordinal.
   const D6_NEGATIVE_MASKS: [MM128Contents; 12] = [
     MM128Contents::zero_shuffle(),
     MM128Contents::move_y_to_x_shuffle(),
@@ -115,6 +174,8 @@ impl PawnList8 {
     MM128Contents::duplicate_x_shuffle(),
     MM128Contents::swap_xy_shuffle(),
   ];
+
+  // TODO: Leave comment
 
   const ONES_MASKS: [MM128Contents; 29] = [
     // Trivial
@@ -179,18 +240,18 @@ impl PawnList8 {
     MM128Contents::duplicate_y_shuffle(),
     MM128Contents::zero_shuffle(),
     // C
-    Self::D6_POSITIVE_MASKS[0],
-    Self::D6_POSITIVE_MASKS[1],
-    Self::D6_POSITIVE_MASKS[2],
-    Self::D6_POSITIVE_MASKS[3],
-    Self::D6_POSITIVE_MASKS[4],
-    Self::D6_POSITIVE_MASKS[5],
-    Self::D6_POSITIVE_MASKS[6],
-    Self::D6_POSITIVE_MASKS[7],
-    Self::D6_POSITIVE_MASKS[8],
-    Self::D6_POSITIVE_MASKS[9],
-    Self::D6_POSITIVE_MASKS[10],
-    Self::D6_POSITIVE_MASKS[11],
+    D6_POSITIVE_MASKS[0],
+    D6_POSITIVE_MASKS[1],
+    D6_POSITIVE_MASKS[2],
+    D6_POSITIVE_MASKS[3],
+    D6_POSITIVE_MASKS[4],
+    D6_POSITIVE_MASKS[5],
+    D6_POSITIVE_MASKS[6],
+    D6_POSITIVE_MASKS[7],
+    D6_POSITIVE_MASKS[8],
+    D6_POSITIVE_MASKS[9],
+    D6_POSITIVE_MASKS[10],
+    D6_POSITIVE_MASKS[11],
   ];
   const NEGATIVE_MASKS: [MM128Contents; 29] = [
     // Trivial
@@ -217,18 +278,18 @@ impl PawnList8 {
     MM128Contents::isolate_x_shuffle(),
     MM128Contents::swap_xy_shuffle(),
     // C
-    Self::D6_NEGATIVE_MASKS[0],
-    Self::D6_NEGATIVE_MASKS[1],
-    Self::D6_NEGATIVE_MASKS[2],
-    Self::D6_NEGATIVE_MASKS[3],
-    Self::D6_NEGATIVE_MASKS[4],
-    Self::D6_NEGATIVE_MASKS[5],
-    Self::D6_NEGATIVE_MASKS[6],
-    Self::D6_NEGATIVE_MASKS[7],
-    Self::D6_NEGATIVE_MASKS[8],
-    Self::D6_NEGATIVE_MASKS[9],
-    Self::D6_NEGATIVE_MASKS[10],
-    Self::D6_NEGATIVE_MASKS[11],
+    D6_NEGATIVE_MASKS[0],
+    D6_NEGATIVE_MASKS[1],
+    D6_NEGATIVE_MASKS[2],
+    D6_NEGATIVE_MASKS[3],
+    D6_NEGATIVE_MASKS[4],
+    D6_NEGATIVE_MASKS[5],
+    D6_NEGATIVE_MASKS[6],
+    D6_NEGATIVE_MASKS[7],
+    D6_NEGATIVE_MASKS[8],
+    D6_NEGATIVE_MASKS[9],
+    D6_NEGATIVE_MASKS[10],
+    D6_NEGATIVE_MASKS[11],
   ];
 
   const fn symmetry_class_offset(symm_class: SymmetryClass) -> usize {
@@ -243,6 +304,42 @@ impl PawnList8 {
     }
   }
 
+  /// Applies the `D6` symmetry operation to every pair of epi8 lanes, treated as
+  /// coordinate pairs centered at (0, 0).
+  #[target_feature(enable = "sse4.1")]
+  #[inline]
+  pub fn apply_d6_c_sse(pawns: __m128i, op_ord: usize) -> __m128i {
+    let positive_mask = unsafe { D6_POSITIVE_MASKS.get_unchecked(op_ord) }.load();
+    let negative_mask = unsafe { D6_NEGATIVE_MASKS.get_unchecked(op_ord) }.load();
+    let positive = _mm_shuffle_epi8(pawns, positive_mask);
+    let negative = _mm_shuffle_epi8(pawns, negative_mask);
+    _mm_sub_epi8(positive, negative)
+  }
+
+  #[target_feature(enable = "sse4.1")]
+  #[inline]
+  pub fn apply_sse(pawns: __m128i, symm_class: SymmetryClass, op_ord: usize) -> __m128i {
+    let idx = symmetry_class_offset(symm_class) + op_ord;
+    let ones = unsafe { ONES_MASKS.get_unchecked(idx) }.load();
+    let positive_mask = unsafe { POSITIVE_MASKS.get_unchecked(idx) }.load();
+    let negative_mask = unsafe { NEGATIVE_MASKS.get_unchecked(idx) }.load();
+    let positive = _mm_shuffle_epi8(pawns, positive_mask);
+    let negative = _mm_shuffle_epi8(pawns, negative_mask);
+
+    _mm_sub_epi8(_mm_add_epi8(positive, ones), negative)
+  }
+}
+
+#[cfg(target_feature = "sse4.1")]
+#[derive(Clone, Copy)]
+pub struct PawnList8 {
+  /// Stores 8 pawns, with x- and y- coordinates in back-to-back epi8 channels.
+  pawns: __m128i,
+  zero_poses: __m128i,
+}
+
+#[cfg(target_feature = "sse4.1")]
+impl PawnList8 {
   #[target_feature(enable = "sse4.1")]
   fn extract_black_pawns_sse(pawn_poses: &[PackedIdx; N], origin: HexPos) -> Self {
     let pawns = unsafe { _mm_loadu_si128(pawn_poses.as_ptr() as *const _) };
@@ -310,12 +407,8 @@ impl PawnList8 {
 
   #[target_feature(enable = "sse4.1")]
   fn apply_d6_c_sse(&self, op_ord: usize) -> Self {
-    let positive_mask = unsafe { Self::D6_POSITIVE_MASKS.get_unchecked(op_ord) }.load();
-    let negative_mask = unsafe { Self::D6_NEGATIVE_MASKS.get_unchecked(op_ord) }.load();
-    let positive = _mm_shuffle_epi8(self.pawns, positive_mask);
-    let negative = _mm_shuffle_epi8(self.pawns, negative_mask);
     Self {
-      pawns: _mm_sub_epi8(positive, negative),
+      pawns: rotate_impl::apply_d6_c_sse(self.pawns, op_ord),
       ..*self
     }
   }
@@ -326,15 +419,8 @@ impl PawnList8 {
 
   #[target_feature(enable = "sse4.1")]
   fn apply_sse(&self, symm_class: SymmetryClass, op_ord: usize) -> Self {
-    let idx = Self::symmetry_class_offset(symm_class) + op_ord;
-    let ones = unsafe { Self::ONES_MASKS.get_unchecked(idx) }.load();
-    let positive_mask = unsafe { Self::POSITIVE_MASKS.get_unchecked(idx) }.load();
-    let negative_mask = unsafe { Self::NEGATIVE_MASKS.get_unchecked(idx) }.load();
-    let positive = _mm_shuffle_epi8(self.pawns, positive_mask);
-    let negative = _mm_shuffle_epi8(self.pawns, negative_mask);
-
     Self {
-      pawns: _mm_sub_epi8(_mm_add_epi8(positive, ones), negative),
+      pawns: rotate_impl::apply_sse(self.pawns, symm_class, op_ord),
       ..*self
     }
   }
