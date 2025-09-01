@@ -401,18 +401,27 @@ pub struct PawnList8 {
 
 #[cfg(target_feature = "ssse3")]
 impl PawnList8 {
+  /// Extracts the 8 black pawns (at even incides) from `pawn_poses` into a
+  /// `PawnList8`, ignoring any `null` poses.
   #[target_feature(enable = "ssse3")]
   fn extract_black_pawns_sse(pawn_poses: &[PackedIdx; N], origin: HexPos) -> Self {
     let pawns = unsafe { _mm_loadu_si128(pawn_poses.as_ptr() as *const _) };
 
+    // Mask just the x coordinates from each `PackedIdx`. These are
+    // conveniently already in the correct lanes, so no need to shift.
     let black_x_coords_mask = _mm_set1_epi16(0x00_0f);
     let x_coords = _mm_and_si128(pawns, black_x_coords_mask);
 
+    // Mask just the y coordinates from each `PackedIdx`, and shift them left
+    // by 4 bits into the epi8 lane to the left of their corresponding x
+    // coordinate.
     let black_y_coords_mask = _mm_set1_epi16(0x00_f0);
     let y_coords = _mm_and_si128(pawns, black_y_coords_mask);
     let y_coords = _mm_slli_epi16::<4>(y_coords);
 
+    // Combine the x and y coordinate vectors.
     let pawns = _mm_or_si128(x_coords, y_coords);
+    // Record which `PackedIdx`s were originally `null`.
     let null_poses = _mm_cmpeq_epi16(pawns, _mm_setzero_si128());
 
     let centered_pawns = Self::centered_by(pawns, origin);
@@ -423,19 +432,27 @@ impl PawnList8 {
     }
   }
 
+  /// Extracts the 8 white pawns (at odd incides) from `pawn_poses` into a
+  /// `PawnList8`, ignoring any `null` poses.
   #[target_feature(enable = "ssse3")]
   fn extract_white_pawns_sse(pawn_poses: &[PackedIdx; N], origin: HexPos) -> Self {
     let pawns = unsafe { _mm_loadu_si128(pawn_poses.as_ptr() as *const _) };
 
+    // Mask just the x coordinates from each `PackedIdx`, and shift them right
+    // by one epi8 lane.
     let white_x_coords_mask = _mm_set1_epi16(0x0f_00);
     let x_coords = _mm_and_si128(pawns, white_x_coords_mask);
     let x_coords = _mm_srli_epi16::<8>(x_coords);
 
+    // Mask just the y coordinates from each `PackedIdx`, and shift them right
+    // by 4 bits into the lower 4 bits of their epi8 lane.
     let white_y_coords_mask = _mm_set1_epi16(0xf0_00u16 as i16);
     let y_coords = _mm_and_si128(pawns, white_y_coords_mask);
     let y_coords = _mm_srli_epi16::<4>(y_coords);
 
+    // Combine the x and y coordinate vectors.
     let pawns = _mm_or_si128(x_coords, y_coords);
+    // Record which `PackedIdx`s were originally `null`.
     let null_poses = _mm_cmpeq_epi16(pawns, _mm_setzero_si128());
 
     let centered_pawns = Self::centered_by(pawns, origin);
@@ -446,6 +463,8 @@ impl PawnList8 {
     }
   }
 
+  /// Subtracts `origin` from each coordinate pair in adjacent epi8 lanes of
+  /// `pawns`, making each coordinate relative to `origin`.
   #[target_feature(enable = "ssse3")]
   fn centered_by(pawns: __m128i, origin: HexPos) -> __m128i {
     let x = origin.x();
@@ -453,6 +472,7 @@ impl PawnList8 {
     if x > u8::MAX as u32 || y > u8::MAX as u32 {
       unreachable();
     }
+    // Broadcast origin to all epi16 lanes.
     let origin_array = _mm_set1_epi16((x | (y << 8)) as i16);
 
     _mm_sub_epi8(pawns, origin_array)
