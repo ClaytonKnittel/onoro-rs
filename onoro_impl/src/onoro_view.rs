@@ -25,7 +25,7 @@ use crate::{
   r#move::Move,
   onoro_defs::{Onoro16, Onoro16View},
   pawn_list::PawnList8,
-  util::{unlikely, unreachable},
+  util::{likely, unreachable},
 };
 
 /// A wrapper over Onoro states that caches the hash of the game state and it's
@@ -124,18 +124,18 @@ impl<const N: usize> OnoroView<N> {
     let pawns_equal =
       Self::pawns_equal_with_transform(onoro1, onoro2, |pos| apply_view_transform(pos, &to_view2));
 
+    if likely(pawns_equal) {
+      return true;
+    }
+
     // In the extremely unlikely case of a hash collision, the best-guess
     // canonical orientations may not have produced equal orientations. As a
     // fallback, we can simply check every other possible view transform.
-    if unlikely(!pawns_equal) {
-      return G::for_each().skip(1).any(|op| {
-        debug_assert!(op != G::identity());
-        let to_view2 = op * to_view2.clone();
-        Self::pawns_equal_with_transform(onoro1, onoro2, |pos| apply_view_transform(pos, &to_view2))
-      });
-    }
-
-    pawns_equal
+    G::for_each().skip(1).any(|op| {
+      debug_assert!(op != G::identity());
+      let to_view2 = op * to_view2.clone();
+      Self::pawns_equal_with_transform(onoro1, onoro2, |pos| apply_view_transform(pos, &to_view2))
+    })
   }
 
   fn cmp_views_dispatch(&self, other: &Self) -> bool {
@@ -167,44 +167,50 @@ impl<const N: usize> OnoroView<N> {
     let pawns_in_play = onoro1.pawns_in_play();
     debug_assert_eq!(onoro2.pawns_in_play(), pawns_in_play);
 
-    let symm_state1 = board_symm_state_with_pawns_in_play(onoro1, pawns_in_play);
-    let symm_state2 = board_symm_state_with_pawns_in_play(onoro2, pawns_in_play);
-    let normalizing_op1 = symm_state1.op_ord();
-    let normalizing_op2 = symm_state2.op_ord();
-    let origin1 = onoro1.origin_with_pawns_in_play(&symm_state1, pawns_in_play);
-    let origin2 = onoro2.origin_with_pawns_in_play(&symm_state2, pawns_in_play);
-
-    let pawn_poses1: &[PackedIdx; 16] =
-      unsafe { (onoro1.pawn_poses() as &[_]).try_into().unwrap_unchecked() };
-    let pawn_poses2: &[PackedIdx; 16] =
-      unsafe { (onoro2.pawn_poses() as &[_]).try_into().unwrap_unchecked() };
-    let black_pawns1 = PawnList8::extract_black_pawns(pawn_poses1, origin1);
-    let white_pawns1 = PawnList8::extract_white_pawns(pawn_poses1, origin1);
-    let black_pawns2 = PawnList8::extract_black_pawns(pawn_poses2, origin2);
-    let white_pawns2 = PawnList8::extract_white_pawns(pawn_poses2, origin2);
-
-    let normalize_view1 = |pawns: PawnList8| {
-      pawns
-        .apply_d6_c(normalizing_op1)
-        .apply(symm_class, norm_view1)
+    // Find the hash-minimizing normalizing operation and origin of each board.
+    let norm_opt_and_origin = |onoro: &OnoroImpl<N>| {
+      let symm_state = board_symm_state_with_pawns_in_play(onoro, pawns_in_play);
+      (
+        symm_state.op_ord(),
+        onoro.origin_with_pawns_in_play(&symm_state, pawns_in_play),
+      )
     };
-    let normalize_view2 = |pawns: PawnList8| {
-      pawns
-        .apply_d6_c(normalizing_op2)
-        .apply(symm_class, norm_view2)
+    let (normalizing_op1, origin1) = norm_opt_and_origin(onoro1);
+    let (normalizing_op2, origin2) = norm_opt_and_origin(onoro2);
+
+    // Extract both sets of pawns into `PawnList8`'s for efficient handling.
+    let extract_pawns = |onoro: &OnoroImpl<N>, origin: HexPos| {
+      let pawn_poses: &[PackedIdx; 16] =
+        unsafe { (onoro.pawn_poses() as &[_]).try_into().unwrap_unchecked() };
+      (
+        PawnList8::extract_black_pawns(pawn_poses, origin),
+        PawnList8::extract_white_pawns(pawn_poses, origin),
+      )
     };
+    let (black_pawns1, white_pawns1) = extract_pawns(onoro1, origin1);
+    let (black_pawns2, white_pawns2) = extract_pawns(onoro2, origin2);
 
-    let black_pawns1 = normalize_view1(black_pawns1);
-    let white_pawns1 = normalize_view1(white_pawns1);
-    let black_pawns2 = normalize_view2(black_pawns2);
-    let white_pawns2 = normalize_view2(white_pawns2);
+    let normalize_view =
+      |pawns: PawnList8, com_normalizing_op: usize, hash_normalizing_op: usize| {
+        pawns
+          .apply_d6_c(com_normalizing_op)
+          .apply(symm_class, hash_normalizing_op)
+      };
+    let black_pawns1 = normalize_view(black_pawns1, normalizing_op1, norm_view1);
+    let white_pawns1 = normalize_view(white_pawns1, normalizing_op1, norm_view1);
+    let black_pawns2 = normalize_view(black_pawns2, normalizing_op2, norm_view2);
+    let white_pawns2 = normalize_view(white_pawns2, normalizing_op2, norm_view2);
 
+    // If the player to move is not the same in both boards, swap which pairs
+    // of pawns we are comparing.
     let (black_pawns2, white_pawns2) = if onoro1.player_color() == onoro2.player_color() {
       (black_pawns2, white_pawns2)
     } else {
       (white_pawns2, black_pawns2)
     };
 
+    // The boards are equal if the sets of same-colored pawns are equal,
+    // ignoring ordering.
     black_pawns1.equal_ignoring_order(black_pawns2)
       && white_pawns1.equal_ignoring_order(white_pawns2)
   }
@@ -223,29 +229,23 @@ impl<const N: usize> OnoroView<N> {
     let symm_class = view1.canon_view().symm_class();
     let pawns_equal = Self::pawns_equal_with_transform_fast(onoro1, onoro2, symm_class, op1, op2);
 
+    if likely(pawns_equal) {
+      return true;
+    }
+
     // In the extremely unlikely case of a hash collision, the best-guess
     // canonical orientations may not have produced equal orientations. As a
     // fallback, we can simply check every other possible view transform.
-    if unlikely(!pawns_equal) {
-      let group_size = match symm_class {
-        SymmetryClass::C => D6::SIZE,
-        SymmetryClass::V => D3::SIZE,
-        SymmetryClass::E => K4::SIZE,
-        SymmetryClass::CV | SymmetryClass::CE | SymmetryClass::EV => C2::SIZE,
-        SymmetryClass::Trivial => Trivial::SIZE,
-      };
-      return (1..group_size).any(|i| {
-        Self::pawns_equal_with_transform_fast(
-          onoro1,
-          onoro2,
-          symm_class,
-          op1,
-          (op2 + i) % group_size,
-        )
-      });
-    }
-
-    pawns_equal
+    let group_size = match symm_class {
+      SymmetryClass::C => D6::SIZE,
+      SymmetryClass::V => D3::SIZE,
+      SymmetryClass::E => K4::SIZE,
+      SymmetryClass::CV | SymmetryClass::CE | SymmetryClass::EV => C2::SIZE,
+      SymmetryClass::Trivial => Trivial::SIZE,
+    };
+    (1..group_size).any(|i| {
+      Self::pawns_equal_with_transform_fast(onoro1, onoro2, symm_class, op1, (op2 + i) % group_size)
+    })
   }
 
   pub(crate) fn cmp_views(&self, other: &Self) -> bool {

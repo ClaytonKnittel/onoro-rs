@@ -230,6 +230,11 @@ impl<const N: usize> OnoroImpl<N> {
     self.sum_of_mass
   }
 
+  /// Returns the origin tile assuming the given `pawns_in_play` matches
+  /// `self.pawns_in_play()`. Since `self.pawns_in_play()` has to parse some
+  /// bits out of of `OnoroState`, the compiler is not good at folding multiple
+  /// calls to this method. It can be faster to cache `pawns_in_play` if it is
+  /// needed in multiple places.
   pub fn origin_with_pawns_in_play(
     &self,
     symm_state: &BoardSymmetryState,
