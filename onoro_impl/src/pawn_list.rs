@@ -521,6 +521,12 @@ impl PawnList8 {
   /// elements.
   #[target_feature(enable = "ssse3")]
   fn equal_ignoring_order_sse(&self, other: PawnList8) -> bool {
+    // The two pawn lists are assumed to contain equal counts of null coordinates.
+    debug_assert_eq!(
+      _mm_movemask_epi8(self.null_poses).count_ones(),
+      _mm_movemask_epi8(other.null_poses).count_ones()
+    );
+
     let pawns1 = self.masked_pawns();
     let pawns2 = other.masked_pawns();
 
