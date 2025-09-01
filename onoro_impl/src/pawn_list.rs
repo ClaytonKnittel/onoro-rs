@@ -490,6 +490,9 @@ impl PawnList8 {
     unsafe { Self::extract_white_pawns_sse(pawn_poses, origin) }
   }
 
+  /// Applies a rotation/reflection from the D6 group about the origin of the
+  /// board for each pawn in the list, where `op_ord` is the ordinal of the D6
+  /// operation.
   pub fn apply_d6_c(&self, op_ord: usize) -> Self {
     Self {
       pawns: unsafe { rotate_impl::apply_d6_c_sse(self.pawns, op_ord) },
@@ -497,6 +500,9 @@ impl PawnList8 {
     }
   }
 
+  /// Applies a rotation/reflection from the respective group for the given
+  /// `symm_class` for each pawn in the list, where `op_ord` is the ordinal of
+  /// the operation for the derived group.
   pub fn apply(&self, symm_class: SymmetryClass, op_ord: usize) -> Self {
     Self {
       pawns: unsafe { rotate_impl::apply_sse(self.pawns, symm_class, op_ord) },
@@ -504,6 +510,8 @@ impl PawnList8 {
     }
   }
 
+  /// Sets all coordinates to 0 which were `null` in the original pawns array
+  /// when the coordinates were extracted.
   #[target_feature(enable = "ssse3")]
   fn masked_pawns(&self) -> __m128i {
     _mm_andnot_si128(self.null_poses, self.pawns)
@@ -516,9 +524,12 @@ impl PawnList8 {
     let pawns1 = self.masked_pawns();
     let pawns2 = other.masked_pawns();
 
+    // Replicate each of the lower/higher four epi16 channels into adjacent
+    // pairs of channels.
     let lo_pawns1 = _mm_unpacklo_epi16(pawns1, pawns1);
     let hi_pawns1 = _mm_unpackhi_epi16(pawns1, pawns1);
 
+    // Broadcast all eight different coordinates into a full __m128i register.
     let total = [
       _mm_shuffle_epi32::<0b00_00_00_00>(lo_pawns1),
       _mm_shuffle_epi32::<0b01_01_01_01>(lo_pawns1),
@@ -530,9 +541,12 @@ impl PawnList8 {
       _mm_shuffle_epi32::<0b11_11_11_11>(hi_pawns1),
     ]
     .into_iter()
+    // Compare each mask to the other pawns list.
     .map(|search_mask| _mm_cmpeq_epi16(pawns2, search_mask))
     .reduce(|l, r| _mm_add_epi16(l, r));
 
+    // The pawn lists were equal if all coordinates from `pawns1` were found in
+    // `pawns2`.
     _mm_movemask_epi8(unsafe { total.unwrap_unchecked() }) == 0xffff
   }
 
