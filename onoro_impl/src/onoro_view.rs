@@ -5,6 +5,7 @@ use std::{
 };
 
 use algebra::{
+  finite::Finite,
   group::{Group, Trivial},
   ordinal::Ordinal,
 };
@@ -20,10 +21,11 @@ use onoro::{
 use crate::{
   MoveGenerator, OnoroImpl, PackedIdx,
   canonical_view::CanonicalView,
-  canonicalize::board_symm_state,
+  canonicalize::{board_symm_state, board_symm_state_with_pawns_in_play},
   r#move::Move,
   onoro_defs::{Onoro16, Onoro16View},
-  util::unlikely,
+  pawn_list::PawnList8,
+  util::{likely, unreachable},
 };
 
 /// A wrapper over Onoro states that caches the hash of the game state and it's
@@ -64,8 +66,8 @@ impl<const N: usize> OnoroView<N> {
   {
     let symm_state1 = board_symm_state(onoro1);
     let symm_state2 = board_symm_state(onoro2);
-    let normalizing_op1 = symm_state1.op;
-    let denormalizing_op2 = symm_state2.op.inverse();
+    let normalizing_op1 = D6::from_ord(symm_state1.op_ord());
+    let denormalizing_op2 = D6::from_ord(symm_state2.op_ord()).inverse();
     let origin1 = onoro1.origin(&symm_state1);
     let origin2 = onoro2.origin(&symm_state2);
 
@@ -115,32 +117,28 @@ impl<const N: usize> OnoroView<N> {
       return false;
     }
 
-    let canon_op1 = G::from_ord(view1.canon_view().op_ord() as usize);
-    let canon_op2 = G::from_ord(view2.canon_view().op_ord() as usize);
+    let canon_op1 = G::from_ord(view1.canon_view().op_ord());
+    let canon_op2 = G::from_ord(view2.canon_view().op_ord());
     let to_view2 = canon_op2.inverse() * canon_op1;
 
     let pawns_equal =
       Self::pawns_equal_with_transform(onoro1, onoro2, |pos| apply_view_transform(pos, &to_view2));
 
+    if likely(pawns_equal) {
+      return true;
+    }
+
     // In the extremely unlikely case of a hash collision, the best-guess
     // canonical orientations may not have produced equal orientations. As a
     // fallback, we can simply check every other possible view transform.
-    if unlikely(!pawns_equal) {
-      return G::for_each().skip(1).any(|op| {
-        debug_assert!(op != G::identity());
-        let to_view2 = op * to_view2.clone();
-        Self::pawns_equal_with_transform(onoro1, onoro2, |pos| apply_view_transform(pos, &to_view2))
-      });
-    }
-
-    pawns_equal
+    G::for_each().skip(1).any(|op| {
+      debug_assert!(op != G::identity());
+      let to_view2 = op * to_view2.clone();
+      Self::pawns_equal_with_transform(onoro1, onoro2, |pos| apply_view_transform(pos, &to_view2))
+    })
   }
 
-  pub(crate) fn cmp_views(&self, other: &Self) -> bool {
-    if self.canon_view().symm_class() != other.canon_view().symm_class() {
-      return false;
-    }
-
+  fn cmp_views_dispatch(&self, other: &Self) -> bool {
     match self.canon_view().symm_class() {
       SymmetryClass::C => Self::cmp_views_in_symm_class(self, other, HexPosOffset::apply_d6_c),
       SymmetryClass::V => Self::cmp_views_in_symm_class(self, other, HexPosOffset::apply_d3_v),
@@ -152,6 +150,115 @@ impl<const N: usize> OnoroView<N> {
         Self::cmp_views_in_symm_class(self, other, HexPosOffset::apply_trivial)
       }
     }
+  }
+
+  #[cfg(target_feature = "sse4.1")]
+  fn pawns_equal_with_transform_fast(
+    onoro1: &OnoroImpl<N>,
+    onoro2: &OnoroImpl<N>,
+    symm_class: SymmetryClass,
+    norm_view1: usize,
+    norm_view2: usize,
+  ) -> bool {
+    if const { N != 16 } {
+      unreachable()
+    }
+
+    let pawns_in_play = onoro1.pawns_in_play();
+    debug_assert_eq!(onoro2.pawns_in_play(), pawns_in_play);
+
+    // Find the hash-minimizing normalizing operation and origin of each board.
+    let norm_opt_and_origin = |onoro: &OnoroImpl<N>| {
+      let symm_state = board_symm_state_with_pawns_in_play(onoro, pawns_in_play);
+      (
+        symm_state.op_ord(),
+        onoro.origin_with_pawns_in_play(&symm_state, pawns_in_play),
+      )
+    };
+    let (normalizing_op1, origin1) = norm_opt_and_origin(onoro1);
+    let (normalizing_op2, origin2) = norm_opt_and_origin(onoro2);
+
+    // Extract both sets of pawns into `PawnList8`'s for efficient handling.
+    let extract_pawns = |onoro: &OnoroImpl<N>, origin: HexPos| {
+      let pawn_poses: &[PackedIdx; 16] =
+        unsafe { (onoro.pawn_poses() as &[_]).try_into().unwrap_unchecked() };
+      (
+        PawnList8::extract_black_pawns(pawn_poses, origin),
+        PawnList8::extract_white_pawns(pawn_poses, origin),
+      )
+    };
+    let (black_pawns1, white_pawns1) = extract_pawns(onoro1, origin1);
+    let (black_pawns2, white_pawns2) = extract_pawns(onoro2, origin2);
+
+    // Rotate the pawns per their respective canonicalizing group ops.
+    let normalize_view =
+      |pawns: PawnList8, com_normalizing_op: usize, hash_normalizing_op: usize| {
+        pawns
+          .apply_d6_c(com_normalizing_op)
+          .apply(symm_class, hash_normalizing_op)
+      };
+    let black_pawns1 = normalize_view(black_pawns1, normalizing_op1, norm_view1);
+    let white_pawns1 = normalize_view(white_pawns1, normalizing_op1, norm_view1);
+    let black_pawns2 = normalize_view(black_pawns2, normalizing_op2, norm_view2);
+    let white_pawns2 = normalize_view(white_pawns2, normalizing_op2, norm_view2);
+
+    // If the player to move is not the same in both boards, swap which pairs
+    // of pawns we are comparing.
+    let (black_pawns2, white_pawns2) = if onoro1.player_color() == onoro2.player_color() {
+      (black_pawns2, white_pawns2)
+    } else {
+      (white_pawns2, black_pawns2)
+    };
+
+    // The boards are equal if the sets of same-colored pawns are equal,
+    // ignoring ordering.
+    black_pawns1.equal_ignoring_order(black_pawns2)
+      && white_pawns1.equal_ignoring_order(white_pawns2)
+  }
+
+  #[cfg(target_feature = "sse4.1")]
+  fn cmp_views_in_symm_class_fast(view1: &OnoroView<N>, view2: &OnoroView<N>) -> bool {
+    let onoro1 = &view1.onoro;
+    let onoro2 = &view2.onoro;
+
+    if onoro1.pawns_in_play() != onoro2.pawns_in_play() {
+      return false;
+    }
+
+    let op1 = view1.canon_view().op_ord();
+    let op2 = view2.canon_view().op_ord();
+    let symm_class = view1.canon_view().symm_class();
+    let pawns_equal = Self::pawns_equal_with_transform_fast(onoro1, onoro2, symm_class, op1, op2);
+
+    if likely(pawns_equal) {
+      return true;
+    }
+
+    // In the extremely unlikely case of a hash collision, the best-guess
+    // canonical orientations may not have produced equal orientations. As a
+    // fallback, we can simply check every other possible view transform.
+    let group_size = match symm_class {
+      SymmetryClass::C => D6::SIZE,
+      SymmetryClass::V => D3::SIZE,
+      SymmetryClass::E => K4::SIZE,
+      SymmetryClass::CV | SymmetryClass::CE | SymmetryClass::EV => C2::SIZE,
+      SymmetryClass::Trivial => Trivial::SIZE,
+    };
+    (1..group_size).any(|i| {
+      Self::pawns_equal_with_transform_fast(onoro1, onoro2, symm_class, op1, (op2 + i) % group_size)
+    })
+  }
+
+  pub(crate) fn cmp_views(&self, other: &Self) -> bool {
+    if self.canon_view().symm_class() != other.canon_view().symm_class() {
+      return false;
+    }
+
+    #[cfg(target_feature = "sse4.1")]
+    if const { N == 16 } {
+      return Self::cmp_views_in_symm_class_fast(self, other);
+    }
+    self.cmp_views_dispatch(other)
   }
 }
 
@@ -176,14 +283,14 @@ impl<const N: usize> Hash for OnoroView<N> {
 impl<const N: usize> Display for OnoroView<N> {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     let symm_state = board_symm_state(self.onoro());
-    let rotated = self.onoro().rotated_d6_c(symm_state.op);
+    let rotated = self.onoro().rotated_d6_c(D6::from_ord(symm_state.op_ord()));
     let _rotated = match self.canon_view().symm_class() {
-      SymmetryClass::C => rotated.rotated_d6_c(D6::from_ord(self.canon_view().op_ord() as usize)),
-      SymmetryClass::V => rotated.rotated_d3_v(D3::from_ord(self.canon_view().op_ord() as usize)),
-      SymmetryClass::E => rotated.rotated_k4_e(K4::from_ord(self.canon_view().op_ord() as usize)),
-      SymmetryClass::CV => rotated.rotated_c2_cv(C2::from_ord(self.canon_view().op_ord() as usize)),
-      SymmetryClass::CE => rotated.rotated_c2_ce(C2::from_ord(self.canon_view().op_ord() as usize)),
-      SymmetryClass::EV => rotated.rotated_c2_ev(C2::from_ord(self.canon_view().op_ord() as usize)),
+      SymmetryClass::C => rotated.rotated_d6_c(D6::from_ord(self.canon_view().op_ord())),
+      SymmetryClass::V => rotated.rotated_d3_v(D3::from_ord(self.canon_view().op_ord())),
+      SymmetryClass::E => rotated.rotated_k4_e(K4::from_ord(self.canon_view().op_ord())),
+      SymmetryClass::CV => rotated.rotated_c2_cv(C2::from_ord(self.canon_view().op_ord())),
+      SymmetryClass::CE => rotated.rotated_c2_ce(C2::from_ord(self.canon_view().op_ord())),
+      SymmetryClass::EV => rotated.rotated_c2_ev(C2::from_ord(self.canon_view().op_ord())),
       SymmetryClass::Trivial => rotated,
     };
 
@@ -192,15 +299,14 @@ impl<const N: usize> Display for OnoroView<N> {
       "{}\n{:?}: canon: {}, normalize: {} ({:#018x?})",
       self.onoro,
       self.canon_view().symm_class(),
-      symm_state.op,
+      D6::from_ord(symm_state.op_ord()),
       match self.canon_view().symm_class() {
-        SymmetryClass::C => D6::from_ord(self.canon_view().op_ord() as usize).to_string(),
-        SymmetryClass::V => D3::from_ord(self.canon_view().op_ord() as usize).to_string(),
-        SymmetryClass::E => K4::from_ord(self.canon_view().op_ord() as usize).to_string(),
+        SymmetryClass::C => D6::from_ord(self.canon_view().op_ord()).to_string(),
+        SymmetryClass::V => D3::from_ord(self.canon_view().op_ord()).to_string(),
+        SymmetryClass::E => K4::from_ord(self.canon_view().op_ord()).to_string(),
         SymmetryClass::CV | SymmetryClass::CE | SymmetryClass::EV =>
-          C2::from_ord(self.canon_view().op_ord() as usize).to_string(),
-        SymmetryClass::Trivial =>
-          Trivial::from_ord(self.canon_view().op_ord() as usize).to_string(),
+          C2::from_ord(self.canon_view().op_ord()).to_string(),
+        SymmetryClass::Trivial => Trivial::from_ord(self.canon_view().op_ord()).to_string(),
       },
       self.canon_view().hash()
     )

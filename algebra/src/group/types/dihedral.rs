@@ -15,6 +15,13 @@ impl<const N: u16> Dihedral<N> {
     Self::Rot(0)
   }
 
+  pub const fn const_ord(self) -> usize {
+    match self {
+      Self::Rot(i) => i as usize,
+      Self::Rfl(i) => (N + i) as usize,
+    }
+  }
+
   pub const fn const_op(&self, rhs: &Self) -> Self {
     match (*self, *rhs) {
       (Self::Rot(i), Self::Rot(j)) => Self::Rot((i + j) % N),
@@ -39,10 +46,7 @@ impl<const N: u16> Finite for Dihedral<N> {
 
 impl<const N: u16> Ordinal for Dihedral<N> {
   fn ord(&self) -> usize {
-    match self {
-      Self::Rot(i) => *i as usize,
-      Self::Rfl(i) => (N + i) as usize,
-    }
+    Self::const_ord(*self)
   }
 
   fn from_ord(ord: usize) -> Self {

@@ -37,10 +37,11 @@ harness = false
 
 [profile.profiled]
 inherits = "release"
-opt-level = 1
-lto = "none"
+opt-level = 3
+lto = "thin"
 debug = 2
 strip = "none"
+force-frame-pointers = true
 
 [dev-dependencies]
 googletest = "0.14.2"

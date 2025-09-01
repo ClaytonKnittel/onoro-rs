@@ -4,3 +4,4 @@ target
 *.svg
 *.swp
 *.txt
+perf.data*

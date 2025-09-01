@@ -41,8 +41,8 @@ impl CanonicalView {
     self.symm_class
   }
 
-  pub fn op_ord(&self) -> u8 {
-    self.op_ord
+  pub fn op_ord(&self) -> usize {
+    self.op_ord as usize
   }
 
   pub fn hash(&self) -> u64 {
