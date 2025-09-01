@@ -152,7 +152,7 @@ impl<const N: usize> OnoroView<N> {
     }
   }
 
-  #[target_feature(enable = "ssse3")]
+  #[cfg(target_feature = "sse4.1")]
   fn pawns_equal_with_transform_fast(
     onoro1: &OnoroImpl<N>,
     onoro2: &OnoroImpl<N>,
@@ -216,7 +216,7 @@ impl<const N: usize> OnoroView<N> {
       && white_pawns1.equal_ignoring_order(white_pawns2)
   }
 
-  #[target_feature(enable = "ssse3")]
+  #[cfg(target_feature = "sse4.1")]
   fn cmp_views_in_symm_class_fast(view1: &OnoroView<N>, view2: &OnoroView<N>) -> bool {
     let onoro1 = &view1.onoro;
     let onoro2 = &view2.onoro;
@@ -254,9 +254,9 @@ impl<const N: usize> OnoroView<N> {
       return false;
     }
 
-    #[cfg(target_feature = "ssse3")]
+    #[cfg(target_feature = "sse4.1")]
     if const { N == 16 } {
-      return unsafe { Self::cmp_views_in_symm_class_fast(self, other) };
+      return Self::cmp_views_in_symm_class_fast(self, other);
     }
     self.cmp_views_dispatch(other)
   }
