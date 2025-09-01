@@ -490,28 +490,18 @@ impl PawnList8 {
     unsafe { Self::extract_white_pawns_sse(pawn_poses, origin) }
   }
 
-  #[target_feature(enable = "ssse3")]
-  fn apply_d6_c_sse(&self, op_ord: usize) -> Self {
-    Self {
-      pawns: rotate_impl::apply_d6_c_sse(self.pawns, op_ord),
-      ..*self
-    }
-  }
-
   pub fn apply_d6_c(&self, op_ord: usize) -> Self {
-    unsafe { self.apply_d6_c_sse(op_ord) }
-  }
-
-  #[target_feature(enable = "ssse3")]
-  fn apply_sse(&self, symm_class: SymmetryClass, op_ord: usize) -> Self {
     Self {
-      pawns: rotate_impl::apply_sse(self.pawns, symm_class, op_ord),
+      pawns: unsafe { rotate_impl::apply_d6_c_sse(self.pawns, op_ord) },
       ..*self
     }
   }
 
   pub fn apply(&self, symm_class: SymmetryClass, op_ord: usize) -> Self {
-    unsafe { self.apply_sse(symm_class, op_ord) }
+    Self {
+      pawns: unsafe { rotate_impl::apply_sse(self.pawns, symm_class, op_ord) },
+      ..*self
+    }
   }
 
   #[target_feature(enable = "ssse3")]
