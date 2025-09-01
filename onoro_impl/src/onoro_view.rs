@@ -102,6 +102,56 @@ impl<const N: usize> OnoroView<N> {
     })
   }
 
+  fn cmp_views_in_symm_class<G: Group + Ordinal + Clone + Display, F>(
+    view1: &OnoroView<N>,
+    view2: &OnoroView<N>,
+    mut apply_view_transform: F,
+  ) -> bool
+  where
+    F: FnMut(&HexPosOffset, &G) -> HexPosOffset,
+  {
+    let onoro1 = &view1.onoro;
+    let onoro2 = &view2.onoro;
+
+    if onoro1.pawns_in_play() != onoro2.pawns_in_play() {
+      return false;
+    }
+
+    let canon_op1 = G::from_ord(view1.canon_view().op_ord());
+    let canon_op2 = G::from_ord(view2.canon_view().op_ord());
+    let to_view2 = canon_op2.inverse() * canon_op1;
+
+    let pawns_equal =
+      Self::pawns_equal_with_transform(onoro1, onoro2, |pos| apply_view_transform(pos, &to_view2));
+
+    // In the extremely unlikely case of a hash collision, the best-guess
+    // canonical orientations may not have produced equal orientations. As a
+    // fallback, we can simply check every other possible view transform.
+    if unlikely(!pawns_equal) {
+      return G::for_each().skip(1).any(|op| {
+        debug_assert!(op != G::identity());
+        let to_view2 = op * to_view2.clone();
+        Self::pawns_equal_with_transform(onoro1, onoro2, |pos| apply_view_transform(pos, &to_view2))
+      });
+    }
+
+    pawns_equal
+  }
+
+  fn cmp_views_dispatch(&self, other: &Self) -> bool {
+    match self.canon_view().symm_class() {
+      SymmetryClass::C => Self::cmp_views_in_symm_class(self, other, HexPosOffset::apply_d6_c),
+      SymmetryClass::V => Self::cmp_views_in_symm_class(self, other, HexPosOffset::apply_d3_v),
+      SymmetryClass::E => Self::cmp_views_in_symm_class(self, other, HexPosOffset::apply_k4_e),
+      SymmetryClass::CV => Self::cmp_views_in_symm_class(self, other, HexPosOffset::apply_c2_cv),
+      SymmetryClass::CE => Self::cmp_views_in_symm_class(self, other, HexPosOffset::apply_c2_ce),
+      SymmetryClass::EV => Self::cmp_views_in_symm_class(self, other, HexPosOffset::apply_c2_ev),
+      SymmetryClass::Trivial => {
+        Self::cmp_views_in_symm_class(self, other, HexPosOffset::apply_trivial)
+      }
+    }
+  }
+
   #[target_feature(enable = "sse4.1")]
   fn pawns_equal_with_transform_fast(
     onoro1: &OnoroImpl<N>,
@@ -159,42 +209,6 @@ impl<const N: usize> OnoroView<N> {
       && white_pawns1.equal_ignoring_order(white_pawns2)
   }
 
-  fn cmp_views_in_symm_class<G: Group + Ordinal + Clone + Display, F>(
-    view1: &OnoroView<N>,
-    view2: &OnoroView<N>,
-    mut apply_view_transform: F,
-  ) -> bool
-  where
-    F: FnMut(&HexPosOffset, &G) -> HexPosOffset,
-  {
-    let onoro1 = &view1.onoro;
-    let onoro2 = &view2.onoro;
-
-    if onoro1.pawns_in_play() != onoro2.pawns_in_play() {
-      return false;
-    }
-
-    let canon_op1 = G::from_ord(view1.canon_view().op_ord());
-    let canon_op2 = G::from_ord(view2.canon_view().op_ord());
-    let to_view2 = canon_op2.inverse() * canon_op1;
-
-    let pawns_equal =
-      Self::pawns_equal_with_transform(onoro1, onoro2, |pos| apply_view_transform(pos, &to_view2));
-
-    // In the extremely unlikely case of a hash collision, the best-guess
-    // canonical orientations may not have produced equal orientations. As a
-    // fallback, we can simply check every other possible view transform.
-    if unlikely(!pawns_equal) {
-      return G::for_each().skip(1).any(|op| {
-        debug_assert!(op != G::identity());
-        let to_view2 = op * to_view2.clone();
-        Self::pawns_equal_with_transform(onoro1, onoro2, |pos| apply_view_transform(pos, &to_view2))
-      });
-    }
-
-    pawns_equal
-  }
-
   #[target_feature(enable = "sse4.1")]
   fn cmp_views_in_symm_class_fast(view1: &OnoroView<N>, view2: &OnoroView<N>) -> bool {
     let onoro1 = &view1.onoro;
@@ -232,20 +246,6 @@ impl<const N: usize> OnoroView<N> {
     }
 
     pawns_equal
-  }
-
-  fn cmp_views_dispatch(&self, other: &Self) -> bool {
-    match self.canon_view().symm_class() {
-      SymmetryClass::C => Self::cmp_views_in_symm_class(self, other, HexPosOffset::apply_d6_c),
-      SymmetryClass::V => Self::cmp_views_in_symm_class(self, other, HexPosOffset::apply_d3_v),
-      SymmetryClass::E => Self::cmp_views_in_symm_class(self, other, HexPosOffset::apply_k4_e),
-      SymmetryClass::CV => Self::cmp_views_in_symm_class(self, other, HexPosOffset::apply_c2_cv),
-      SymmetryClass::CE => Self::cmp_views_in_symm_class(self, other, HexPosOffset::apply_c2_ce),
-      SymmetryClass::EV => Self::cmp_views_in_symm_class(self, other, HexPosOffset::apply_c2_ev),
-      SymmetryClass::Trivial => {
-        Self::cmp_views_in_symm_class(self, other, HexPosOffset::apply_trivial)
-      }
-    }
   }
 
   pub(crate) fn cmp_views(&self, other: &Self) -> bool {
