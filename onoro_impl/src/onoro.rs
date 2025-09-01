@@ -24,7 +24,7 @@ use crate::{
   p2_move_gen::P2MoveGenerator,
   packed_hex_pos::PackedHexPos,
   packed_idx::{IdxOffset, PackedIdx},
-  util::{equal_mask_epi8, packed_positions_to_mask, unlikely},
+  util::{equal_mask_epi8, likely, packed_positions_to_mask, unlikely},
 };
 
 /// An Onoro game state with `N / 2` pawns per player.
@@ -236,7 +236,13 @@ impl<const N: usize> OnoroImpl<N> {
   pub fn origin(&self, symm_state: &BoardSymmetryState) -> HexPos {
     let x = self.sum_of_mass.x() as u32;
     let y = self.sum_of_mass.y() as u32;
-    let truncated_com = HexPos::new(x / self.pawns_in_play(), y / self.pawns_in_play());
+
+    let pawns_in_play = self.pawns_in_play();
+    let truncated_com = if likely(pawns_in_play == N as u32) {
+      HexPos::new(x / N as u32, y / N as u32)
+    } else {
+      HexPos::new(x / self.pawns_in_play(), y / self.pawns_in_play())
+    };
     truncated_com + symm_state.center_offset()
   }
 
