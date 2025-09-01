@@ -361,27 +361,21 @@ impl PawnList8 {
     let pawns1 = self.masked_pawns();
     let pawns2 = other.masked_pawns();
 
-    let lo_pawns1 = _mm_cvtsi128_si64x(pawns1) as u64;
-    let pawns1 = _mm_unpackhi_epi64(pawns1, pawns1);
-    let hi_pawns1 = _mm_cvtsi128_si64x(pawns1) as u64;
-
-    let eq_poses = |needle: i16| {
-      let search_mask = _mm_set1_epi16(needle);
-      _mm_cmpeq_epi16(pawns2, search_mask)
-    };
+    let lo_pawns1 = _mm_unpacklo_epi16(pawns1, pawns1);
+    let hi_pawns1 = _mm_unpackhi_epi16(pawns1, pawns1);
 
     let total = [
-      lo_pawns1 as i16,
-      (lo_pawns1 >> 16) as i16,
-      (lo_pawns1 >> 32) as i16,
-      (lo_pawns1 >> 48) as i16,
-      hi_pawns1 as i16,
-      (hi_pawns1 >> 16) as i16,
-      (hi_pawns1 >> 32) as i16,
-      (hi_pawns1 >> 48) as i16,
+      _mm_shuffle_epi32::<0b00_00_00_00>(lo_pawns1),
+      _mm_shuffle_epi32::<0b01_01_01_01>(lo_pawns1),
+      _mm_shuffle_epi32::<0b10_10_10_10>(lo_pawns1),
+      _mm_shuffle_epi32::<0b11_11_11_11>(lo_pawns1),
+      _mm_shuffle_epi32::<0b00_00_00_00>(hi_pawns1),
+      _mm_shuffle_epi32::<0b01_01_01_01>(hi_pawns1),
+      _mm_shuffle_epi32::<0b10_10_10_10>(hi_pawns1),
+      _mm_shuffle_epi32::<0b11_11_11_11>(hi_pawns1),
     ]
     .into_iter()
-    .map(eq_poses)
+    .map(|search_mask| _mm_cmpeq_epi16(pawns2, search_mask))
     .reduce(|l, r| _mm_add_epi16(l, r));
 
     _mm_movemask_epi8(unsafe { total.unwrap_unchecked() }) == 0xffff
