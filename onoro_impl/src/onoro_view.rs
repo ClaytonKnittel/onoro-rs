@@ -190,6 +190,7 @@ impl<const N: usize> OnoroView<N> {
     let (black_pawns1, white_pawns1) = extract_pawns(onoro1, origin1);
     let (black_pawns2, white_pawns2) = extract_pawns(onoro2, origin2);
 
+    // Rotate the pawns per their respective canonicalizing group ops.
     let normalize_view =
       |pawns: PawnList8, com_normalizing_op: usize, hash_normalizing_op: usize| {
         pawns
