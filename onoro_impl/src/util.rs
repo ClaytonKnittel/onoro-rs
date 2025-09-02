@@ -102,6 +102,7 @@ impl<I: PrimInt> Default for MinAndMax<I> {
 }
 
 pub trait MM128Iter {
+  /// Iterates over the epi16 lanes of the register.
   fn iter_epi16(self) -> impl Iterator<Item = i16>;
 }
 
