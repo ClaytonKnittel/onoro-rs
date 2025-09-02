@@ -46,6 +46,10 @@ impl PackedIdx {
     ((self.bytes.0 as u32) >> 4) & 0x0fu32
   }
 
+  pub const fn is_nonnull(&self) -> bool {
+    self.bytes.0 != 0
+  }
+
   /// Returns the coordinate along the xy-axis, the angular bisector between
   /// the x- and y-axes. This is normalized such that any PackedIdx will return
   /// a positive value.

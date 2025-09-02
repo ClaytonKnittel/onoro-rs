@@ -12,6 +12,8 @@ use onoro::{
   hex_pos::HexPosOffset,
 };
 
+#[cfg(target_feature = "sse4.1")]
+use crate::util::MM128Iter;
 use crate::{PackedIdx, util::unreachable};
 
 const N: usize = 16;
@@ -463,18 +465,21 @@ impl PawnList8 {
     }
   }
 
+  #[target_feature(enable = "sse4.1")]
+  fn broadcast_hex_pos(pos: HexPos) -> __m128i {
+    let x = pos.x();
+    let y = pos.y();
+    if x > u8::MAX as u32 || y > u8::MAX as u32 {
+      unreachable();
+    }
+    _mm_set1_epi16((x | (y << 8)) as i16)
+  }
+
   /// Subtracts `origin` from each coordinate pair in adjacent epi8 lanes of
   /// `pawns`, making each coordinate relative to `origin`.
   #[target_feature(enable = "sse4.1")]
   fn centered_by(pawns: __m128i, origin: HexPos) -> __m128i {
-    let x = origin.x();
-    let y = origin.y();
-    if x > u8::MAX as u32 || y > u8::MAX as u32 {
-      unreachable();
-    }
-    // Broadcast origin to all epi16 lanes.
-    let origin_array = _mm_set1_epi16((x | (y << 8)) as i16);
-
+    let origin_array = Self::broadcast_hex_pos(origin);
     _mm_sub_epi8(pawns, origin_array)
   }
 
@@ -519,7 +524,7 @@ impl PawnList8 {
   /// pawns array when the coordinates were extracted. This is an impossible
   /// relative coordinate given we are playing with 16 pawns)
   #[target_feature(enable = "sse4.1")]
-  fn masked_pawns(&self) -> __m128i {
+  fn remove_null_pawns(&self) -> __m128i {
     let impossible_coords = _mm_set1_epi8(i8::MAX);
     _mm_blendv_epi8(self.pawns, impossible_coords, self.null_mask)
   }
@@ -533,8 +538,8 @@ impl PawnList8 {
       _mm_movemask_epi8(other.null_mask).count_ones()
     );
 
-    let pawns1 = self.masked_pawns();
-    let pawns2 = other.masked_pawns();
+    let pawns1 = self.remove_null_pawns();
+    let pawns2 = other.remove_null_pawns();
 
     // Replicate each of the lower/higher four epi16 channels into adjacent
     // pairs of channels.
@@ -567,77 +572,158 @@ impl PawnList8 {
   pub fn equal_ignoring_order(&self, other: PawnList8) -> bool {
     unsafe { self.equal_ignoring_order_sse(other) }
   }
+
+  /// Zeroes out all coordinates which were `null` originally.
+  #[target_feature(enable = "sse4.1")]
+  fn zero_null_pawns(&self, pawns: __m128i) -> __m128i {
+    _mm_andnot_si128(self.null_mask, pawns)
+  }
+
+  #[target_feature(enable = "sse4.1")]
+  fn pawn_indices_sse<const N: usize>(&self, origin: HexPos) -> impl Iterator<Item = usize> {
+    debug_assert!(N.is_power_of_two());
+
+    let origin_array = Self::broadcast_hex_pos(origin);
+    let absolute_pawns = _mm_add_epi8(self.pawns, origin_array);
+    let x_coords_mask = _mm_set1_epi16(0x00_ff);
+    let x_coords = _mm_and_si128(absolute_pawns, x_coords_mask);
+
+    let y_coords_mask = _mm_set1_epi16(0xff_00u16 as i16);
+    let y_coords = _mm_and_si128(absolute_pawns, y_coords_mask);
+
+    let y_shifted = match const { 8 - N.trailing_zeros() } {
+      0 => _mm_srli_epi16::<0>(y_coords),
+      1 => _mm_srli_epi16::<1>(y_coords),
+      2 => _mm_srli_epi16::<2>(y_coords),
+      3 => _mm_srli_epi16::<3>(y_coords),
+      4 => _mm_srli_epi16::<4>(y_coords),
+      5 => _mm_srli_epi16::<5>(y_coords),
+      6 => _mm_srli_epi16::<6>(y_coords),
+      7 => _mm_srli_epi16::<7>(y_coords),
+      _ => unreachable(),
+    };
+
+    let indices = self.zero_null_pawns(_mm_add_epi16(x_coords, y_shifted));
+    indices
+      .iter_epi16()
+      .map(|i| i as usize)
+      .inspect(|&i| debug_assert!(i < N * N))
+  }
+
+  /// Returns an iterator over the indices of pawns in a table with center at
+  /// `origin`. The index of a relative position (x, y) is
+  /// `(x + origin.x, (y + origin.y) * N)`. It is assumed that
+  /// |x| < N / 2, |y| < N / 2.
+  ///
+  /// `null` positions map to index 0.
+  pub fn pawn_indices<const N: usize>(&self, origin: HexPos) -> impl Iterator<Item = usize> {
+    unsafe { self.pawn_indices_sse::<N>(origin) }
+  }
 }
 
 #[cfg(not(target_feature = "sse4.1"))]
 #[derive(Clone, Copy)]
 pub struct PawnList8 {
-  pawns: [HexPosOffset; 8],
+  pawns: [Option<HexPosOffset>; 8],
 }
 
 #[cfg(not(target_feature = "sse4.1"))]
 impl PawnList8 {
   pub fn extract_black_pawns(pawn_poses: &[PackedIdx; N], origin: HexPos) -> Self {
     let pawns = [
-      HexPos::from(pawn_poses[0]) - origin,
-      HexPos::from(pawn_poses[2]) - origin,
-      HexPos::from(pawn_poses[4]) - origin,
-      HexPos::from(pawn_poses[6]) - origin,
-      HexPos::from(pawn_poses[8]) - origin,
-      HexPos::from(pawn_poses[10]) - origin,
-      HexPos::from(pawn_poses[12]) - origin,
-      HexPos::from(pawn_poses[14]) - origin,
+      pawn_poses[0]
+        .is_nonnull()
+        .then_some(HexPos::from(pawn_poses[0]) - origin),
+      pawn_poses[2]
+        .is_nonnull()
+        .then_some(HexPos::from(pawn_poses[2]) - origin),
+      pawn_poses[4]
+        .is_nonnull()
+        .then_some(HexPos::from(pawn_poses[4]) - origin),
+      pawn_poses[6]
+        .is_nonnull()
+        .then_some(HexPos::from(pawn_poses[6]) - origin),
+      pawn_poses[8]
+        .is_nonnull()
+        .then_some(HexPos::from(pawn_poses[8]) - origin),
+      pawn_poses[10]
+        .is_nonnull()
+        .then_some(HexPos::from(pawn_poses[10]) - origin),
+      pawn_poses[12]
+        .is_nonnull()
+        .then_some(HexPos::from(pawn_poses[12]) - origin),
+      pawn_poses[14]
+        .is_nonnull()
+        .then_some(HexPos::from(pawn_poses[14]) - origin),
     ];
     Self { pawns }
   }
 
   pub fn extract_white_pawns(pawn_poses: &[PackedIdx; N], origin: HexPos) -> Self {
     let pawns = [
-      HexPos::from(pawn_poses[1]) - origin,
-      HexPos::from(pawn_poses[3]) - origin,
-      HexPos::from(pawn_poses[5]) - origin,
-      HexPos::from(pawn_poses[7]) - origin,
-      HexPos::from(pawn_poses[9]) - origin,
-      HexPos::from(pawn_poses[11]) - origin,
-      HexPos::from(pawn_poses[13]) - origin,
-      HexPos::from(pawn_poses[15]) - origin,
+      pawn_poses[1]
+        .is_nonnull()
+        .then_some(HexPos::from(pawn_poses[1]) - origin),
+      pawn_poses[3]
+        .is_nonnull()
+        .then_some(HexPos::from(pawn_poses[3]) - origin),
+      pawn_poses[5]
+        .is_nonnull()
+        .then_some(HexPos::from(pawn_poses[5]) - origin),
+      pawn_poses[7]
+        .is_nonnull()
+        .then_some(HexPos::from(pawn_poses[7]) - origin),
+      pawn_poses[9]
+        .is_nonnull()
+        .then_some(HexPos::from(pawn_poses[9]) - origin),
+      pawn_poses[11]
+        .is_nonnull()
+        .then_some(HexPos::from(pawn_poses[11]) - origin),
+      pawn_poses[13]
+        .is_nonnull()
+        .then_some(HexPos::from(pawn_poses[13]) - origin),
+      pawn_poses[15]
+        .is_nonnull()
+        .then_some(HexPos::from(pawn_poses[15]) - origin),
     ];
     Self { pawns }
   }
 
   pub fn apply_d6_c(&self, op_ord: usize) -> Self {
     Self {
-      pawns: self.pawns.map(|pos| pos.apply_d6_c(&D6::from_ord(op_ord))),
+      pawns: self
+        .pawns
+        .map(|pos| pos.map(|pos| pos.apply_d6_c(&D6::from_ord(op_ord)))),
     }
   }
 
   fn apply_d3_v(&self, op: &D3) -> Self {
     Self {
-      pawns: self.pawns.map(|pos| pos.apply_d3_v(op)),
+      pawns: self.pawns.map(|pos| pos.map(|pos| pos.apply_d3_v(op))),
     }
   }
 
   fn apply_k4_e(&self, op: &K4) -> Self {
     Self {
-      pawns: self.pawns.map(|pos| pos.apply_k4_e(op)),
+      pawns: self.pawns.map(|pos| pos.map(|pos| pos.apply_k4_e(op))),
     }
   }
 
   fn apply_c2_cv(&self, op: &C2) -> Self {
     Self {
-      pawns: self.pawns.map(|pos| pos.apply_c2_cv(op)),
+      pawns: self.pawns.map(|pos| pos.map(|pos| pos.apply_c2_cv(op))),
     }
   }
 
   fn apply_c2_ce(&self, op: &C2) -> Self {
     Self {
-      pawns: self.pawns.map(|pos| pos.apply_c2_ce(op)),
+      pawns: self.pawns.map(|pos| pos.map(|pos| pos.apply_c2_ce(op))),
     }
   }
 
   fn apply_c2_ev(&self, op: &C2) -> Self {
     Self {
-      pawns: self.pawns.map(|pos| pos.apply_c2_ev(op)),
+      pawns: self.pawns.map(|pos| pos.map(|pos| pos.apply_c2_ev(op))),
     }
   }
 
@@ -660,12 +746,28 @@ impl PawnList8 {
   /// Returns true if `self` and `other` contain the same coordinates in some
   /// order.
   pub fn equal_ignoring_order(&self, other: Self) -> bool {
-    self.pawns.iter().all(|pos| other.pawns.contains(pos))
+    self
+      .pawns
+      .iter()
+      .all(|pos| pos.is_none_or(|pos| other.pawns.contains(&Some(pos))))
+  }
+
+  pub fn pawn_indices<const N: usize>(&self, origin: HexPos) -> impl Iterator<Item = usize> {
+    self.pawns.iter().map(move |&pos| {
+      if let Some(pos) = pos {
+        let pos = origin + pos;
+        debug_assert!(pos.x() < N as u32 && pos.y() < N as u32);
+        pos.x() as usize + pos.y() as usize * N
+      } else {
+        0
+      }
+    })
   }
 }
 
 #[cfg(test)]
 mod tests {
+  #[cfg(target_feature = "sse4.1")]
   use std::arch::x86_64::{_mm_bsrli_si128, _mm_cvtsi128_si64x};
 
   use algebra::{group::Trivial, ordinal::Ordinal, semigroup::Semigroup};
@@ -707,7 +809,7 @@ mod tests {
       pos_at_sse(pawn_list, idx)
     }
     #[cfg(not(target_feature = "sse4.1"))]
-    pawn_list.pawns[idx]
+    pawn_list.pawns[idx].unwrap()
   }
 
   fn positions(pawn_list: &PawnList8) -> Vec<HexPosOffset> {
@@ -960,5 +1062,35 @@ mod tests {
     let black_pawns1 = PawnList8::extract_black_pawns(&poses1, origin);
     let black_pawns2 = PawnList8::extract_black_pawns(&poses2, origin);
     assert!(!black_pawns1.equal_ignoring_order(black_pawns2));
+  }
+
+  #[gtest]
+  fn test_pawn_indices() {
+    for y in 1..=15 {
+      for l in 1..=8 {
+        let mut poses = [PackedIdx::null(); N];
+        for (x, pos) in poses.iter_mut().step_by(2).take(l).enumerate() {
+          *pos = PackedIdx::new(x as u32 + 1, y);
+        }
+
+        let center = HexPos::new(N as u32 / 2 + 1, y);
+        let pawns = PawnList8::extract_black_pawns(&poses, center);
+
+        let other_center = HexPos::new(9, 8);
+        let expected_indices = poses
+          .iter()
+          .step_by(2)
+          .take(l)
+          .map(|&idx| {
+            let pos = HexPos::from(idx) - center + other_center;
+            pos.x() as usize + pos.y() as usize * N
+          })
+          .chain(std::iter::once(0).cycle().take(8 - l))
+          .collect_vec();
+
+        let indices = pawns.pawn_indices::<N>(other_center).collect_vec();
+        assert_that!(indices, container_eq(expected_indices), "y = {y}, l = {l}");
+      }
+    }
   }
 }

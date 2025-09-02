@@ -101,6 +101,18 @@ impl<I: PrimInt> Default for MinAndMax<I> {
   }
 }
 
+pub trait MM128Iter {
+  /// Iterates over the epi16 lanes of the register.
+  fn iter_epi16(self) -> impl Iterator<Item = i16>;
+}
+
+impl MM128Iter for __m128i {
+  #[inline]
+  fn iter_epi16(self) -> impl Iterator<Item = i16> {
+    unsafe { core::mem::transmute::<__m128i, [i16; 8]>(self) }.into_iter()
+  }
+}
+
 /// Sorts the 16-bit lanes of `vec`, returning the sorted result.
 #[allow(dead_code)]
 #[inline]
