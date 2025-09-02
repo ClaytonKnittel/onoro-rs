@@ -31,7 +31,7 @@ impl std::hash::BuildHasher for BuildPassThroughHasher {
 }
 
 fn solve_default_start(c: &mut Criterion) {
-  let mut group = c.benchmark_group("solve");
+  let mut group = c.benchmark_group("solve p1");
   group.throughput(Throughput::Elements(1));
   group.measurement_time(Duration::from_secs(20));
 
@@ -41,7 +41,7 @@ fn solve_default_start(c: &mut Criterion) {
     b.iter(|| {
       let options = cooperate::Options {
         num_threads: 1,
-        search_depth: 5,
+        search_depth: 7,
         unit_depth: 0,
       };
       let score = solve_with_hasher(
@@ -56,5 +56,38 @@ fn solve_default_start(c: &mut Criterion) {
   group.finish();
 }
 
-criterion_group!(cooperate_benches, solve_default_start);
+fn solve_phase2(c: &mut Criterion) {
+  let mut group = c.benchmark_group("solve p2");
+  group.throughput(Throughput::Elements(1));
+  group.measurement_time(Duration::from_secs(20));
+
+  let onoro = Onoro16::from_board_string(
+    ". . . W . .
+      . B B B W .
+       . W B B B W
+        B W W W B .
+         . W . . . .",
+  )
+  .unwrap();
+
+  group.bench_function("solve 1 thread phase 2 to depth 4", |b| {
+    b.iter(|| {
+      let options = cooperate::Options {
+        num_threads: 1,
+        search_depth: 4,
+        unit_depth: 0,
+      };
+      let score = solve_with_hasher(
+        &OnoroView::new(onoro.clone()),
+        options,
+        BuildPassThroughHasher,
+      );
+      black_box(score);
+    })
+  });
+
+  group.finish();
+}
+
+criterion_group!(cooperate_benches, solve_default_start, solve_phase2);
 criterion_main!(cooperate_benches);
