@@ -37,7 +37,7 @@ fn solve_default_start(c: &mut Criterion) {
 
   let onoro = Onoro16::default_start();
 
-  group.bench_function("solve 1 thread default start to depth 5", |b| {
+  group.bench_function("solve 1 thread default start to depth 7", |b| {
     b.iter(|| {
       let options = cooperate::Options {
         num_threads: 1,
