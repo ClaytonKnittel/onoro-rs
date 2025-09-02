@@ -149,18 +149,18 @@ where
   }
   assert!(!any_bad);
 
-  for mv in game.each_move() {
-    let next_state = game.with_move(mv);
-    print!("{mv}: ");
-    // if let Some(score) = globals.resolved_states_table().get(&next_state) {
-    //   println!("{score}");
-    //   if score.score_at_depth(score.determined_depth()) != ScoreValue::Tie {
-    //     playout(&next_state, globals.resolved_states_table(), score.determined_depth());
-    //   }
-    // } else {
-    //   println!();
-    // }
-  }
+  // for mv in game.each_move() {
+  //   let next_state = game.with_move(mv);
+  // print!("{mv}: ");
+  // if let Some(score) = globals.resolved_states_table().get(&next_state) {
+  //   println!("{score}");
+  //   if score.score_at_depth(score.determined_depth()) != ScoreValue::Tie {
+  //     playout(&next_state, globals.resolved_states_table(), score.determined_depth());
+  //   }
+  // } else {
+  //   println!();
+  // }
+  // }
 
   find_best_move_serial_table(game, options.search_depth, globals.resolved_states_table())
     .0

@@ -1,5 +1,3 @@
-#![allow(unused)]
-
 mod cooperate;
 mod global_data;
 mod metrics;

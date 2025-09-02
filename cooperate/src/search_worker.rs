@@ -142,7 +142,7 @@ where
     }
   }
 
-  println!("Worker {} done: {:?}", data.thread_idx, data.metrics);
+  // println!("Worker {} done: {:?}", data.thread_idx, data.metrics);
 }
 
 #[cfg(test)]
