@@ -573,6 +573,7 @@ impl PawnList8 {
     unsafe { self.equal_ignoring_order_sse(other) }
   }
 
+  /// Zeroes out all coordinates which were `null` originally.
   #[target_feature(enable = "sse4.1")]
   fn zero_null_pawns(&self, pawns: __m128i) -> __m128i {
     _mm_andnot_si128(self.null_mask, pawns)
@@ -603,9 +604,18 @@ impl PawnList8 {
     };
 
     let indices = self.zero_null_pawns(_mm_add_epi16(x_coords, y_shifted));
-    indices.iter_epi16().map(|i| i as usize)
+    indices
+      .iter_epi16()
+      .map(|i| i as usize)
+      .inspect(|&i| debug_assert!(i < N * N))
   }
 
+  /// Returns an iterator over the indices of pawns in a table with center at
+  /// `origin`. The index of a relative position (x, y) is
+  /// `(x + origin.x, (y + origin.y) * N)`. It is assumed that
+  /// |x| < N / 2, |y| < N / 2.
+  ///
+  /// `null` positions map to index 0.
   pub fn pawn_indices<const N: usize>(&self, origin: HexPos) -> impl Iterator<Item = usize> {
     unsafe { self.pawn_indices_sse::<N>(origin) }
   }
