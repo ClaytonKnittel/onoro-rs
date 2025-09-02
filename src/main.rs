@@ -33,12 +33,6 @@ fn main() {
 
   println!("{}", onoro);
 
-  let guard = pprof::ProfilerGuardBuilder::default()
-    .frequency(1000)
-    .blocklist(&["libc", "libgcc", "pthread", "vdso"])
-    .build()
-    .unwrap();
-
   let start = SystemTime::now();
   let options = cooperate::Options {
     num_threads: 16,
@@ -47,11 +41,6 @@ fn main() {
   };
   let score = solve_with_hasher(&OnoroView::new(onoro), options, BuildPassThroughHasher);
   let end = SystemTime::now();
-
-  if let Ok(report) = guard.report().build() {
-    let file = std::fs::File::create("onoro.svg").unwrap();
-    report.flamegraph(file).unwrap();
-  };
 
   println!("Done: {:?}", end.duration_since(start).unwrap());
   println!("Score: {score}");

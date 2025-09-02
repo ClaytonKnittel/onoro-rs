@@ -19,13 +19,6 @@ fn construct_views(c: &mut Criterion) {
   let mut rng = StdRng::seed_from_u64(90383240);
   let states = generate_random_unfinished_states(N_GAMES, 18, &mut rng).unwrap();
 
-  #[cfg(feature = "profiled")]
-  let guard = pprof::ProfilerGuardBuilder::default()
-    .frequency(1000)
-    .blocklist(&["libc", "libgcc", "pthread", "vdso"])
-    .build()
-    .unwrap();
-
   group.bench_function("construct after 18 moves", |b| {
     b.iter(|| {
       for onoro in &states {
@@ -34,12 +27,6 @@ fn construct_views(c: &mut Criterion) {
       }
     })
   });
-
-  #[cfg(feature = "profiled")]
-  if let Ok(report) = guard.report().build() {
-    let file = std::fs::File::create("onoro_view_construct.svg").unwrap();
-    report.flamegraph(file).unwrap();
-  };
 
   group.finish();
 }
@@ -70,13 +57,6 @@ fn cmp_views(c: &mut Criterion) {
   let states = generate_random_unfinished_states(N_GAMES, 18, &mut rng).unwrap();
   let states = generate_game_pairs(states, &mut rng);
 
-  #[cfg(feature = "profiled")]
-  let guard = pprof::ProfilerGuardBuilder::default()
-    .frequency(1000)
-    .blocklist(&["libc", "libgcc", "pthread", "vdso"])
-    .build()
-    .unwrap();
-
   group.bench_function("compare views after 18 moves", |b| {
     b.iter(|| {
       for (view1, view2) in &states {
@@ -84,12 +64,6 @@ fn cmp_views(c: &mut Criterion) {
       }
     })
   });
-
-  #[cfg(feature = "profiled")]
-  if let Ok(report) = guard.report().build() {
-    let file = std::fs::File::create("onoro_view_cmp.svg").unwrap();
-    report.flamegraph(file).unwrap();
-  };
 
   group.finish();
 }
