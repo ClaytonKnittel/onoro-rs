@@ -104,6 +104,7 @@ impl<const N: usize, G: Group> HashTable<N, G> {
     })
   }
 
+  /// Looks up the hash of each pawn in the list and returns their xor sum.
   #[cfg(target_feature = "sse4.1")]
   fn fold_hashes(pawns: PawnList8, table: &ConstTable<TileHash<G>, N>) -> u64 {
     pawns
@@ -260,7 +261,6 @@ impl<const N: usize> HashTable<N, D6> {
 }
 
 impl<const N: usize> HashTable<N, D3> {
-  /// Generates a hash table for boards with symmetry class V.
   const fn make_v() -> ConstTable<TileHash<D3>, N> {
     let mut table = ConstTable::filled(TileHash::<D3>::uninitialized());
     let mut rng = Xoroshiro128::from_seed([const_random!(u64), const_random!(u64)]);
@@ -518,7 +518,7 @@ impl<const N: usize> HashTable<N, Trivial> {
     table
   }
 
-  /// Generates a hash table for boards with symmetry class E.
+  /// Generates a hash table for boards with trivial symmetry class.
   pub const fn new_trivial() -> Self {
     Self {
       cur_table: Self::make_trivial(),
