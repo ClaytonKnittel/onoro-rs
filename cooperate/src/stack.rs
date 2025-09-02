@@ -197,13 +197,14 @@ where
 
   /// Advances the current move to the next possible move.
   fn advance(&mut self) {
-    self.current_move = match &mut self.move_gen {
-      Some(move_gen) => move_gen.next(&self.game),
+    let move_gen = match &mut self.move_gen {
+      Some(move_gen) => move_gen,
       None => {
         self.move_gen = Some(self.game.move_generator());
-        self.move_gen.as_mut().unwrap().next(&self.game)
+        self.move_gen.as_mut().unwrap()
       }
     };
+    self.current_move = move_gen.next(&self.game);
   }
 }
 
