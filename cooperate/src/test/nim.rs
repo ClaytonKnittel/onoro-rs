@@ -1,6 +1,6 @@
 use std::{fmt::Display, hash::Hash};
 
-use abstract_game::{Game, GameResult, GameMoveIterator, Score};
+use abstract_game::{Game, GameMoveIterator, GameResult, Score};
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum NimPlayer {

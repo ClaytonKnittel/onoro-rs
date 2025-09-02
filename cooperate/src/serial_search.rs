@@ -73,7 +73,7 @@ where
       Some(score) => score.backstep(),
       // Consider winning by no legal moves as not winning until after the
       // other player's attempt at making a move, since all game states that
-      // don't have 4 in a row of a pawn are considered a tie.
+      // aren't explicitly winning are considered a tie.
       None => Score::win(2),
     };
 
