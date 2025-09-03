@@ -13,7 +13,6 @@ use crate::{
   global_data::GlobalData,
   null_lock::NullLock,
   search_worker::{start_worker, WorkerData},
-  serial_search::find_best_move_serial_table,
   stack::Stack,
   table::Table,
 };
@@ -162,9 +161,7 @@ where
   // }
   // }
 
-  find_best_move_serial_table(game, options.search_depth, globals.resolved_states_table())
-    .0
-    .unwrap()
+  globals.resolved_states_table().get(game).unwrap()
 }
 
 #[cfg(test)]
@@ -176,8 +173,12 @@ mod tests {
   use crate::{
     cooperate::construct_globals,
     search_worker::{start_worker, WorkerData},
-    serial_search::{find_best_move_serial, find_best_move_serial_table},
-    test::{gomoku::Gomoku, nim::Nim, tic_tac_toe::Ttt},
+    test::{
+      gomoku::Gomoku,
+      nim::Nim,
+      serial_search::{find_best_move_serial, find_best_move_serial_table},
+      tic_tac_toe::Ttt,
+    },
   };
 
   #[test]

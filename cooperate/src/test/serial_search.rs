@@ -1,7 +1,6 @@
 use std::{
-  collections::hash_map::RandomState,
   fmt::Display,
-  hash::{BuildHasher, Hash},
+  hash::{BuildHasher, Hash, RandomState},
 };
 
 use abstract_game::{Game, GameResult, Score, ScoreValue};

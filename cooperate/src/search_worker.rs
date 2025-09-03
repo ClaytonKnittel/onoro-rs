@@ -154,9 +154,13 @@ mod tests {
   use crate::{
     global_data::GlobalData,
     null_lock::NullLock,
-    serial_search::{find_best_move_serial, find_best_move_serial_table},
     stack::Stack,
-    test::{gomoku::Gomoku, nim::Nim, tic_tac_toe::Ttt},
+    test::{
+      gomoku::Gomoku,
+      nim::Nim,
+      serial_search::{find_best_move_serial, find_best_move_serial_table},
+      tic_tac_toe::Ttt,
+    },
   };
 
   use super::{start_worker, WorkerData};
