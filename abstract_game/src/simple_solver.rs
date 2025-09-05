@@ -30,6 +30,7 @@ impl SimpleSolver {
       .map(|m| game.with_move(m))
       .map(|next_game| Self::score_for_game(&next_game, depth))
       .max()
+      // If you can't make a move, you lose.
       .unwrap_or(Score::lose(1))
   }
 }
@@ -46,11 +47,10 @@ impl Solver for SimpleSolver {
       .map(|m| {
         let next_game = game.with_move(m);
         let score = Self::score_for_game(&next_game, depth);
-        println!("Score {} for\n{:?}", score, next_game);
-
         (score, Some(m))
       })
       .max_by_key(|(score, _)| score.clone())
+      // If you can't make a move, you lose.
       .unwrap_or((Score::lose(1), None))
   }
 }
@@ -100,11 +100,71 @@ mod tests {
       expect_that!(m, some(anything()));
     }
 
+    // . . .
+    // . . .
+    // X . .
     ttt.make_move(TTTMove::new((0, 0)));
     {
       let (score, m) = solver.solve(&ttt, 8);
       expect_eq!(score.score_at_depth(8), ScoreValue::Tie);
+      expect_that!(
+        m,
+        some(any![
+          eq(TTTMove::new((0, 1))),
+          eq(TTTMove::new((1, 1))),
+          eq(TTTMove::new((1, 0))),
+        ])
+      );
+    }
+
+    // . . .
+    // . . .
+    // X . O
+    ttt.make_move(TTTMove::new((2, 0)));
+    {
+      let (score, m) = solver.solve(&ttt, 7);
+      expect_eq!(score.score_at_depth(7), ScoreValue::CurrentPlayerWins);
+      expect_that!(m, some(eq(TTTMove::new((2, 2)))));
+    }
+
+    // . . X
+    // . . .
+    // X . O
+    ttt.make_move(TTTMove::new((2, 2)));
+    {
+      let (score, m) = solver.solve(&ttt, 6);
+      expect_eq!(score.score_at_depth(6), ScoreValue::OtherPlayerWins);
       expect_that!(m, some(eq(TTTMove::new((1, 1)))));
+    }
+
+    // . . X
+    // . O .
+    // X . O
+    ttt.make_move(TTTMove::new((1, 1)));
+    {
+      let (score, m) = solver.solve(&ttt, 5);
+      expect_eq!(score.score_at_depth(5), ScoreValue::CurrentPlayerWins);
+      expect_that!(m, some(eq(TTTMove::new((0, 2)))));
+    }
+
+    // X . X
+    // . O .
+    // X . O
+    ttt.make_move(TTTMove::new((0, 2)));
+    {
+      let (score, m) = solver.solve(&ttt, 5);
+      expect_eq!(score.score_at_depth(5), ScoreValue::OtherPlayerWins);
+      expect_that!(m, some(anything()));
+    }
+
+    // X . X
+    // O O .
+    // X . O
+    ttt.make_move(TTTMove::new((0, 1)));
+    {
+      let (score, m) = solver.solve(&ttt, 4);
+      expect_eq!(score.score_at_depth(4), ScoreValue::CurrentPlayerWins);
+      expect_that!(m, some(eq(TTTMove::new((1, 2)))));
     }
   }
 }
