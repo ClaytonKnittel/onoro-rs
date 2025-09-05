@@ -360,10 +360,11 @@ mod tests {
     connect_four.make_move(ConnectMove { col: 4 });
     connect_four.make_move(ConnectMove { col: 5 });
     connect_four.make_move(ConnectMove { col: 5 });
+    connect_four.make_move(ConnectMove { col: 6 });
     connect_four.make_move(ConnectMove { col: 5 });
     connect_four.make_move(ConnectMove { col: 6 });
     connect_four.make_move(ConnectMove { col: 6 });
-    connect_four.make_move(ConnectMove { col: 6 });
+    connect_four.make_move(ConnectMove { col: 0 });
     connect_four.make_move(ConnectMove { col: 6 });
 
     expect_eq!(
@@ -380,10 +381,11 @@ mod tests {
     connect_four.make_move(ConnectMove { col: 2 });
     connect_four.make_move(ConnectMove { col: 1 });
     connect_four.make_move(ConnectMove { col: 1 });
+    connect_four.make_move(ConnectMove { col: 0 });
     connect_four.make_move(ConnectMove { col: 1 });
     connect_four.make_move(ConnectMove { col: 0 });
     connect_four.make_move(ConnectMove { col: 0 });
-    connect_four.make_move(ConnectMove { col: 0 });
+    connect_four.make_move(ConnectMove { col: 5 });
     connect_four.make_move(ConnectMove { col: 0 });
 
     expect_eq!(
