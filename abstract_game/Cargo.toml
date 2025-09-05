@@ -10,3 +10,5 @@ edition = "2021"
 [dev-dependencies]
 googletest = "0.14.2"
 itertools = "0.14.0"
+rstest = "0.26.1"
+rstest_reuse = "0.7.0"

@@ -55,10 +55,7 @@ impl Solver for SimpleSolver {
 
 #[cfg(test)]
 mod tests {
-  use crate::{
-    test_games::{ConnectMove, ConnectN, Nim, TTTMove, TicTacToe},
-    Game, ScoreValue, SimpleSolver, Solver,
-  };
+  use crate::{test_games::Nim, ScoreValue, SimpleSolver, Solver};
 
   use googletest::{gtest, prelude::*};
 
@@ -86,96 +83,5 @@ mod tests {
         expect_that!(best_move, some(anything()));
       }
     }
-  }
-
-  #[gtest]
-  fn test_solve_tic_tac_toe() {
-    let mut solver = SimpleSolver;
-    let mut ttt = TicTacToe::new();
-    {
-      let (score, m) = solver.solve(&ttt, 9);
-      expect_eq!(score.score_at_depth(9), ScoreValue::Tie);
-      expect_that!(m, some(anything()));
-    }
-
-    // . . .
-    // . . .
-    // X . .
-    ttt.make_move(TTTMove::new((0, 0)));
-    {
-      let (score, m) = solver.solve(&ttt, 8);
-      expect_eq!(score.score_at_depth(8), ScoreValue::Tie);
-      expect_that!(
-        m,
-        some(any![
-          eq(TTTMove::new((0, 1))),
-          eq(TTTMove::new((1, 1))),
-          eq(TTTMove::new((1, 0))),
-        ])
-      );
-    }
-
-    // . . .
-    // . . .
-    // X . O
-    ttt.make_move(TTTMove::new((2, 0)));
-    {
-      let (score, m) = solver.solve(&ttt, 7);
-      expect_eq!(score.score_at_depth(7), ScoreValue::CurrentPlayerWins);
-      expect_that!(m, some(eq(TTTMove::new((2, 2)))));
-    }
-
-    // . . X
-    // . . .
-    // X . O
-    ttt.make_move(TTTMove::new((2, 2)));
-    {
-      let (score, m) = solver.solve(&ttt, 6);
-      expect_eq!(score.score_at_depth(6), ScoreValue::OtherPlayerWins);
-      expect_that!(m, some(eq(TTTMove::new((1, 1)))));
-    }
-
-    // . . X
-    // . O .
-    // X . O
-    ttt.make_move(TTTMove::new((1, 1)));
-    {
-      let (score, m) = solver.solve(&ttt, 5);
-      expect_eq!(score.score_at_depth(5), ScoreValue::CurrentPlayerWins);
-      expect_that!(m, some(eq(TTTMove::new((0, 2)))));
-    }
-
-    // X . X
-    // . O .
-    // X . O
-    ttt.make_move(TTTMove::new((0, 2)));
-    {
-      let (score, m) = solver.solve(&ttt, 5);
-      expect_eq!(score.score_at_depth(5), ScoreValue::OtherPlayerWins);
-      expect_that!(m, some(anything()));
-    }
-
-    // X . X
-    // O O .
-    // X . O
-    ttt.make_move(TTTMove::new((0, 1)));
-    {
-      let (score, m) = solver.solve(&ttt, 4);
-      expect_eq!(score.score_at_depth(4), ScoreValue::CurrentPlayerWins);
-      expect_that!(m, some(eq(TTTMove::new((1, 2)))));
-    }
-  }
-
-  #[gtest]
-  fn test_solve_connect_three() {
-    let mut solver = SimpleSolver;
-    let conn = ConnectN::new(4, 3, 3);
-
-    let (score, m) = solver.solve(&conn, 12);
-    expect_eq!(score.score_at_depth(12), ScoreValue::CurrentPlayerWins);
-    expect_that!(
-      m,
-      some(any![eq(ConnectMove { col: 1 }), eq(ConnectMove { col: 2 })])
-    );
   }
 }
