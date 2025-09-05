@@ -154,12 +154,19 @@ impl Debug for TicTacToe {
 
 #[cfg(test)]
 mod tests {
-  use googletest::{gtest, prelude::*};
+  use std::fmt::Debug;
+
+  use googletest::{
+    description::Description,
+    gtest,
+    matcher::{Matcher, MatcherResult},
+    prelude::*,
+  };
   use itertools::Itertools;
 
   use crate::{
     test_games::{TTTMove, TicTacToe},
-    Game,
+    Game, GameResult,
   };
 
   #[gtest]
@@ -177,6 +184,136 @@ mod tests {
         &TTTMove::new((2, 1)),
         &TTTMove::new((2, 2)),
       ]
+    );
+  }
+
+  #[gtest]
+  fn test_second_moves() {
+    let mut ttt = TicTacToe::new();
+    ttt.make_move(TTTMove::new((1, 1)));
+    expect_that!(
+      ttt.each_move().collect_vec(),
+      unordered_elements_are![
+        &TTTMove::new((0, 0)),
+        &TTTMove::new((0, 1)),
+        &TTTMove::new((0, 2)),
+        &TTTMove::new((1, 0)),
+        &TTTMove::new((1, 2)),
+        &TTTMove::new((2, 0)),
+        &TTTMove::new((2, 1)),
+        &TTTMove::new((2, 2)),
+      ]
+    );
+  }
+
+  #[derive(MatcherBase)]
+  struct EndsInWinMatcher;
+
+  impl<T> Matcher<T> for EndsInWinMatcher
+  where
+    T: Copy + Debug + IntoIterator<Item = TTTMove>,
+  {
+    fn matches(&self, actual: T) -> MatcherResult {
+      let moves = actual.into_iter().collect_vec();
+      let n_moves = moves.len();
+
+      let mut ttt = TicTacToe::new();
+      for (i, m) in moves.into_iter().enumerate() {
+        ttt = ttt.with_move(m);
+        if i == n_moves - 1 {
+          if ttt.finished() != GameResult::Win(ttt.current_player.opposite()) {
+            return MatcherResult::NoMatch;
+          } else {
+            return MatcherResult::Match;
+          }
+        } else if ttt.finished() != GameResult::NotFinished {
+          return MatcherResult::NoMatch;
+        }
+      }
+
+      unreachable!();
+    }
+
+    fn describe(&self, matcher_result: MatcherResult) -> Description {
+      match matcher_result {
+        MatcherResult::Match => Description::new().text("Expected all ties until the last move."),
+        MatcherResult::NoMatch => {
+          Description::new().text("Not all states were ties until the last move.")
+        }
+      }
+    }
+
+    fn explain_match(&self, actual: T) -> Description {
+      Description::new().text(format!(
+        "{:?}",
+        actual
+          .into_iter()
+          .scan(TicTacToe::new(), |ttt, m| {
+            *ttt = ttt.with_move(m);
+            Some(ttt.finished())
+          })
+          .collect_vec()
+      ))
+    }
+  }
+
+  fn ends_in_win() -> EndsInWinMatcher {
+    EndsInWinMatcher
+  }
+
+  #[gtest]
+  fn test_win_row() {
+    expect_that!(
+      [
+        TTTMove::new((0, 0)),
+        TTTMove::new((2, 0)),
+        TTTMove::new((0, 1)),
+        TTTMove::new((1, 1)),
+        TTTMove::new((0, 2)),
+      ],
+      ends_in_win()
+    );
+  }
+
+  #[gtest]
+  fn test_win_col() {
+    expect_that!(
+      [
+        TTTMove::new((0, 1)),
+        TTTMove::new((2, 0)),
+        TTTMove::new((2, 1)),
+        TTTMove::new((1, 2)),
+        TTTMove::new((1, 1)),
+      ],
+      ends_in_win()
+    );
+  }
+
+  #[gtest]
+  fn test_win_diag1() {
+    expect_that!(
+      [
+        TTTMove::new((0, 0)),
+        TTTMove::new((2, 0)),
+        TTTMove::new((1, 1)),
+        TTTMove::new((1, 2)),
+        TTTMove::new((2, 2)),
+      ],
+      ends_in_win()
+    );
+  }
+
+  #[gtest]
+  fn test_win_diag2() {
+    expect_that!(
+      [
+        TTTMove::new((0, 2)),
+        TTTMove::new((2, 1)),
+        TTTMove::new((1, 1)),
+        TTTMove::new((1, 2)),
+        TTTMove::new((2, 0)),
+      ],
+      ends_in_win()
     );
   }
 }
