@@ -1,11 +1,9 @@
-use std::fmt::Debug;
-
 use crate::{Game, GameResult, Score, Solver};
 
 pub struct SimpleSolver;
 
 impl SimpleSolver {
-  fn score_for_game<G: Game + Debug>(game: &G, depth: u32) -> Score {
+  fn score_for_game<G: Game>(game: &G, depth: u32) -> Score {
     match game.finished() {
       GameResult::Win(player) => {
         if player == game.current_player() {
@@ -19,7 +17,7 @@ impl SimpleSolver {
     }
   }
 
-  fn solve_impl<G: Game + Debug>(game: &G, depth: u32) -> Score {
+  fn solve_impl<G: Game>(game: &G, depth: u32) -> Score {
     debug_assert!(matches!(game.finished(), GameResult::NotFinished));
     if depth == 0 {
       return Score::no_info();
@@ -36,7 +34,7 @@ impl SimpleSolver {
 }
 
 impl Solver for SimpleSolver {
-  fn solve<G: Game + Debug>(&mut self, game: &G, depth: u32) -> (Score, Option<G::Move>) {
+  fn solve<G: Game>(&mut self, game: &G, depth: u32) -> (Score, Option<G::Move>) {
     debug_assert!(matches!(game.finished(), GameResult::NotFinished));
     if depth == 0 {
       return (Score::no_info(), None);
