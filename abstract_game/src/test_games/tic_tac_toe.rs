@@ -7,7 +7,7 @@ pub struct TTTMove(u32);
 
 impl TTTMove {
   pub fn new(coord: (u32, u32)) -> Self {
-    Self(0x0001_0001 << (coord.0 + coord.1 * 3))
+    Self(0x0001_0001 << (coord.0 + coord.1 * 4))
   }
 
   pub fn board_index(&self) -> u32 {
@@ -15,11 +15,11 @@ impl TTTMove {
   }
 
   pub fn x(&self) -> u32 {
-    self.board_index() % 3
+    self.board_index() % 4
   }
 
   pub fn y(&self) -> u32 {
-    self.board_index() / 3
+    self.board_index() / 4
   }
 }
 
@@ -39,7 +39,7 @@ impl GameMoveIterator for TTTMoveGen {
 
   fn next(&mut self, game: &TicTacToe) -> Option<TTTMove> {
     let mut move_mask = self.move_mask;
-    while move_mask != 0x0200_0200 {
+    while move_mask != 0x1000_1000 {
       let next_mask = move_mask << 1;
 
       if game.board & move_mask == 0 {
@@ -60,9 +60,12 @@ pub struct TicTacToe {
 }
 
 impl TicTacToe {
+  /// Bits that are never in use for the board.
+  const PHONY_BITS: u32 = 0xf888_f888;
+
   pub fn new() -> Self {
     Self {
-      board: 0,
+      board: Self::PHONY_BITS,
       current_player: GamePlayer::Player1,
     }
   }
@@ -104,14 +107,14 @@ impl Game for TicTacToe {
 
   fn finished(&self) -> GameResult {
     // Check for 3 in a row, column, or diagonal.
-    let board = self.board;
+    let board = self.board & !Self::PHONY_BITS;
 
     let three_in_a_row = (board & (board >> 1) & (board >> 2)) != 0;
-    let three_in_a_col = (board & (board >> 3) & (board >> 6)) != 0;
+    let three_in_a_col = (board & (board >> 4) & (board >> 8)) != 0;
 
     let contains_bits = |board: u32, bits: u32| -> bool { board & bits == bits };
-    let diag_tl_to_br = contains_bits(board, 0x0000_0111) || contains_bits(board, 0x0111_0000);
-    let diag_tr_to_bl = contains_bits(board, 0x0000_0054) || contains_bits(board, 0x0054_0000);
+    let diag_tl_to_br = contains_bits(board, 0x0000_0421) || contains_bits(board, 0x0421_0000);
+    let diag_tr_to_bl = contains_bits(board, 0x0000_0124) || contains_bits(board, 0x0124_0000);
 
     if three_in_a_row || three_in_a_col || diag_tl_to_br || diag_tr_to_bl {
       GameResult::Win(self.current_player.opposite())
@@ -207,11 +210,14 @@ mod tests {
   }
 
   #[derive(MatcherBase)]
-  struct EndsInWinMatcher;
+  struct EndsInMatcher<F> {
+    end_score: F,
+  }
 
-  impl<T> Matcher<T> for EndsInWinMatcher
+  impl<T, F> Matcher<T> for EndsInMatcher<F>
   where
     T: Copy + Debug + IntoIterator<Item = TTTMove>,
+    F: Fn(&TicTacToe) -> GameResult,
   {
     fn matches(&self, actual: T) -> MatcherResult {
       let moves = actual.into_iter().collect_vec();
@@ -221,7 +227,8 @@ mod tests {
       for (i, m) in moves.into_iter().enumerate() {
         ttt = ttt.with_move(m);
         if i == n_moves - 1 {
-          if ttt.finished() != GameResult::Win(ttt.current_player.opposite()) {
+          let expected_end_score = (self.end_score)(&ttt);
+          if ttt.finished() != expected_end_score {
             return MatcherResult::NoMatch;
           } else {
             return MatcherResult::Match;
@@ -244,21 +251,30 @@ mod tests {
     }
 
     fn explain_match(&self, actual: T) -> Description {
-      Description::new().text(format!(
-        "{:?}",
+      Description::new().text(
         actual
           .into_iter()
           .scan(TicTacToe::new(), |ttt, m| {
             *ttt = ttt.with_move(m);
-            Some(ttt.finished())
+            Some(format!("{:?}:\n{:?}", ttt.finished(), ttt))
           })
           .collect_vec()
-      ))
+          .join("\n\n")
+          .to_string(),
+      )
     }
   }
 
-  fn ends_in_win() -> EndsInWinMatcher {
-    EndsInWinMatcher
+  fn ends_in_win() -> EndsInMatcher<impl Fn(&TicTacToe) -> GameResult> {
+    EndsInMatcher {
+      end_score: |ttt: &TicTacToe| GameResult::Win(ttt.current_player().opposite()),
+    }
+  }
+
+  fn ends_in_tie() -> EndsInMatcher<impl Fn(&TicTacToe) -> GameResult> {
+    EndsInMatcher {
+      end_score: |_: &TicTacToe| GameResult::Tie,
+    }
   }
 
   #[gtest]
@@ -314,6 +330,24 @@ mod tests {
         TTTMove::new((2, 0)),
       ],
       ends_in_win()
+    );
+  }
+
+  #[gtest]
+  fn test_cats_game() {
+    expect_that!(
+      [
+        TTTMove::new((0, 0)),
+        TTTMove::new((1, 0)),
+        TTTMove::new((2, 0)),
+        TTTMove::new((1, 1)),
+        TTTMove::new((0, 1)),
+        TTTMove::new((2, 1)),
+        TTTMove::new((1, 2)),
+        TTTMove::new((0, 2)),
+        TTTMove::new((2, 2)),
+      ],
+      ends_in_tie()
     );
   }
 }
