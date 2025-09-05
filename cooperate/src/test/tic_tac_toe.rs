@@ -1,14 +1,8 @@
 use std::{fmt::Display, hash::Hash};
 
-use abstract_game::{Game, GameMoveIterator, GameResult, Score};
+use abstract_game::{Game, GameMoveIterator, GamePlayer, GameResult, Score};
 
 use crate::test::serial_search::find_best_move_serial;
-
-#[derive(Debug, PartialEq, Eq)]
-pub enum TttPlayer {
-  First,
-  Second,
-}
 
 #[derive(Clone, Copy)]
 pub struct TttMove {
@@ -122,7 +116,6 @@ impl Ttt {
 impl Game for Ttt {
   type Move = TttMove;
   type MoveGenerator = TttMoveIter;
-  type PlayerIdentifier = TttPlayer;
 
   fn move_generator(&self) -> Self::MoveGenerator {
     Self::MoveGenerator { x: 0, y: 0 }
@@ -137,15 +130,15 @@ impl Game for Ttt {
     self.turn += 1;
   }
 
-  fn current_player(&self) -> Self::PlayerIdentifier {
+  fn current_player(&self) -> GamePlayer {
     if self.turn % 2 == 0 {
-      TttPlayer::First
+      GamePlayer::Player1
     } else {
-      TttPlayer::Second
+      GamePlayer::Player2
     }
   }
 
-  fn finished(&self) -> GameResult<Self::PlayerIdentifier> {
+  fn finished(&self) -> GameResult {
     let board = self.tile_mask;
     // Finished horizotally
     let horiz = board & (board >> 1) & (board >> 2);
@@ -155,8 +148,8 @@ impl Game for Ttt {
 
     let finished = horiz | vert | rdiag | ldiag;
     match Self::player_for_mask(finished) {
-      TttTile::X => return GameResult::Win(TttPlayer::First),
-      TttTile::O => return GameResult::Win(TttPlayer::Second),
+      TttTile::X => return GameResult::Win(GamePlayer::Player1),
+      TttTile::O => return GameResult::Win(GamePlayer::Player2),
       TttTile::Empty => {}
     }
 

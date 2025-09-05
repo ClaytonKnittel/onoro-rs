@@ -1,12 +1,6 @@
 use std::{fmt::Display, hash::Hash};
 
-use abstract_game::{Game, GameMoveIterator, GameResult, Score};
-
-#[derive(Debug, PartialEq, Eq)]
-pub enum NimPlayer {
-  First,
-  Second,
-}
+use abstract_game::{Game, GameMoveIterator, GamePlayer, GameResult, Score};
 
 #[derive(Clone, Copy)]
 pub struct NimMove {
@@ -65,7 +59,6 @@ impl Nim {
 impl Game for Nim {
   type Move = NimMove;
   type MoveGenerator = NimMoveIter;
-  type PlayerIdentifier = NimPlayer;
 
   fn move_generator(&self) -> Self::MoveGenerator {
     NimMoveIter {
@@ -79,21 +72,21 @@ impl Game for Nim {
     self.turn += 1;
   }
 
-  fn current_player(&self) -> Self::PlayerIdentifier {
+  fn current_player(&self) -> GamePlayer {
     if self.turn % 2 == 0 {
-      NimPlayer::First
+      GamePlayer::Player1
     } else {
-      NimPlayer::Second
+      GamePlayer::Player2
     }
   }
 
-  fn finished(&self) -> GameResult<Self::PlayerIdentifier> {
+  fn finished(&self) -> GameResult {
     if self.sticks == 0 {
       // The winner is the player to take the last stick.
       if self.turn % 2 == 0 {
-        GameResult::Win(NimPlayer::Second)
+        GameResult::Win(GamePlayer::Player2)
       } else {
-        GameResult::Win(NimPlayer::First)
+        GameResult::Win(GamePlayer::Player1)
       }
     } else {
       GameResult::NotFinished

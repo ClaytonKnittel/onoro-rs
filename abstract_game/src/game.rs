@@ -1,3 +1,22 @@
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum GamePlayer {
+  Player1,
+  Player2,
+}
+
+impl GamePlayer {
+  pub fn is_p1(&self) -> bool {
+    matches!(self, GamePlayer::Player1)
+  }
+
+  pub fn opposite(&self) -> Self {
+    match self {
+      Self::Player1 => Self::Player2,
+      Self::Player2 => Self::Player1,
+    }
+  }
+}
+
 pub trait GameMoveIterator: Sized {
   type Item;
   type Game;
@@ -29,16 +48,15 @@ where
 }
 
 #[derive(Debug, PartialEq, Eq)]
-pub enum GameResult<PlayerIdentifier> {
+pub enum GameResult {
   NotFinished,
-  Win(PlayerIdentifier),
+  Win(GamePlayer),
   Tie,
 }
 
 pub trait Game: Clone + Sized {
   type Move: Copy;
   type MoveGenerator: GameMoveIterator<Item = Self::Move, Game = Self>;
-  type PlayerIdentifier: Eq;
 
   fn move_generator(&self) -> Self::MoveGenerator;
   fn each_move(&self) -> GameIterator<'_, Self::MoveGenerator, Self> {
@@ -47,12 +65,12 @@ pub trait Game: Clone + Sized {
 
   fn make_move(&mut self, m: Self::Move);
 
-  /// Returns the `Self::PlayerIdentifier` of the player to make the next move.
-  fn current_player(&self) -> Self::PlayerIdentifier;
+  /// Returns the which player is to make the next move.
+  fn current_player(&self) -> GamePlayer;
 
-  /// Returns `Some(player_id)` if a player has won, otherwise `None` if no
+  /// Returns `Some(player_1_won)` if a player has won, otherwise `None` if no
   /// player has won yet.
-  fn finished(&self) -> GameResult<Self::PlayerIdentifier>;
+  fn finished(&self) -> GameResult;
 
   fn with_move(&self, m: Self::Move) -> Self {
     let mut copy = self.clone();

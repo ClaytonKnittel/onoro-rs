@@ -35,12 +35,14 @@ impl Score {
   /// Construct a `Score` for the current player winning in `turn_count_win`
   /// moves.
   pub const fn win(turn_count_win: u32) -> Self {
+    debug_assert!(turn_count_win != 0);
     Score::new(true, 0, turn_count_win)
   }
 
   /// Construct a `Score` for the current player losing in `turn_count_lose`
   /// moves.
   pub const fn lose(turn_count_lose: u32) -> Self {
+    debug_assert!(turn_count_lose != 0);
     Score::new(false, 0, turn_count_lose)
   }
 
@@ -243,10 +245,13 @@ impl PartialOrd for Score {
 impl Ord for Score {
   fn cmp(&self, other: &Self) -> Ordering {
     if self.better(other) {
+      debug_assert!(!other.better(self));
       Ordering::Greater
     } else if self == other {
+      debug_assert!(!other.better(self));
       Ordering::Equal
     } else {
+      debug_assert!(other.better(self));
       Ordering::Less
     }
   }

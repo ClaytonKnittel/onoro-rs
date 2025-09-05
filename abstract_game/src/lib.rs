@@ -3,6 +3,7 @@ mod packed_score;
 mod score;
 mod simple_solver;
 mod solver;
+pub mod test_games;
 mod util;
 
 pub use game::*;

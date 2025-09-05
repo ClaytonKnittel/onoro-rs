@@ -1,6 +1,6 @@
 use std::{
   collections::{hash_map::RandomState, HashSet},
-  fmt::{Debug, Display},
+  fmt::Display,
   hash::{BuildHasher, Hash},
   sync::Arc,
   thread,
@@ -65,7 +65,6 @@ fn construct_globals<G, H>(game: &G, options: Options, hasher: H) -> Arc<GlobalD
 where
   G: Game + Display + Hash + PartialEq + Eq + 'static,
   G::Move: Display,
-  G::PlayerIdentifier: Debug,
   H: BuildHasher + Clone,
 {
   let globals = Arc::new(GlobalData::with_hasher(
@@ -89,7 +88,6 @@ pub fn solve<G>(game: &G, options: Options) -> Score
 where
   G: Game + Display + Send + Sync + Hash + PartialEq + Eq + 'static,
   G::Move: Display,
-  G::PlayerIdentifier: Debug,
 {
   solve_with_hasher(game, options, RandomState::new())
 }
@@ -98,7 +96,6 @@ fn playout<G, H>(game: &G, tbl: &Table<G, H>, depth: u32)
 where
   G: Game + Display + Send + Sync + Hash + PartialEq + Eq + 'static,
   G::Move: Display,
-  G::PlayerIdentifier: Debug,
   H: BuildHasher + Clone + Send + Sync + 'static,
 {
   println!("{}", game);
@@ -126,7 +123,6 @@ pub fn solve_with_hasher<G, H>(game: &G, options: Options, hasher: H) -> Score
 where
   G: Game + Display + Send + Sync + Hash + PartialEq + Eq + 'static,
   G::Move: Display,
-  G::PlayerIdentifier: Debug,
   H: BuildHasher + Clone + Send + Sync + 'static,
 {
   let globals = construct_globals(game, options.clone(), hasher);

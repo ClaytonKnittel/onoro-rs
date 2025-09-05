@@ -1,6 +1,6 @@
 use std::{
   collections::hash_map::RandomState,
-  fmt::{Debug, Display},
+  fmt::Display,
   hash::{BuildHasher, Hash},
 };
 
@@ -69,7 +69,6 @@ impl<G, H> GlobalData<G, H>
 where
   G: Display + Game + Clone + Hash + Eq + 'static,
   G::Move: Display,
-  G::PlayerIdentifier: Debug,
   H: BuildHasher + Clone,
 {
   pub fn with_hasher(search_depth: u32, num_threads: u32, hasher: H) -> Self {
