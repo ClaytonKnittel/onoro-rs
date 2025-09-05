@@ -1,4 +1,4 @@
-use std::hint::unreachable_unchecked;
+use std::{fmt::Debug, hint::unreachable_unchecked};
 
 use crate::{Game, GameMoveIterator, GamePlayer, GameResult};
 
@@ -29,13 +29,13 @@ where
           Some((item, 1))
         }
       })
-      .map(|(item, _)| item)
+      .and_then(|(item, count)| (count == n).then_some(item))
   }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ConnectMove {
-  col: u32,
+  pub col: u32,
 }
 
 pub struct ConnectMoveGen {
@@ -64,6 +64,16 @@ enum TileState {
   Empty,
   P1,
   P2,
+}
+
+impl From<TileState> for Option<GamePlayer> {
+  fn from(tile_state: TileState) -> Self {
+    match tile_state {
+      TileState::Empty => None,
+      TileState::P1 => Some(GamePlayer::Player1),
+      TileState::P2 => Some(GamePlayer::Player2),
+    }
+  }
 }
 
 #[derive(Clone)]
@@ -143,11 +153,7 @@ impl Game for ConnectN {
   fn finished(&self) -> GameResult {
     for y in 0..self.height {
       if let Some(winner) = (0..self.width)
-        .map(|x| match self.at((x, y)) {
-          TileState::P1 => Some(GamePlayer::Player1),
-          TileState::P2 => Some(GamePlayer::Player2),
-          TileState::Empty => None,
-        })
+        .map(|x| self.at((x, y)).into())
         .in_a_row(self.in_a_row)
       {
         return GameResult::Win(winner);
@@ -201,6 +207,27 @@ impl Game for ConnectN {
     }
 
     GameResult::NotFinished
+  }
+}
+
+impl Debug for ConnectN {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    for y in (0..self.height).rev() {
+      for x in 0..self.width {
+        write!(
+          f,
+          "{}",
+          match self.at((x, y)) {
+            TileState::Empty => ".",
+            TileState::P1 => "X",
+            TileState::P2 => "O",
+          }
+        )?;
+      }
+      writeln!(f)?;
+    }
+
+    Ok(())
   }
 }
 
@@ -274,6 +301,20 @@ mod tests {
   #[gtest]
   fn test_not_finished_empty() {
     let connect_four = ConnectN::new(7, 6, 4);
+    expect_eq!(connect_four.finished(), GameResult::NotFinished);
+  }
+
+  #[gtest]
+  fn test_not_finished_one_move() {
+    let mut connect_four = ConnectN::new(7, 6, 4);
+    connect_four.make_move(ConnectMove { col: 3 });
+    expect_eq!(connect_four.finished(), GameResult::NotFinished);
+  }
+
+  #[gtest]
+  fn test_not_finished_one_move_edge() {
+    let mut connect_four = ConnectN::new(5, 4, 3);
+    connect_four.make_move(ConnectMove { col: 4 });
     expect_eq!(connect_four.finished(), GameResult::NotFinished);
   }
 

@@ -56,7 +56,7 @@ impl Solver for SimpleSolver {
 #[cfg(test)]
 mod tests {
   use crate::{
-    test_games::{Nim, TTTMove, TicTacToe},
+    test_games::{ConnectMove, ConnectN, Nim, TTTMove, TicTacToe},
     Game, ScoreValue, SimpleSolver, Solver,
   };
 
@@ -164,5 +164,18 @@ mod tests {
       expect_eq!(score.score_at_depth(4), ScoreValue::CurrentPlayerWins);
       expect_that!(m, some(eq(TTTMove::new((1, 2)))));
     }
+  }
+
+  #[gtest]
+  fn test_solve_connect_three() {
+    let mut solver = SimpleSolver;
+    let conn = ConnectN::new(4, 3, 3);
+
+    let (score, m) = solver.solve(&conn, 12);
+    expect_eq!(score.score_at_depth(12), ScoreValue::CurrentPlayerWins);
+    expect_that!(
+      m,
+      some(any![eq(ConnectMove { col: 1 }), eq(ConnectMove { col: 2 })])
+    );
   }
 }
