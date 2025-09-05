@@ -1,4 +1,7 @@
-use std::fmt::{Debug, Display};
+use std::{
+  cmp::Ordering,
+  fmt::{Debug, Display},
+};
 
 use crate::util::{max_u32, min_u32};
 
@@ -230,6 +233,24 @@ impl PartialEq for Score {
 }
 
 impl Eq for Score {}
+
+impl PartialOrd for Score {
+  fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+    Some(self.cmp(other))
+  }
+}
+
+impl Ord for Score {
+  fn cmp(&self, other: &Self) -> Ordering {
+    if self.better(other) {
+      Ordering::Greater
+    } else if self == other {
+      Ordering::Equal
+    } else {
+      Ordering::Less
+    }
+  }
+}
 
 impl Debug for Score {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
