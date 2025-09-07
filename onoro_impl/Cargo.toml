@@ -4,7 +4,6 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-abstract_game = { path = "../abstract_game" }
 algebra = { path = "../algebra" }
 const-random = "0.1"
 itertools = "0.11"

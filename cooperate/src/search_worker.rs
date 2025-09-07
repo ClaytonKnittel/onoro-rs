@@ -1,5 +1,5 @@
 use std::{
-  fmt::{Debug, Display},
+  fmt::Display,
   hash::{BuildHasher, Hash},
   sync::Arc,
 };
@@ -41,7 +41,6 @@ pub fn start_worker<G, H>(mut data: WorkerData<G, H>)
 where
   G: Display + Game + Hash + Eq + 'static,
   G::Move: Display,
-  G::PlayerIdentifier: Debug,
   H: BuildHasher + Clone,
 {
   let queue = data.globals.queue(data.thread_idx);
@@ -142,7 +141,7 @@ where
     }
   }
 
-  println!("Worker {} done: {:?}", data.thread_idx, data.metrics);
+  // println!("Worker {} done: {:?}", data.thread_idx, data.metrics);
 }
 
 #[cfg(test)]
@@ -154,9 +153,13 @@ mod tests {
   use crate::{
     global_data::GlobalData,
     null_lock::NullLock,
-    serial_search::{find_best_move_serial, find_best_move_serial_table},
     stack::Stack,
-    test::{gomoku::Gomoku, nim::Nim, tic_tac_toe::Ttt},
+    test::{
+      gomoku::Gomoku,
+      nim::Nim,
+      serial_search::{find_best_move_serial, find_best_move_serial_table},
+      tic_tac_toe::Ttt,
+    },
   };
 
   use super::{start_worker, WorkerData};

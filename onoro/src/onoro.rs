@@ -1,5 +1,6 @@
 use std::fmt::Debug;
 
+use abstract_game::GamePlayer;
 use itertools::interleave;
 
 use crate::{
@@ -12,6 +13,15 @@ use crate::{
 pub enum PawnColor {
   Black,
   White,
+}
+
+impl From<PawnColor> for GamePlayer {
+  fn from(pawn_color: PawnColor) -> Self {
+    match pawn_color {
+      PawnColor::Black => GamePlayer::Player1,
+      PawnColor::White => GamePlayer::Player2,
+    }
+  }
 }
 
 #[derive(Debug, PartialEq, Eq)]

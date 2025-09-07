@@ -1,6 +1,6 @@
 use std::{
   collections::{hash_map::RandomState, HashSet},
-  fmt::{Debug, Display},
+  fmt::Display,
   hash::{BuildHasher, Hash},
   sync::Arc,
   thread,
@@ -13,7 +13,6 @@ use crate::{
   global_data::GlobalData,
   null_lock::NullLock,
   search_worker::{start_worker, WorkerData},
-  serial_search::find_best_move_serial_table,
   stack::Stack,
   table::Table,
 };
@@ -66,7 +65,6 @@ fn construct_globals<G, H>(game: &G, options: Options, hasher: H) -> Arc<GlobalD
 where
   G: Game + Display + Hash + PartialEq + Eq + 'static,
   G::Move: Display,
-  G::PlayerIdentifier: Debug,
   H: BuildHasher + Clone,
 {
   let globals = Arc::new(GlobalData::with_hasher(
@@ -90,7 +88,6 @@ pub fn solve<G>(game: &G, options: Options) -> Score
 where
   G: Game + Display + Send + Sync + Hash + PartialEq + Eq + 'static,
   G::Move: Display,
-  G::PlayerIdentifier: Debug,
 {
   solve_with_hasher(game, options, RandomState::new())
 }
@@ -99,7 +96,6 @@ fn playout<G, H>(game: &G, tbl: &Table<G, H>, depth: u32)
 where
   G: Game + Display + Send + Sync + Hash + PartialEq + Eq + 'static,
   G::Move: Display,
-  G::PlayerIdentifier: Debug,
   H: BuildHasher + Clone + Send + Sync + 'static,
 {
   println!("{}", game);
@@ -127,7 +123,6 @@ pub fn solve_with_hasher<G, H>(game: &G, options: Options, hasher: H) -> Score
 where
   G: Game + Display + Send + Sync + Hash + PartialEq + Eq + 'static,
   G::Move: Display,
-  G::PlayerIdentifier: Debug,
   H: BuildHasher + Clone + Send + Sync + 'static,
 {
   let globals = construct_globals(game, options.clone(), hasher);
@@ -149,22 +144,20 @@ where
   }
   assert!(!any_bad);
 
-  for mv in game.each_move() {
-    let next_state = game.with_move(mv);
-    print!("{mv}: ");
-    // if let Some(score) = globals.resolved_states_table().get(&next_state) {
-    //   println!("{score}");
-    //   if score.score_at_depth(score.determined_depth()) != ScoreValue::Tie {
-    //     playout(&next_state, globals.resolved_states_table(), score.determined_depth());
-    //   }
-    // } else {
-    //   println!();
-    // }
-  }
+  // for mv in game.each_move() {
+  //   let next_state = game.with_move(mv);
+  // print!("{mv}: ");
+  // if let Some(score) = globals.resolved_states_table().get(&next_state) {
+  //   println!("{score}");
+  //   if score.score_at_depth(score.determined_depth()) != ScoreValue::Tie {
+  //     playout(&next_state, globals.resolved_states_table(), score.determined_depth());
+  //   }
+  // } else {
+  //   println!();
+  // }
+  // }
 
-  find_best_move_serial_table(game, options.search_depth, globals.resolved_states_table())
-    .0
-    .unwrap()
+  globals.resolved_states_table().get(game).unwrap()
 }
 
 #[cfg(test)]
@@ -176,8 +169,12 @@ mod tests {
   use crate::{
     cooperate::construct_globals,
     search_worker::{start_worker, WorkerData},
-    serial_search::{find_best_move_serial, find_best_move_serial_table},
-    test::{gomoku::Gomoku, nim::Nim, tic_tac_toe::Ttt},
+    test::{
+      gomoku::Gomoku,
+      nim::Nim,
+      serial_search::{find_best_move_serial, find_best_move_serial_table},
+      tic_tac_toe::Ttt,
+    },
   };
 
   #[test]

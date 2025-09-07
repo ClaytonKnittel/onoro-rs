@@ -5,6 +5,7 @@ version = 4
 [[package]]
 name = "abstract_game"
 version = "0.1.0"
+source = "git+https://github.com/ClaytonKnittel/abstract-game.git?rev=bc011aff1ab15fbbe8cf24052709b73b976ba9db#bc011aff1ab15fbbe8cf24052709b73b976ba9db"
 
 [[package]]
 name = "aho-corasick"
@@ -550,7 +551,6 @@ dependencies = [
 name = "onoro-rs"
 version = "0.1.0"
 dependencies = [
- "abstract_game",
  "ai_gen_onoro",
  "algebra",
  "cooperate",
@@ -571,7 +571,6 @@ dependencies = [
 name = "onoro_impl"
 version = "0.1.0"
 dependencies = [
- "abstract_game",
  "algebra",
  "const-random",
  "itertools 0.11.0",

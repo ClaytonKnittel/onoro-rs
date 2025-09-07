@@ -4,7 +4,6 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-abstract_game = { path = "./abstract_game" }
 ai_gen_onoro = { path = "./ai_gen_onoro" }
 algebra = { path = "./algebra" }
 dashmap = "5.5"
@@ -29,6 +28,10 @@ harness = false
 
 [[bench]]
 name = "onoro_view"
+harness = false
+
+[[bench]]
+name = "cooperate"
 harness = false
 
 [profile.profiled]

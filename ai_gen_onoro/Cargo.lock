@@ -5,6 +5,7 @@ version = 4
 [[package]]
 name = "abstract_game"
 version = "0.1.0"
+source = "git+https://github.com/ClaytonKnittel/abstract-game.git?rev=bc011aff1ab15fbbe8cf24052709b73b976ba9db#bc011aff1ab15fbbe8cf24052709b73b976ba9db"
 
 [[package]]
 name = "aho-corasick"

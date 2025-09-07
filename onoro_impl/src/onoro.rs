@@ -3,10 +3,10 @@ use std::{
   fmt::{Debug, Display},
 };
 
-use abstract_game::{GameIterator, GameMoveIterator};
 use algebra::group::Group;
 use onoro::{
   Color, Colored, Onoro, OnoroMoveWrapper, OnoroPawn, PawnColor, TileState,
+  abstract_game::{GameIterator, GameMoveIterator},
   groups::{C2, D3, D6, K4},
   hex_pos::{HexPos, HexPosOffset},
 };

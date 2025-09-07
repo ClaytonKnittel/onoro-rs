@@ -1,5 +1,4 @@
-use abstract_game::GameMoveIterator;
-use onoro::{Onoro, PawnColor};
+use onoro::{Onoro, PawnColor, abstract_game::GameMoveIterator};
 
 use crate::{
   Move, OnoroImpl, PackedIdx,
@@ -472,11 +471,11 @@ impl<const N: usize> GameMoveIterator for P2MoveGenerator<N> {
 mod tests {
   use std::collections::{HashMap, HashSet};
 
-  use abstract_game::GameMoveIterator;
   use googletest::{gtest, prelude::*};
   use itertools::Itertools;
   use onoro::{
     Onoro, OnoroIndex,
+    abstract_game::GameMoveIterator,
     error::OnoroResult,
     hex_pos::{HexPos, HexPosOffset},
   };

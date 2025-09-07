@@ -1,22 +1,6 @@
 use std::{fmt::Display, hash::Hash};
 
-use abstract_game::{Game, GameResult, GameMoveIterator};
-
-#[derive(Debug, PartialEq, Eq)]
-pub enum GomokuPlayer {
-  First,
-  Second,
-}
-
-impl From<GomokuTile> for GomokuPlayer {
-  fn from(value: GomokuTile) -> Self {
-    match value {
-      GomokuTile::X => GomokuPlayer::First,
-      GomokuTile::O => GomokuPlayer::Second,
-      GomokuTile::Empty => panic!("Calling into::<GomokuPlayer>() on Empty tile."),
-    }
-  }
-}
+use abstract_game::{Game, GameMoveIterator, GamePlayer, GameResult};
 
 #[derive(Clone, Copy)]
 pub struct GomokuMove {
@@ -70,6 +54,16 @@ pub enum GomokuTile {
   O,
 }
 
+impl From<GomokuTile> for GamePlayer {
+  fn from(value: GomokuTile) -> Self {
+    match value {
+      GomokuTile::X => GamePlayer::Player1,
+      GomokuTile::O => GamePlayer::Player2,
+      GomokuTile::Empty => panic!("Calling into::<GomokuPlayer>() on Empty tile."),
+    }
+  }
+}
+
 impl Display for GomokuTile {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     write!(
@@ -119,7 +113,6 @@ impl Gomoku {
 impl Game for Gomoku {
   type Move = GomokuMove;
   type MoveGenerator = GomokuMoveIter;
-  type PlayerIdentifier = GomokuPlayer;
 
   fn move_generator(&self) -> Self::MoveGenerator {
     Self::MoveGenerator { x: 0, y: 0 }
@@ -136,15 +129,15 @@ impl Game for Gomoku {
     self.turn += 1;
   }
 
-  fn current_player(&self) -> Self::PlayerIdentifier {
+  fn current_player(&self) -> GamePlayer {
     if self.turn % 2 == 0 {
-      GomokuPlayer::First
+      GamePlayer::Player1
     } else {
-      GomokuPlayer::Second
+      GamePlayer::Player2
     }
   }
 
-  fn finished(&self) -> GameResult<Self::PlayerIdentifier> {
+  fn finished(&self) -> GameResult {
     // Check rows
     for y in 0..self.height {
       for x in 0..(self.width - (self.to_win - 1)) {

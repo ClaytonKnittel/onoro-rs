@@ -10,9 +10,9 @@ use algebra::{
   ordinal::Ordinal,
 };
 
-use abstract_game::{Game, GameMoveIterator, GameResult};
 use onoro::{
   Compress, Onoro, PawnColor, TileState,
+  abstract_game::{Game, GameMoveIterator, GamePlayer, GameResult},
   error::{OnoroError, OnoroResult},
   groups::{C2, D3, D6, K4, SymmetryClass},
   hex_pos::{HexPos, HexPosOffset},
@@ -333,7 +333,6 @@ impl<const N: usize> GameMoveIterator for ViewMoveGenerator<N> {
 impl<const N: usize> Game for OnoroView<N> {
   type Move = Move;
   type MoveGenerator = ViewMoveGenerator<N>;
-  type PlayerIdentifier = PawnColor;
 
   fn move_generator(&self) -> Self::MoveGenerator {
     ViewMoveGenerator(self.onoro().each_move_gen())
@@ -345,13 +344,13 @@ impl<const N: usize> Game for OnoroView<N> {
     *self = OnoroView::new(onoro);
   }
 
-  fn current_player(&self) -> Self::PlayerIdentifier {
-    self.onoro().player_color()
+  fn current_player(&self) -> GamePlayer {
+    self.onoro().player_color().into()
   }
 
-  fn finished(&self) -> GameResult<Self::PlayerIdentifier> {
+  fn finished(&self) -> GameResult {
     match self.onoro().finished() {
-      Some(color) => GameResult::Win(color),
+      Some(color) => GameResult::Win(color.into()),
       None => GameResult::NotFinished,
     }
   }
