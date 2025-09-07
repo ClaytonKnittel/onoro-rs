@@ -56,6 +56,12 @@ pub enum GameResult {
   Tie,
 }
 
+impl GameResult {
+  pub fn is_finished(&self) -> bool {
+    !matches!(self, Self::NotFinished)
+  }
+}
+
 pub trait Game: Clone + Sized {
   type Move: Copy;
   type MoveGenerator: GameMoveIterator<Item = Self::Move, Game = Self>;

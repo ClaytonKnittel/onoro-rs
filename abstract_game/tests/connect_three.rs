@@ -16,7 +16,7 @@ fn solvers(#[values(SimpleSolver)] solver: (impl Solver)) {}
 fn test_solve(mut solver: impl Solver) {
   let conn = ConnectN::new(4, 3, 3);
 
-  let (score, m) = solver.solve(&conn, 12);
+  let (score, m) = solver.best_move(&conn, 12);
   expect_eq!(score.score_at_depth(12), ScoreValue::CurrentPlayerWins);
   expect_that!(
     m,
@@ -30,7 +30,7 @@ fn test_lose_in_corner(mut solver: impl Solver) {
   let mut conn = ConnectN::new(4, 3, 3);
   conn.make_move(ConnectMove { col: 0 });
 
-  let (score, m) = solver.solve(&conn, 12);
+  let (score, m) = solver.best_move(&conn, 12);
   expect_eq!(score.score_at_depth(12), ScoreValue::OtherPlayerWins);
   expect_that!(
     m,

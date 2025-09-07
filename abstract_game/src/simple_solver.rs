@@ -34,7 +34,7 @@ impl SimpleSolver {
 }
 
 impl Solver for SimpleSolver {
-  fn solve<G: Game>(&mut self, game: &G, depth: u32) -> (Score, Option<G::Move>) {
+  fn best_move<G: Game>(&mut self, game: &G, depth: u32) -> (Score, Option<G::Move>) {
     debug_assert!(matches!(game.finished(), GameResult::NotFinished));
     if depth == 0 {
       return (Score::no_info(), None);
@@ -66,7 +66,7 @@ mod tests {
       let expected_winner = sticks % 3 != 0;
 
       let mut solver = SimpleSolver;
-      let (score, best_move) = solver.solve(&Nim::new(sticks), sticks + 1);
+      let (score, best_move) = solver.best_move(&Nim::new(sticks), sticks + 1);
 
       expect_eq!(
         score.score_at_depth(depth),
