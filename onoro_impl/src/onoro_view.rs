@@ -10,9 +10,9 @@ use algebra::{
   ordinal::Ordinal,
 };
 
-use abstract_game::{Game, GameMoveIterator, GamePlayer, GameResult};
 use onoro::{
   Compress, Onoro, PawnColor, TileState,
+  abstract_game::{Game, GameMoveIterator, GamePlayer, GameResult},
   error::{OnoroError, OnoroResult},
   groups::{C2, D3, D6, K4, SymmetryClass},
   hex_pos::{HexPos, HexPosOffset},

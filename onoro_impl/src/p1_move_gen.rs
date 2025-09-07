@@ -1,7 +1,6 @@
-use abstract_game::GameMoveIterator;
 use itertools::Either;
 use num_traits::{PrimInt, Unsigned};
-use onoro::hex_pos::HexPos;
+use onoro::{abstract_game::GameMoveIterator, hex_pos::HexPos};
 
 use crate::{
   Move, OnoroImpl, PackedIdx,
@@ -231,8 +230,10 @@ impl<const N: usize> GameMoveIterator for P1MoveGenerator<N> {
 
 #[cfg(test)]
 mod tests {
-  use abstract_game::GameMoveIterator;
-  use onoro::{Onoro, error::OnoroResult, hex_pos::HexPos, test_util::BOARD_POSITIONS};
+  use onoro::{
+    Onoro, abstract_game::GameMoveIterator, error::OnoroResult, hex_pos::HexPos,
+    test_util::BOARD_POSITIONS,
+  };
   use rstest::rstest;
   use rstest_reuse::{apply, template};
 
