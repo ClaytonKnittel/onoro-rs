@@ -3,7 +3,7 @@ use std::{
   hash::{BuildHasher, Hash, RandomState},
 };
 
-use abstract_game::{Game, GameResult, Score};
+use abstract_game::{Game, GameResult, Score, ScoreValue};
 
 use crate::table::Table;
 
@@ -90,10 +90,10 @@ where
     }
 
     // Stop the search early if there's already a winning move.
-    // if score.score_at_depth(depth) == ScoreValue::CurrentPlayerWins {
-    //   best_score = Some(score.break_early());
-    //   break;
-    // }
+    if score.score_at_depth(depth) == ScoreValue::CurrentPlayerWins {
+      best_score = Some(score.break_early());
+      break;
+    }
   }
 
   if let Some(ref score) = best_score {
