@@ -147,6 +147,7 @@ dependencies = [
 [[package]]
 name = "cooperate"
 version = "0.1.0"
+source = "git+https://github.com/ClaytonKnittel/cooperate.git?rev=189a2e37c503e2d4f69f7abe0a7b2f79b022bf4f#189a2e37c503e2d4f69f7abe0a7b2f79b022bf4f"
 dependencies = [
  "abstract_game",
  "crossbeam-queue",

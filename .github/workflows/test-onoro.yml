@@ -32,9 +32,6 @@ jobs:
       - name: Test algebra
         working-directory: algebra
         run: cargo test
-      - name: Test cooperate
-        working-directory: cooperate
-        run: cargo test
       - name: Test union find
         working-directory: union_find
         run: cargo test

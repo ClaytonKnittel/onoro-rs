@@ -4,7 +4,6 @@
     "./algebra/Cargo.toml",
     "./ai_gen_onoro/Cargo.toml",
     "./cardinality_estimate/Cargo.toml",
-    "./cooperate/Cargo.toml",
     "./onoro/Cargo.toml",
     "./onoro_impl/Cargo.toml",
     "./union_find/Cargo.toml"
