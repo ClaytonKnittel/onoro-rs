@@ -42,4 +42,4 @@ jobs:
         working-directory: onoro
         run: cargo test
       - name: Test main
-        run: cargo test
+        run: cargo test --profile test
