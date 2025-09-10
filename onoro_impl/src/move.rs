@@ -4,7 +4,7 @@ use onoro::{OnoroMove, hex_pos::HexPos};
 
 use super::packed_idx::PackedIdx;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Move {
   Phase1Move {
     /// Position to place the pawn at.

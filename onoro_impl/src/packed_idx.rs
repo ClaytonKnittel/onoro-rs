@@ -9,7 +9,7 @@ use onoro::{
   hex_pos::{HexPos, HexPosOffset},
 };
 
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub struct PackedIdx {
   bytes: Wrapping<u8>,
 }
