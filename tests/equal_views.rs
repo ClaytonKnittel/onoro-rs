@@ -4,7 +4,7 @@ use onoro::{
   error::OnoroResult, groups::D6, hex_pos::HexPos, test_util::BOARD_POSITIONS, Onoro, TileState,
 };
 use onoro_impl::{
-  benchmark_util::{board_symm_state, random_unfinished_state, TestOnlyCompareViewsIgnoringHash},
+  benchmark_util::{board_symm_state, TestOnlyCompareViewsIgnoringHash},
   Onoro16, OnoroView, PackedIdx,
 };
 use rand::{rngs::StdRng, Rng, SeedableRng};
@@ -59,7 +59,9 @@ fn test_equal_view(board_string: &str, seed: u64) -> OnoroResult {
 
   for i in 0..64 {
     // Make between 1-30 random moves, preferring more moves.
-    let num_moves = rng.gen_range(1..=30).max(rng.gen_range(1..=30));
+
+    use onoro_impl::benchmark_util::random_unfinished_state;
+    let num_moves = rng.random_range(1..=30).max(rng.random_range(1..=30));
     let onoro = random_unfinished_state(&onoro, num_moves, &mut rng)?;
 
     // Try comparing all rotations of the board.
@@ -113,10 +115,12 @@ fn test_inequal_view(board_string: &str, seed: u64) -> OnoroResult {
 
   for i in 0..64 {
     // Make between 1-30 random moves, preferring more moves.
-    let num_moves = rng.gen_range(1..=30).max(rng.gen_range(1..=30));
+
+    use onoro_impl::benchmark_util::random_unfinished_state;
+    let num_moves = rng.random_range(1..=30).max(rng.random_range(1..=30));
     let onoro = random_unfinished_state(&onoro, num_moves, &mut rng)?;
     // Make 1 - 4 more random moves.
-    let onoro2 = random_unfinished_state(&onoro, rng.gen_range(1..=4), &mut rng)?;
+    let onoro2 = random_unfinished_state(&onoro, rng.random_range(1..=4), &mut rng)?;
 
     // Try comparing all rotations of the board.
     for op in D6::for_each() {

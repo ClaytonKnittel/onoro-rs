@@ -943,7 +943,7 @@ mod tests {
     let mut poses = Vec::with_capacity(count);
     for _ in 0..count {
       let pos = loop {
-        let pos = PackedIdx::new(rng.gen_range(1..15), rng.gen_range(1..15));
+        let pos = PackedIdx::new(rng.random_range(1..15), rng.random_range(1..15));
         if poses.contains(&pos) {
           continue;
         }
@@ -958,7 +958,7 @@ mod tests {
   }
 
   fn randomly_mutate<R: Rng>(poses: &mut [PackedIdx], rng: &mut R) {
-    let to_change = (0..poses.len()).map(|_| rng.gen_bool(0.4)).collect_vec();
+    let to_change = (0..poses.len()).map(|_| rng.random_bool(0.4)).collect_vec();
     for (i, _) in to_change
       .iter()
       .cloned()
@@ -966,7 +966,7 @@ mod tests {
       .filter(|&(_, to_change)| to_change)
     {
       let pos = loop {
-        let pos = PackedIdx::new(rng.gen_range(1..15), rng.gen_range(1..15));
+        let pos = PackedIdx::new(rng.random_range(1..15), rng.random_range(1..15));
         if poses
           .iter()
           .enumerate()
@@ -990,11 +990,11 @@ mod tests {
     let mut rng = StdRng::seed_from_u64(19304910);
 
     for t in 0..ITERATIONS {
-      let origin = HexPos::new(rng.gen_range(1..15), rng.gen_range(1..15));
-      let count = if rng.gen_bool(0.75) {
+      let origin = HexPos::new(rng.random_range(1..15), rng.random_range(1..15));
+      let count = if rng.random_bool(0.75) {
         16
       } else {
-        rng.gen_range(1..=16)
+        rng.random_range(1..=16)
       };
 
       let mut poses1 = [PackedIdx::null(); N];
@@ -1009,7 +1009,7 @@ mod tests {
         *pos2 = random_pos;
       }
 
-      let (black_equal, white_equal) = if rng.gen_bool(0.5) {
+      let (black_equal, white_equal) = if rng.random_bool(0.5) {
         (true, true)
       } else {
         // Generate different positions.
@@ -1026,7 +1026,7 @@ mod tests {
 
       // Shuffle the even indices of poses2.
       for i in 2..N {
-        let j = 2 * rng.gen_range(0..=(i / 2)) + (i % 2);
+        let j = 2 * rng.random_range(0..=(i / 2)) + (i % 2);
         poses2.swap(i, j);
       }
 

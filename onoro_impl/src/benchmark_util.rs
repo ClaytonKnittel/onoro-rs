@@ -60,7 +60,7 @@ pub fn make_random_move<R: Rng>(onoro: &mut Onoro16, rng: &mut R) -> Option<Move
     return None;
   }
 
-  let m = moves[rng.gen_range(0..moves.len())];
+  let m = moves[rng.random_range(0..moves.len())];
   onoro.make_move(m);
   Some(m)
 }

@@ -458,7 +458,7 @@ mod tests {
     let mut rng = StdRng::seed_from_u64(393990259);
 
     for t in 0..ITERATIONS {
-      let list = (0..8).map(|_| rng.r#gen::<i16>()).collect_vec();
+      let list = (0..8).map(|_| rng.random::<i16>()).collect_vec();
       let expected_sorted_list = list.iter().cloned().sorted().collect_vec();
 
       let sorted = unsafe {

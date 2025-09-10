@@ -38,7 +38,7 @@ fn generate_game_pairs<const N: usize, R: Rng>(
   games
     .into_iter()
     .map(|game| {
-      let ord = rng.gen_range(0..D6::SIZE);
+      let ord = rng.random_range(0..D6::SIZE);
       let op = D6::from_ord(ord);
       let other_game = game.rotated_d6_c(op);
       (OnoroView::new(game), OnoroView::new(other_game))
