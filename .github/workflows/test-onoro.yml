@@ -28,18 +28,18 @@ jobs:
             echo "RUSTFLAGS=-C target-feature=+ssse3,+sse4.1" >> $GITHUB_ENV
           fi
       - name: Build
-        run: cargo build --verbose
+        run: cargo build --verbose --profile test
       - name: Test algebra
         working-directory: algebra
-        run: cargo test
+        run: cargo test --profile test
       - name: Test union find
         working-directory: union_find
-        run: cargo test
+        run: cargo test --profile test
       - name: Test onoro impl
         working-directory: onoro_impl
-        run: cargo test
+        run: cargo test --profile test
       - name: Test onoro
         working-directory: onoro
-        run: cargo test
+        run: cargo test --profile test
       - name: Test main
         run: cargo test --profile test
