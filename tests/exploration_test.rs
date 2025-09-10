@@ -107,7 +107,7 @@ fn test_random_exploration<T: OnoroFactory, U: OnoroFactory>(
       "Expected same moves in this position:\n{onoro1:?}"
     );
 
-    let move_idx = rng.gen_range(0..m1.len());
+    let move_idx = rng.random_range(0..m1.len());
     onoro1.make_move(m1[move_idx].original());
     onoro2.make_move(m2[move_idx].original());
 

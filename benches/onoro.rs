@@ -154,7 +154,7 @@ fn check_win(c: &mut Criterion) {
   // Make an extra move for half the games. Otherwise, it would be the same
   // color's turn in every game.
   for state in &mut states {
-    if rng.gen_bool(0.5) {
+    if rng.random_bool(0.5) {
       random_playout(state, 1, &mut rng);
     }
   }
