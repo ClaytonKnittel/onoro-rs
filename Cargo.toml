@@ -22,6 +22,10 @@ debug-assertions = false
 overflow-checks = false
 lto = "fat"
 
+[profile.test]
+inherits = "dev"
+opt-level = 3
+
 [[bench]]
 name = "onoro"
 harness = false

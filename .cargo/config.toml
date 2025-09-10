@@ -5,4 +5,4 @@ rustflags = ["-C", "target-cpu=native"]
 CONST_RANDOM_SEED = "onoro"
 
 [alias]
-t = "test --quiet"
+t = "test --quiet --profile test"
