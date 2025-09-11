@@ -1,6 +1,6 @@
 use std::fmt::Debug;
 
-use abstract_game::GamePlayer;
+use abstract_game::{Game, GamePlayer};
 use itertools::interleave;
 
 use crate::{
@@ -142,9 +142,8 @@ pub trait OnoroPawn {
   fn color(&self) -> PawnColor;
 }
 
-pub trait Onoro: Sized {
+pub trait Onoro: Game<Move: OnoroMove<Index = Self::Index>> + Sized {
   type Index: OnoroIndex;
-  type Move: OnoroMove<Index = Self::Index>;
   type Pawn: OnoroPawn<Index = Self::Index>;
 
   /// Initializes an empty game. This should not be called outside the `Onoro`
@@ -164,10 +163,6 @@ pub trait Onoro: Sized {
 
   /// Returns the number of pawns on the board currently.
   fn pawns_in_play(&self) -> u32;
-
-  /// If the game is finished, returns `Some(<player color who won>)`, or `None`
-  /// if the game is not over yet.
-  fn finished(&self) -> Option<PawnColor>;
 
   /// Given a position on the board, returns the tile state of that position,
   /// i.e. the color of the piece on that tile, or `Empty` if no piece is there.
@@ -193,9 +188,6 @@ pub trait Onoro: Sized {
 
   /// Returns an iterator over all legal moves that can be made from this state.
   fn each_move(&self) -> impl Iterator<Item = Self::Move>;
-
-  /// Makes a move, mutating the game state.
-  fn make_move(&mut self, m: Self::Move);
 
   /// Make move without checking that we are in the right phase. This is used by
   /// the game constructors to place the first pawn on an empty board.

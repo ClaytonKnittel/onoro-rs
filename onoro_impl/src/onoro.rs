@@ -6,7 +6,7 @@ use std::{
 use algebra::group::Group;
 use onoro::{
   Color, Colored, Onoro, OnoroMoveWrapper, OnoroPawn, PawnColor, TileState,
-  abstract_game::{GameIterator, GameMoveIterator},
+  abstract_game::{Game, GameIterator, GameMoveIterator, GamePlayer, GameResult},
   groups::{C2, D3, D6, K4},
   hex_pos::{HexPos, HexPosOffset},
 };
@@ -600,6 +600,26 @@ impl<const N: usize> OnoroImpl<N> {
     } else {
       self.get_tile(idx.into())
     }
+  }
+}
+
+impl<const N: usize> Game for OnoroImpl<N> {
+  type Move = Move;
+
+  fn move_generator(&self) -> impl GameMoveIterator<Game = Self> {
+    self.each_move_gen()
+  }
+
+  fn make_move(&mut self, m: Self::Move) {
+    Onoro::make_move(self, m);
+  }
+
+  fn current_player(&self) -> GamePlayer {
+    todo!()
+  }
+
+  fn finished(&self) -> GameResult {
+    todo!()
   }
 }
 
