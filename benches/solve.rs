@@ -12,11 +12,19 @@ fn solve_default(c: &mut Criterion) {
   group.throughput(Throughput::Elements(N_GAMES as u64));
   group.measurement_time(Duration::from_secs(20));
 
-  group.bench_function("solve default start", |b| {
+  let onoro = Onoro16::default_start();
+  group.bench_function("solve default start to depth 7", |b| {
     b.iter(|| {
-      let onoro = Onoro16::default_start();
       let mut solver = TTSolver::with_hasher(BuildPassThroughHasher);
-      black_box(solver.best_move(&OnoroView::new(onoro), 7));
+      black_box(solver.best_move(&OnoroView::new(onoro.clone()), 7));
+    })
+  });
+
+  let onoro = Onoro16::hex_start();
+  group.bench_function("solve hex start to depth 7", |b| {
+    b.iter(|| {
+      let mut solver = TTSolver::with_hasher(BuildPassThroughHasher);
+      black_box(solver.best_move(&OnoroView::new(onoro.clone()), 7));
     })
   });
 
