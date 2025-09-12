@@ -142,7 +142,7 @@ pub trait OnoroPawn {
   fn color(&self) -> PawnColor;
 }
 
-pub trait Onoro: Game<Move: OnoroMove<Index = Self::Index>> + Sized {
+pub trait Onoro: Game<Move: OnoroMove<Index = Self::Index>> {
   type Index: OnoroIndex;
   type Pawn: OnoroPawn<Index = Self::Index>;
 
