@@ -1,6 +1,6 @@
-use googletest::{expect_eq, expect_that, expect_true, gtest, prelude::none};
+use googletest::{expect_eq, expect_true, gtest};
 use itertools::Itertools;
-use onoro::{Onoro, OnoroPawn, PawnColor};
+use onoro::{abstract_game::GameResult, Onoro, OnoroPawn, PawnColor};
 use rstest::rstest;
 use rstest_reuse::{apply, template};
 
@@ -24,7 +24,7 @@ fn test_pawns_in_play(onoro: impl Onoro) {
 #[apply(default_start)]
 #[gtest]
 fn test_finished(onoro: impl Onoro) {
-  expect_that!(onoro.finished(), none());
+  expect_eq!(onoro.finished(), GameResult::NotFinished);
 }
 
 #[apply(default_start)]

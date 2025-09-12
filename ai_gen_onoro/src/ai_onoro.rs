@@ -3,8 +3,11 @@ use std::{
   fmt::Debug,
 };
 
-use itertools::{Either, Itertools};
-use onoro::{Onoro, OnoroIndex, OnoroMoveWrapper, OnoroPawn, PawnColor, TileState};
+use itertools::Itertools;
+use onoro::{
+  Onoro, OnoroIndex, OnoroMoveWrapper, OnoroPawn, PawnColor, TileState,
+  abstract_game::{Game, GameMoveIterator, GamePlayer, GameResult},
+};
 
 type Move = OnoroMoveWrapper<PackedIdx>;
 
@@ -179,53 +182,26 @@ impl OnoroGame {
   }
 }
 
-impl Onoro for OnoroGame {
-  type Index = PackedIdx;
+pub struct OnoroMoveGen<I>(I);
+
+impl<I> GameMoveIterator for OnoroMoveGen<I>
+where
+  I: Iterator<Item = Move>,
+{
+  type Game = OnoroGame;
+
+  fn next(&mut self, _game: &OnoroGame) -> Option<Move> {
+    self.0.next()
+  }
+}
+
+impl Game for OnoroGame {
   type Move = Move;
-  type Pawn = Pawn;
+  type MoveGenerator = OnoroMoveGen<Box<dyn Iterator<Item = Move>>>;
 
-  unsafe fn new() -> Self {
-    OnoroGame {
-      board: HashMap::new(),
-      to_move: PawnColor::Black,
-      winner: None,
-    }
-  }
-
-  fn pawns_per_player() -> usize {
-    8
-  }
-
-  fn turn(&self) -> PawnColor {
-    self.to_move
-  }
-
-  fn pawns_in_play(&self) -> u32 {
-    self.board.len() as u32
-  }
-
-  fn finished(&self) -> Option<PawnColor> {
-    self.winner
-  }
-
-  fn get_tile(&self, idx: PackedIdx) -> TileState {
-    match self.board.get(&idx) {
-      Some(&color) => color.into(),
-      None => TileState::Empty,
-    }
-  }
-
-  fn pawns(&self) -> impl Iterator<Item = Pawn> + '_ {
-    self.board.iter().map(|(&pos, &color)| Pawn { color, pos })
-  }
-
-  fn in_phase1(&self) -> bool {
-    self.board.len() < 2 * Self::pawns_per_player()
-  }
-
-  fn each_move(&self) -> impl Iterator<Item = Move> {
-    if self.in_phase1() {
-      Either::Left(
+  fn move_generator(&self) -> Self::MoveGenerator {
+    OnoroMoveGen(if self.in_phase1() {
+      Box::new(
         self
           .board
           .keys()
@@ -244,10 +220,12 @@ impl Onoro for OnoroGame {
               .count()
               >= 2
           })
-          .map(|to| Move::Phase1 { to }),
+          .map(|to| Move::Phase1 { to })
+          .collect_vec()
+          .into_iter(),
       )
     } else {
-      Either::Right(
+      Box::new(
         self
           .board
           .iter()
@@ -266,12 +244,14 @@ impl Onoro for OnoroGame {
               .collect_vec(),
           )
           .filter(|&(from, to)| self.is_legal_move(from, to))
-          .map(|(from, to)| Move::Phase2 { from, to }),
+          .map(|(from, to)| Move::Phase2 { from, to })
+          .collect_vec()
+          .into_iter(),
       )
-    }
+    })
   }
 
-  fn make_move(&mut self, m: Move) {
+  fn make_move(&mut self, m: Self::Move) {
     debug_assert!(self.winner.is_none());
 
     match m {
@@ -298,6 +278,61 @@ impl Onoro for OnoroGame {
     }
 
     unsafe { self.make_move_unchecked(m) };
+  }
+
+  fn current_player(&self) -> GamePlayer {
+    match self.to_move {
+      PawnColor::Black => GamePlayer::Player1,
+      PawnColor::White => GamePlayer::Player2,
+    }
+  }
+
+  fn finished(&self) -> GameResult {
+    match self.winner {
+      Some(PawnColor::Black) => GameResult::Win(GamePlayer::Player1),
+      Some(PawnColor::White) => GameResult::Win(GamePlayer::Player2),
+      None => GameResult::NotFinished,
+    }
+  }
+}
+
+impl Onoro for OnoroGame {
+  type Index = PackedIdx;
+  type Pawn = Pawn;
+
+  unsafe fn new() -> Self {
+    OnoroGame {
+      board: HashMap::new(),
+      to_move: PawnColor::Black,
+      winner: None,
+    }
+  }
+
+  fn pawns_per_player() -> usize {
+    8
+  }
+
+  fn turn(&self) -> PawnColor {
+    self.to_move
+  }
+
+  fn pawns_in_play(&self) -> u32 {
+    self.board.len() as u32
+  }
+
+  fn get_tile(&self, idx: PackedIdx) -> TileState {
+    match self.board.get(&idx) {
+      Some(&color) => color.into(),
+      None => TileState::Empty,
+    }
+  }
+
+  fn pawns(&self) -> impl Iterator<Item = Pawn> + '_ {
+    self.board.iter().map(|(&pos, &color)| Pawn { color, pos })
+  }
+
+  fn in_phase1(&self) -> bool {
+    self.board.len() < 2 * Self::pawns_per_player()
   }
 
   unsafe fn make_move_unchecked(&mut self, m: Move) {

@@ -322,10 +322,9 @@ impl<const N: usize> Debug for OnoroView<N> {
 pub struct ViewMoveGenerator<const N: usize>(MoveGenerator<N>);
 
 impl<const N: usize> GameMoveIterator for ViewMoveGenerator<N> {
-  type Item = Move;
   type Game = OnoroView<N>;
 
-  fn next(&mut self, view: &Self::Game) -> Option<Self::Item> {
+  fn next(&mut self, view: &Self::Game) -> Option<Move> {
     self.0.next(view.onoro())
   }
 }
@@ -334,7 +333,7 @@ impl<const N: usize> Game for OnoroView<N> {
   type Move = Move;
   type MoveGenerator = ViewMoveGenerator<N>;
 
-  fn move_generator(&self) -> Self::MoveGenerator {
+  fn move_generator(&self) -> ViewMoveGenerator<N> {
     ViewMoveGenerator(self.onoro().each_move_gen())
   }
 
@@ -345,14 +344,11 @@ impl<const N: usize> Game for OnoroView<N> {
   }
 
   fn current_player(&self) -> GamePlayer {
-    self.onoro().player_color().into()
+    self.onoro().current_player()
   }
 
   fn finished(&self) -> GameResult {
-    match self.onoro().finished() {
-      Some(color) => GameResult::Win(color.into()),
-      None => GameResult::NotFinished,
-    }
+    self.onoro().finished()
   }
 }
 

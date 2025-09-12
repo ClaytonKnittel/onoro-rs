@@ -3,7 +3,7 @@ use std::{hint::black_box, time::Duration};
 use criterion::{
   criterion_group, criterion_main, measurement::Measurement, BenchmarkGroup, Criterion, Throughput,
 };
-use onoro::{error::OnoroResult, Onoro, OnoroPawn};
+use onoro::{abstract_game::Game, error::OnoroResult, Onoro, OnoroPawn};
 use onoro_impl::{
   benchmark_util::{
     generate_random_unfinished_states, generate_random_walks, random_playout, CheckWinBenchmark,
