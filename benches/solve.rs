@@ -16,9 +16,7 @@ fn solve_default(c: &mut Criterion) {
     b.iter(|| {
       let onoro = Onoro16::default_start();
       let mut solver = TTSolver::with_hasher(BuildPassThroughHasher);
-      for state in solver.playout(&OnoroView::new(onoro), 4) {
-        black_box(state);
-      }
+      black_box(solver.best_move(&OnoroView::new(onoro), 7));
     })
   });
 
