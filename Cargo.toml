@@ -8,7 +8,7 @@ ai_gen_onoro = { path = "./ai_gen_onoro" }
 algebra = { path = "./algebra" }
 dashmap = "5.5"
 multiqueue = "0.3"
-cooperate = { git = "https://github.com/ClaytonKnittel/cooperate.git", rev = "722f5721aea204c67594db3731d9cf31010d4860" }
+cooperate = { git = "https://github.com/ClaytonKnittel/cooperate.git", rev = "ecc4e22609abc3b15d060d68f0a9cec2e7440b22" }
 onoro = { path = "./onoro" }
 onoro_impl = { path = "./onoro_impl" }
 rayon = "1.7"
@@ -32,6 +32,10 @@ harness = false
 
 [[bench]]
 name = "onoro_view"
+harness = false
+
+[[bench]]
+name = "solve"
 harness = false
 
 [[bench]]

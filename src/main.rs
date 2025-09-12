@@ -1,12 +1,8 @@
 use std::time::SystemTime;
 
-use cooperate::solve_with_hasher;
+use cooperate::{cooperate::solve_with_hasher, passthrough_hasher::BuildPassThroughHasher};
 use onoro::Onoro;
 use onoro_impl::{Onoro16, OnoroView};
-
-use crate::passthrough_hasher::BuildPassThroughHasher;
-
-mod passthrough_hasher;
 
 fn main() {
   // let onoro = Onoro16::from_board_string(
@@ -34,7 +30,7 @@ fn main() {
   println!("{}", onoro);
 
   let start = SystemTime::now();
-  let options = cooperate::Options {
+  let options = cooperate::cooperate::Options {
     num_threads: 16,
     search_depth: 9,
     unit_depth: 4,

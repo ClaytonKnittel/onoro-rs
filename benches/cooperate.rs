@@ -1,6 +1,6 @@
 use std::{hint::black_box, time::Duration};
 
-use cooperate::solve_with_hasher;
+use cooperate::cooperate::solve_with_hasher;
 use criterion::{criterion_group, criterion_main, Criterion, Throughput};
 use onoro::Onoro;
 use onoro_impl::{Onoro16, OnoroView};
@@ -39,7 +39,7 @@ fn solve_default_start(c: &mut Criterion) {
 
   group.bench_function("solve 1 thread default start to depth 7", |b| {
     b.iter(|| {
-      let options = cooperate::Options {
+      let options = cooperate::cooperate::Options {
         num_threads: 1,
         search_depth: 7,
         unit_depth: 0,
@@ -72,7 +72,7 @@ fn solve_phase2(c: &mut Criterion) {
 
   group.bench_function("solve 1 thread phase 2 to depth 4", |b| {
     b.iter(|| {
-      let options = cooperate::Options {
+      let options = cooperate::cooperate::Options {
         num_threads: 1,
         search_depth: 4,
         unit_depth: 0,
