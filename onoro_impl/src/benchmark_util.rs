@@ -1,6 +1,7 @@
 use itertools::Itertools;
 use onoro::{
   Onoro,
+  abstract_game::Game,
   error::{OnoroError, OnoroResult},
   hex_pos::HexPos,
 };
@@ -71,7 +72,7 @@ pub fn make_random_move<R: Rng>(onoro: &mut Onoro16, rng: &mut R) -> Option<Move
 pub fn random_playout<R: Rng>(onoro: &mut Onoro16, num_moves: usize, rng: &mut R) -> usize {
   for i in 1..=num_moves {
     make_random_move(onoro, rng);
-    if onoro.finished().is_some() {
+    if onoro.finished().is_finished() {
       return i;
     }
   }
@@ -132,14 +133,14 @@ pub fn generate_random_walks<R: Rng>(
   rng: &mut R,
 ) -> OnoroResult<Vec<Vec<Move>>> {
   const MAX_MOVES: usize = 1000;
-  debug_assert!(initial_state.finished().is_none());
+  debug_assert!(!initial_state.finished().is_finished());
 
   (0..count)
     .map(|_| {
       let mut onoro = initial_state.clone();
       let mut moves = Vec::new();
       for _ in 0..MAX_MOVES {
-        if onoro.finished().is_some() {
+        if onoro.finished().is_finished() {
           return Ok(moves);
         }
         if let Some(m) = make_random_move(&mut onoro, rng) {

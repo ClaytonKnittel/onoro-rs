@@ -6,7 +6,7 @@ use std::{
 use algebra::group::Group;
 use onoro::{
   Color, Colored, Onoro, OnoroMoveWrapper, OnoroPawn, PawnColor, TileState,
-  abstract_game::{Game, GameIterator, GameMoveIterator, GamePlayer, GameResult},
+  abstract_game::{Game, GameMoveIterator, GamePlayer, GameResult},
   groups::{C2, D3, D6, K4},
   hex_pos::{HexPos, HexPosOffset},
 };
@@ -181,8 +181,8 @@ impl<const N: usize> OnoroImpl<N> {
     PawnGenerator { pawn_idx: 0 }
   }
 
-  pub fn pawns_typed(&self) -> GameIterator<'_, PawnGenerator<N>, Self> {
-    self.pawns_gen().to_iter(self)
+  pub fn pawns_typed(&self) -> impl Iterator<Item = Pawn> {
+    self.pawns_gen().into_iter(self)
   }
 
   pub fn color_pawns_gen(&self, color: PawnColor) -> SingleColorPawnGenerator<N> {
@@ -194,11 +194,8 @@ impl<const N: usize> OnoroImpl<N> {
     }
   }
 
-  pub fn color_pawns_typed(
-    &self,
-    color: PawnColor,
-  ) -> GameIterator<'_, SingleColorPawnGenerator<N>, Self> {
-    self.color_pawns_gen(color).to_iter(self)
+  pub fn color_pawns_typed(&self, color: PawnColor) -> impl Iterator<Item = Pawn> {
+    self.color_pawns_gen(color).into_iter(self)
   }
 
   pub fn color_pawns(&self, color: PawnColor) -> impl Iterator<Item = Pawn> + '_ {
@@ -611,21 +608,36 @@ impl<const N: usize> Game for OnoroImpl<N> {
   }
 
   fn make_move(&mut self, m: Self::Move) {
-    Onoro::make_move(self, m);
+    debug_assert!(!self.finished().is_finished());
+
+    match m {
+      Move::Phase1Move { to: _ } => {
+        debug_assert!(self.in_phase1());
+      }
+      Move::Phase2Move { to: _, from_idx: _ } => {
+        debug_assert!(!self.in_phase1());
+      }
+    }
+    unsafe { self.make_move_unchecked(m) }
   }
 
   fn current_player(&self) -> GamePlayer {
-    todo!()
+    self.player_color().into()
   }
 
   fn finished(&self) -> GameResult {
-    todo!()
+    if !self.onoro_state().finished() {
+      GameResult::NotFinished
+    } else if self.onoro_state().black_turn() {
+      GameResult::Win(GamePlayer::Player2)
+    } else {
+      GameResult::Win(GamePlayer::Player1)
+    }
   }
 }
 
 impl<const N: usize> Onoro for OnoroImpl<N> {
   type Index = PackedIdx;
-  type Move = Move;
   type Pawn = Pawn;
 
   unsafe fn new() -> Self {
@@ -652,16 +664,6 @@ impl<const N: usize> Onoro for OnoroImpl<N> {
     self.onoro_state().turn() + 1
   }
 
-  fn finished(&self) -> Option<PawnColor> {
-    self.onoro_state().finished().then(|| {
-      if self.onoro_state().black_turn() {
-        PawnColor::White
-      } else {
-        PawnColor::Black
-      }
-    })
-  }
-
   fn get_tile(&self, idx: PackedIdx) -> TileState {
     #[cfg(target_feature = "ssse3")]
     if N == 16 {
@@ -676,24 +678,6 @@ impl<const N: usize> Onoro for OnoroImpl<N> {
 
   fn in_phase1(&self) -> bool {
     self.onoro_state().turn() < N as u32 - 1
-  }
-
-  fn each_move(&self) -> impl Iterator<Item = Move> {
-    self.each_move_gen().to_iter(self)
-  }
-
-  fn make_move(&mut self, m: Move) {
-    debug_assert!(self.finished().is_none());
-
-    match m {
-      Move::Phase1Move { to: _ } => {
-        debug_assert!(self.in_phase1());
-      }
-      Move::Phase2Move { to: _, from_idx: _ } => {
-        debug_assert!(!self.in_phase1());
-      }
-    }
-    unsafe { self.make_move_unchecked(m) }
   }
 
   unsafe fn make_move_unchecked(&mut self, m: Move) {
@@ -893,11 +877,8 @@ pub struct PawnGeneratorImpl<
   pawn_idx: usize,
 }
 
-impl<const ONE_COLOR: bool, const N: usize> GameMoveIterator for PawnGeneratorImpl<ONE_COLOR, N> {
-  type Item = Pawn;
-  type Game = OnoroImpl<N>;
-
-  fn next(&mut self, onoro: &Self::Game) -> Option<Self::Item> {
+impl<const ONE_COLOR: bool, const N: usize> PawnGeneratorImpl<ONE_COLOR, N> {
+  fn next(&mut self, onoro: &OnoroImpl<N>) -> Option<Pawn> {
     if self.pawn_idx >= onoro.pawns_in_play() as usize {
       return None;
     }
@@ -915,6 +896,21 @@ impl<const ONE_COLOR: bool, const N: usize> GameMoveIterator for PawnGeneratorIm
 
     Some(pawn)
   }
+
+  fn into_iter(self, onoro: &OnoroImpl<N>) -> impl Iterator<Item = Pawn> {
+    struct PawnIter<'a, const ONE_COLOR: bool, const N: usize> {
+      iter: PawnGeneratorImpl<ONE_COLOR, N>,
+      onoro: &'a OnoroImpl<N>,
+    }
+    impl<'a, const ONE_COLOR: bool, const N: usize> Iterator for PawnIter<'a, ONE_COLOR, N> {
+      type Item = Pawn;
+      fn next(&mut self) -> Option<Self::Item> {
+        self.iter.next(self.onoro)
+      }
+    }
+
+    PawnIter { iter: self, onoro }
+  }
 }
 
 pub type PawnGenerator<const N: usize> = PawnGeneratorImpl<false, N>;
@@ -926,10 +922,9 @@ pub enum MoveGenerator<const N: usize> {
 }
 
 impl<const N: usize> GameMoveIterator for MoveGenerator<N> {
-  type Item = Move;
   type Game = OnoroImpl<N>;
 
-  fn next(&mut self, onoro: &Self::Game) -> Option<Self::Item> {
+  fn next(&mut self, onoro: &Self::Game) -> Option<Move> {
     match self {
       Self::P1Moves(p1_iter) => p1_iter.next(onoro),
       Self::P2Moves(p2_iter) => p2_iter.next(onoro),

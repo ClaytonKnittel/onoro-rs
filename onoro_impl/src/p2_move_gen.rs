@@ -432,10 +432,9 @@ impl<const N: usize> P2MoveGenerator<N> {
 }
 
 impl<const N: usize> GameMoveIterator for P2MoveGenerator<N> {
-  type Item = Move;
   type Game = OnoroImpl<N>;
 
-  fn next(&mut self, onoro: &Self::Game) -> Option<Self::Item> {
+  fn next(&mut self, onoro: &Self::Game) -> Option<Move> {
     loop {
       if self.pawn_index >= N - 2 {
         // If we have finished checking all of our pawns, it's time to move on

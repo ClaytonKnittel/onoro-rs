@@ -186,9 +186,6 @@ pub trait Onoro: Game<Move: OnoroMove<Index = Self::Index>> + Sized {
   /// player is to place a new pawn on the board, not to move an existing pawn.
   fn in_phase1(&self) -> bool;
 
-  /// Returns an iterator over all legal moves that can be made from this state.
-  fn each_move(&self) -> impl Iterator<Item = Self::Move>;
-
   /// Make move without checking that we are in the right phase. This is used by
   /// the game constructors to place the first pawn on an empty board.
   ///

@@ -220,10 +220,9 @@ impl<const N: usize> P1MoveGenerator<N> {
 }
 
 impl<const N: usize> GameMoveIterator for P1MoveGenerator<N> {
-  type Item = Move;
   type Game = OnoroImpl<N>;
 
-  fn next(&mut self, _onoro: &Self::Game) -> Option<Self::Item> {
+  fn next(&mut self, _onoro: &Self::Game) -> Option<Move> {
     self.next_move()
   }
 }
