@@ -77,6 +77,8 @@ fn test_random_exploration<T: OnoroFactory, U: OnoroFactory>(
   let mut rng = StdRng::seed_from_u64(seed);
 
   for _ in 0..MAX_ITERS {
+    use onoro::abstract_game::Game;
+
     assert_that!(onoro1.validate(), ok(()));
     assert_that!(onoro2.validate(), ok(()));
     assert_eq!(
@@ -95,7 +97,7 @@ fn test_random_exploration<T: OnoroFactory, U: OnoroFactory>(
       "In position:\n{onoro1:?}"
     );
 
-    if onoro1.finished().is_some() {
+    if onoro1.finished().is_finished() {
       return Ok(());
     }
 

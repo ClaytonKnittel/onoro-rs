@@ -331,8 +331,9 @@ impl<const N: usize> GameMoveIterator for ViewMoveGenerator<N> {
 
 impl<const N: usize> Game for OnoroView<N> {
   type Move = Move;
+  type MoveGenerator = ViewMoveGenerator<N>;
 
-  fn move_generator(&self) -> impl GameMoveIterator<Game = Self> {
+  fn move_generator(&self) -> ViewMoveGenerator<N> {
     ViewMoveGenerator(self.onoro().each_move_gen())
   }
 

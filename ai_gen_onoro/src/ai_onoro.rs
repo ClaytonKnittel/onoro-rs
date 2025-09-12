@@ -3,7 +3,7 @@ use std::{
   fmt::Debug,
 };
 
-use itertools::{Either, Itertools};
+use itertools::Itertools;
 use onoro::{
   Onoro, OnoroIndex, OnoroMoveWrapper, OnoroPawn, PawnColor, TileState,
   abstract_game::{Game, GameMoveIterator, GamePlayer, GameResult},
@@ -182,12 +182,26 @@ impl OnoroGame {
   }
 }
 
+pub struct OnoroMoveGen<I>(I);
+
+impl<I> GameMoveIterator for OnoroMoveGen<I>
+where
+  I: Iterator<Item = Move>,
+{
+  type Game = OnoroGame;
+
+  fn next(&mut self, _game: &OnoroGame) -> Option<Move> {
+    self.0.next()
+  }
+}
+
 impl Game for OnoroGame {
   type Move = Move;
+  type MoveGenerator = OnoroMoveGen<Box<dyn Iterator<Item = Move>>>;
 
-  fn move_generator(&self) -> impl GameMoveIterator<Game = Self> {
-    if self.in_phase1() {
-      Either::Left(
+  fn move_generator(&self) -> Self::MoveGenerator {
+    OnoroMoveGen(if self.in_phase1() {
+      Box::new(
         self
           .board
           .keys()
@@ -206,10 +220,12 @@ impl Game for OnoroGame {
               .count()
               >= 2
           })
-          .map(|to| Move::Phase1 { to }),
+          .map(|to| Move::Phase1 { to })
+          .collect_vec()
+          .into_iter(),
       )
     } else {
-      Either::Right(
+      Box::new(
         self
           .board
           .iter()
@@ -228,9 +244,11 @@ impl Game for OnoroGame {
               .collect_vec(),
           )
           .filter(|&(from, to)| self.is_legal_move(from, to))
-          .map(|(from, to)| Move::Phase2 { from, to }),
+          .map(|(from, to)| Move::Phase2 { from, to })
+          .collect_vec()
+          .into_iter(),
       )
-    }
+    })
   }
 
   fn make_move(&mut self, m: Self::Move) {

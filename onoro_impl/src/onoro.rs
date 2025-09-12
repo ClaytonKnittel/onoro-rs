@@ -602,8 +602,9 @@ impl<const N: usize> OnoroImpl<N> {
 
 impl<const N: usize> Game for OnoroImpl<N> {
   type Move = Move;
+  type MoveGenerator = MoveGenerator<N>;
 
-  fn move_generator(&self) -> impl GameMoveIterator<Game = Self> {
+  fn move_generator(&self) -> MoveGenerator<N> {
     self.each_move_gen()
   }
 
