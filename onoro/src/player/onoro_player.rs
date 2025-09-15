@@ -14,7 +14,13 @@ use crate::{
   OnoroPawn, PawnColor,
 };
 
+enum Phase {
+  Initial,
+  Phase2To { from: HexPosOffset },
+}
+
 pub struct OnoroPlayer<G> {
+  phase: Phase,
   _phantom: PhantomData<G>,
 }
 
@@ -128,6 +134,7 @@ impl<G: Onoro> HumanPlayer for OnoroPlayer<G> {
 impl<G: Onoro> Default for OnoroPlayer<G> {
   fn default() -> Self {
     Self {
+      phase: Phase::Initial,
       _phantom: PhantomData,
     }
   }
