@@ -1,8 +1,8 @@
-use std::{fmt::Display, marker::PhantomData};
+use std::{fmt::Display, io::BufRead, marker::PhantomData};
 
 use abstract_game::{
   error::{GameInterfaceError, GameInterfaceResult},
-  interactive::human_player::HumanPlayer,
+  interactive::{human_player::HumanPlayer, line_reader::GameMoveLineReader},
   Game,
 };
 
@@ -56,7 +56,12 @@ impl<G: Onoro> HumanPlayer for OnoroPlayer<G> {
     )
   }
 
-  fn parse_move(&self, move_text: &str, game: &G) -> GameInterfaceResult<<G as Game>::Move> {
+  fn parse_move<I: BufRead>(
+    &self,
+    mut move_reader: GameMoveLineReader<I>,
+    game: &G,
+  ) -> GameInterfaceResult<<G as Game>::Move> {
+    let move_text = move_reader.next_line()?;
     let mut chars = move_text.chars();
     let c = chars
       .next()
