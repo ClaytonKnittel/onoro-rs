@@ -2,7 +2,9 @@ use std::{collections::HashSet, fmt::Display, io::BufRead, marker::PhantomData};
 
 use abstract_game::{
   error::{GameInterfaceError, GameInterfaceResult},
-  interactive::{human_player::HumanPlayer, line_reader::GameMoveLineReader},
+  interactive::{
+    human_player::HumanPlayer, line_reader::GameMoveLineReader, player::MakeMoveControl,
+  },
   Game,
 };
 use itertools::Either;
@@ -95,7 +97,7 @@ impl<G: Onoro> HumanPlayer for OnoroPlayer<G> {
     &self,
     mut move_reader: GameMoveLineReader<I>,
     game: &G,
-  ) -> GameInterfaceResult<<G as Game>::Move> {
+  ) -> GameInterfaceResult<MakeMoveControl<<G as Game>::Move>> {
     let move_text = move_reader.next_line()?;
     let mut chars = move_text.chars();
     let c = chars
@@ -115,9 +117,11 @@ impl<G: Onoro> HumanPlayer for OnoroPlayer<G> {
 
     let move_idx = c as u8 - b'a';
 
-    game.each_move().nth(move_idx as usize).ok_or_else(|| {
+    let m = game.each_move().nth(move_idx as usize).ok_or_else(|| {
       GameInterfaceError::MalformedMove(format!("{move_text} is not a valid move letter"))
-    })
+    })?;
+
+    Ok(MakeMoveControl::Done(m))
   }
 }
 

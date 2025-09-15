@@ -8,7 +8,7 @@ ai_gen_onoro = { path = "./ai_gen_onoro" }
 algebra = { path = "./algebra" }
 dashmap = "5.5"
 multiqueue = "0.3"
-cooperate = { git = "https://github.com/ClaytonKnittel/cooperate.git", rev = "db381a9d3963aadfd666cc7ca620c1a595ca7be8" }
+cooperate = { git = "https://github.com/ClaytonKnittel/cooperate.git", rev = "3452499bb0f186dc13a5a6d513f42358a6bed620" }
 onoro = { path = "./onoro" }
 onoro_impl = { path = "./onoro_impl" }
 rayon = "1.7"
