@@ -113,6 +113,12 @@ impl OnoroIndex for (i32, i32) {
   }
 }
 
+impl<I: OnoroIndex> From<I> for HexPosOffset {
+  fn from(value: I) -> Self {
+    HexPosOffset::new(value.x(), value.y())
+  }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum OnoroMoveWrapper<Index: OnoroIndex> {
   Phase1 { to: Index },
@@ -330,7 +336,7 @@ pub trait Onoro: Game<Move: OnoroMove<Index = Self::Index>> {
           .pawns()
           .map(|pawn| {
             (
-              HexPosOffset::new(pawn.pos().x(), pawn.pos().y()),
+              pawn.pos().into(),
               match pawn.color() {
                 PawnColor::Black => 'B',
                 PawnColor::White => 'W',

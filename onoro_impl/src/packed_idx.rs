@@ -140,12 +140,6 @@ impl From<PackedIdx> for HexPos {
   }
 }
 
-impl From<PackedIdx> for HexPosOffset {
-  fn from(value: PackedIdx) -> Self {
-    Self::new(value.x() as i32, value.y() as i32)
-  }
-}
-
 impl std::ops::Add<IdxOffset> for PackedIdx {
   type Output = Self;
 
