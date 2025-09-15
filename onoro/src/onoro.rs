@@ -4,6 +4,7 @@ use abstract_game::{Game, GamePlayer};
 use itertools::interleave;
 
 use crate::{
+  board_printer::display_on_hexagonal_grid,
   error::{OnoroError, OnoroResult},
   hex_pos::HexPosOffset,
   onoro_util::{pawns_from_board_string, BoardLayoutPawns},
@@ -312,60 +313,32 @@ pub trait Onoro: Game<Move: OnoroMove<Index = Self::Index>> {
   }
 
   fn display(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    let ((min_x, min_y), (max_x, max_y)) = self.pawns().fold(
-      ((Self::board_width(), Self::board_width()), (0, 0)),
-      |((min_x, min_y), (max_x, max_y)), pawn| {
-        (
-          (
-            min_x.min(pawn.pos().x() as usize),
-            min_y.min(pawn.pos().y() as usize),
-          ),
-          (
-            max_x.max(pawn.pos().x() as usize),
-            max_y.max(pawn.pos().y() as usize),
-          ),
-        )
-      },
-    );
-
-    let min_x = min_x.saturating_sub(1);
-    let min_y = min_y.saturating_sub(1);
-    let max_x = (max_x + 1).min(Self::board_width() - 1);
-    let max_y = (max_y + 1).min(Self::board_width() - 1);
-
     writeln!(
       f,
-      "{}: {:?} is bottom left",
+      "{} turn:",
       match self.turn() {
         PawnColor::Black => "black",
         PawnColor::White => "white",
       },
-      (min_x, min_y)
     )?;
 
-    for y in (min_y..=max_y).rev() {
-      write!(f, "{: <width$}", "", width = max_y - y)?;
-      for x in min_x..=max_x {
-        write!(
-          f,
-          "{}",
-          match self.get_tile(Self::Index::from_coords(x as u32, y as u32)) {
-            TileState::Black => "B",
-            TileState::White => "W",
-            TileState::Empty => ".",
-          }
-        )?;
-
-        if x < Self::board_width() - 1 {
-          write!(f, " ")?;
-        }
-      }
-
-      if y > min_y {
-        writeln!(f)?;
-      }
-    }
-
-    Ok(())
+    write!(
+      f,
+      "{}",
+      display_on_hexagonal_grid(
+        self
+          .pawns()
+          .map(|pawn| {
+            (
+              HexPosOffset::new(pawn.pos().x(), pawn.pos().y()),
+              match pawn.color() {
+                PawnColor::Black => 'B',
+                PawnColor::White => 'W',
+              },
+            )
+          })
+          .collect(),
+      )
+    )
   }
 }

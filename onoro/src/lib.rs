@@ -1,3 +1,4 @@
+pub mod board_printer;
 mod color_print;
 mod compress;
 pub mod error;
