@@ -1,13 +1,15 @@
-use std::{fmt::Display, io::BufRead, marker::PhantomData};
+use std::{collections::HashSet, fmt::Display, io::BufRead, marker::PhantomData};
 
 use abstract_game::{
   error::{GameInterfaceError, GameInterfaceResult},
   interactive::{human_player::HumanPlayer, line_reader::GameMoveLineReader},
   Game,
 };
+use itertools::Either;
 
 use crate::{
-  board_printer::display_on_hexagonal_grid, Onoro, OnoroMoveWrapper, OnoroPawn, PawnColor,
+  board_printer::display_on_hexagonal_grid, hex_pos::HexPosOffset, Onoro, OnoroMoveWrapper,
+  OnoroPawn, PawnColor,
 };
 
 pub struct OnoroPlayer<G> {
@@ -20,6 +22,47 @@ impl<G: Onoro> OnoroPlayer<G> {
   }
 
   fn board_with_labeled_moves(game: &G) -> impl Display {
+    let moves = if game.in_phase1() {
+      Either::Left(game.each_move().enumerate().map(|(i, m)| {
+        (
+          match game.to_move_wrapper(&m) {
+            OnoroMoveWrapper::Phase1 { to } => to.into(),
+            OnoroMoveWrapper::Phase2 { .. } => unreachable!(),
+          },
+          (b'a' + i as u8) as char,
+        )
+      }))
+    } else {
+      let srcs: HashSet<HexPosOffset> = game
+        .each_move()
+        .map(|m| match game.to_move_wrapper(&m) {
+          OnoroMoveWrapper::Phase2 { from, .. } => from.into(),
+          _ => unreachable!(),
+        })
+        .collect();
+      let dsts: HashSet<HexPosOffset> = game
+        .each_move()
+        .map(|m| match game.to_move_wrapper(&m) {
+          OnoroMoveWrapper::Phase2 { to, .. } => to.into(),
+          _ => unreachable!(),
+        })
+        .collect();
+
+      let srcs_len = srcs.len();
+      Either::Right(
+        srcs
+          .into_iter()
+          .enumerate()
+          .map(|(i, pos)| (pos, (b'a' + i as u8) as char))
+          .chain(
+            dsts
+              .into_iter()
+              .enumerate()
+              .map(move |(i, pos)| (pos, (b'a' + (srcs_len + i) as u8) as char)),
+          ),
+      )
+    };
+
     display_on_hexagonal_grid(
       game
         .pawns()
@@ -32,15 +75,7 @@ impl<G: Onoro> OnoroPlayer<G> {
             },
           )
         })
-        .chain(game.each_move().enumerate().map(|(i, m)| {
-          (
-            match game.to_move_wrapper(&m) {
-              OnoroMoveWrapper::Phase1 { to } => to.into(),
-              OnoroMoveWrapper::Phase2 { from, .. } => from.into(),
-            },
-            (b'a' + i as u8) as char,
-          )
-        }))
+        .chain(moves)
         .collect(),
     )
   }
