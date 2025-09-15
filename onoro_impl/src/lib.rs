@@ -15,6 +15,7 @@ mod p2_move_gen;
 mod packed_hex_pos;
 mod packed_idx;
 mod pawn_list;
+pub mod solver;
 #[cfg(test)]
 mod test_util;
 mod tile_hash;

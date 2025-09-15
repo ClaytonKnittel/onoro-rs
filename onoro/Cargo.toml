@@ -6,7 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-abstract_game = { git = "https://github.com/ClaytonKnittel/abstract-game.git", rev = "56a99f46ca7d33806ff4fb6750d8e629e0c4aba3" }
+abstract_game = { git = "https://github.com/ClaytonKnittel/abstract-game.git", rev = "3e97267deac3c7c2d6931133bf34ee360d711d96" }
 algebra = { path = "../algebra" }
 const-random = "0.1"
 googletest = "0.14.2"

@@ -5,6 +5,7 @@ pub mod groups;
 pub mod hex_pos;
 mod onoro;
 mod onoro_util;
+pub mod player;
 pub mod test_util;
 
 pub use crate::onoro::*;
