@@ -5,7 +5,7 @@ version = 4
 [[package]]
 name = "abstract_game"
 version = "0.1.0"
-source = "git+https://github.com/ClaytonKnittel/abstract-game.git?rev=8f6c581a6a6071b2af57bbc7e24bfcca42a2ace7#8f6c581a6a6071b2af57bbc7e24bfcca42a2ace7"
+source = "git+https://github.com/ClaytonKnittel/abstract-game.git?rev=e800a501c0b76e945d649955b65dbec6a4fde4e7#e800a501c0b76e945d649955b65dbec6a4fde4e7"
 dependencies = [
  "itertools 0.14.0",
  "rand 0.9.2",
@@ -151,7 +151,7 @@ dependencies = [
 [[package]]
 name = "cooperate"
 version = "0.1.0"
-source = "git+https://github.com/ClaytonKnittel/cooperate.git?rev=722f5721aea204c67594db3731d9cf31010d4860#722f5721aea204c67594db3731d9cf31010d4860"
+source = "git+https://github.com/ClaytonKnittel/cooperate.git?rev=ecc4e22609abc3b15d060d68f0a9cec2e7440b22#ecc4e22609abc3b15d060d68f0a9cec2e7440b22"
 dependencies = [
  "abstract_game",
  "crossbeam-queue",
