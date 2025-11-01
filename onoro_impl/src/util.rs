@@ -1,3 +1,4 @@
+#[cfg(target_feature = "ssse3")]
 use std::arch::x86_64::*;
 
 use itertools::Itertools;
@@ -106,6 +107,7 @@ pub trait MM128Iter {
   fn iter_epi16(self) -> impl Iterator<Item = i16>;
 }
 
+#[cfg(target_feature = "sse4.1")]
 impl MM128Iter for __m128i {
   #[inline]
   fn iter_epi16(self) -> impl Iterator<Item = i16> {
@@ -116,6 +118,7 @@ impl MM128Iter for __m128i {
 /// Sorts the 16-bit lanes of `vec`, returning the sorted result.
 #[allow(dead_code)]
 #[inline]
+#[cfg(target_feature = "sse4.1")]
 #[target_feature(enable = "sse4.1")]
 pub fn sort_epi16(vec: __m128i) -> __m128i {
   #[target_feature(enable = "sse4.1")]
@@ -171,6 +174,7 @@ pub fn sort_epi16(vec: __m128i) -> __m128i {
 }
 
 #[inline]
+#[cfg(target_feature = "ssse3")]
 #[target_feature(enable = "ssse3")]
 unsafe fn packed_positions_to_mask_sse3(packed_positions: u64) -> u64 {
   debug_assert!(
@@ -257,6 +261,7 @@ pub fn packed_positions_to_mask(packed_positions: u64) -> u64 {
 }
 
 #[inline]
+#[cfg(target_feature = "ssse3")]
 #[target_feature(enable = "ssse3")]
 unsafe fn equal_mask_epi8_sse3(byte_vec: u64, needle: u8) -> u64 {
   let b = needle as i8;
@@ -298,6 +303,7 @@ pub fn equal_mask_epi8(byte_vec: u64, needle: u8) -> u64 {
   equal_mask_epi8_slow(byte_vec, needle)
 }
 
+#[cfg(target_feature = "ssse3")]
 #[target_feature(enable = "ssse3")]
 unsafe fn horizontal_compress<F>(v: __m128i, mut compressor: F) -> u8
 where
@@ -338,6 +344,7 @@ impl CoordLimits {
 }
 
 #[inline]
+#[cfg(target_feature = "ssse3")]
 #[target_feature(enable = "ssse3")]
 fn packed_positions_coord_limits_sse3(pawn_poses: &[PackedIdx]) -> CoordLimits {
   const N: usize = 16;
@@ -417,19 +424,20 @@ mod tests {
   #[cfg(target_feature = "sse4.1")]
   use itertools::Itertools;
   #[cfg(target_feature = "sse4.1")]
-  use rand::{Rng, SeedableRng, rngs::StdRng};
+  use rand::{rngs::StdRng, Rng, SeedableRng};
   use rstest::rstest;
   use rstest_reuse::{apply, template};
 
   #[cfg(target_feature = "sse4.1")]
   use crate::util::sort_epi16;
   use crate::{
-    PackedIdx,
     test_util::PawnPoses,
     util::{
-      CoordLimits, MinAndMax, equal_mask_epi8, equal_mask_epi8_slow, packed_positions_coord_limits,
+      equal_mask_epi8, equal_mask_epi8_slow, packed_positions_coord_limits,
       packed_positions_coord_limits_slow, packed_positions_to_mask, packed_positions_to_mask_slow,
+      CoordLimits, MinAndMax,
     },
+    PackedIdx,
   };
 
   #[cfg(target_feature = "sse4.1")]

@@ -5,10 +5,10 @@ use std::{
 
 use algebra::group::Group;
 use onoro::{
-  Color, Colored, Onoro, OnoroMoveWrapper, OnoroPawn, PawnColor, TileState,
   abstract_game::{Game, GameMoveIterator, GamePlayer, GameResult},
   groups::{C2, D3, D6, K4},
   hex_pos::{HexPos, HexPosOffset},
+  Color, Colored, Onoro, OnoroMoveWrapper, OnoroPawn, PawnColor, TileState,
 };
 #[cfg(test)]
 use onoro::{error::OnoroResult, make_onoro_error};
@@ -16,15 +16,15 @@ use onoro::{error::OnoroResult, make_onoro_error};
 use union_find::UnionFind;
 
 use crate::{
-  FilterNullPackedIdx,
-  canonicalize::{BoardSymmetryState, board_symm_state},
-  r#move::Move,
+  canonicalize::{board_symm_state, BoardSymmetryState},
   onoro_state::OnoroState,
   p1_move_gen::P1MoveGenerator,
   p2_move_gen::P2MoveGenerator,
   packed_hex_pos::PackedHexPos,
   packed_idx::{IdxOffset, PackedIdx},
+  r#move::Move,
   util::{equal_mask_epi8, likely, packed_positions_to_mask, unlikely},
+  FilterNullPackedIdx,
 };
 
 /// An Onoro game state with `N / 2` pawns per player.
@@ -498,6 +498,7 @@ impl<const N: usize> OnoroImpl<N> {
 
   /// Returns a mask with a single bit set in the index corresponding to the
   /// pawn at tile `idx`.
+  #[cfg(target_feature = "ssse3")]
   #[target_feature(enable = "ssse3")]
   unsafe fn pawn_search_mask(pawn_poses: &[PackedIdx; N], idx: PackedIdx) -> u32 {
     use std::arch::x86_64::*;
@@ -515,6 +516,7 @@ impl<const N: usize> OnoroImpl<N> {
     _mm_movemask_epi8(masked_pawns) as u32
   }
 
+  #[cfg(target_feature = "ssse3")]
   #[target_feature(enable = "ssse3")]
   unsafe fn get_tile_fast(pawn_poses: &[PackedIdx; N], idx: PackedIdx) -> TileState {
     debug_assert_eq!(N, 16);
@@ -535,6 +537,7 @@ impl<const N: usize> OnoroImpl<N> {
     }
   }
 
+  #[cfg(target_feature = "ssse3")]
   #[target_feature(enable = "ssse3")]
   unsafe fn get_pawn_idx_fast(pawn_poses: &[PackedIdx; N], idx: PackedIdx) -> u32 {
     debug_assert_eq!(N, 16);
@@ -936,10 +939,10 @@ impl<const N: usize> GameMoveIterator for MoveGenerator<N> {
 #[cfg(test)]
 mod tests {
   use googletest::{expect_false, expect_true, gtest};
-  use onoro::{Onoro, TileState, hex_pos::HexPos};
+  use onoro::{hex_pos::HexPos, Onoro, TileState};
 
   use crate::{
-    Onoro16, OnoroImpl, onoro_defs::Onoro8, packed_idx::PackedIdx, test_util::PawnPoses,
+    onoro_defs::Onoro8, packed_idx::PackedIdx, test_util::PawnPoses, Onoro16, OnoroImpl,
   };
 
   /// Given a position on the board, returns the tile state of that position,
