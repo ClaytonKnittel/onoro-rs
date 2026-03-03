@@ -431,9 +431,9 @@ mod tests {
   #[cfg(target_feature = "sse4.1")]
   use std::arch::x86_64::*;
 
+  use googletest::gtest;
   #[cfg(target_feature = "sse4.1")]
-  use googletest::{gtest, prelude::*};
-  #[cfg(target_feature = "sse4.1")]
+  use googletest::prelude::*;
   use itertools::Itertools;
   use rand::RngCore;
   #[cfg(target_feature = "sse4.1")]
