@@ -102,6 +102,18 @@ impl<I: PrimInt> Default for MinAndMax<I> {
   }
 }
 
+/// Given a set of 3 integers, returns a u64 mask with a 1 in each bit having
+/// at least 2 values in the list with bits set in that position.
+fn bits_with_at_least_two_set_from_3<I: PrimInt>(a: I, b: I, c: I) -> I {
+  (a & b) | ((a ^ b) & c)
+}
+
+/// Given a set of 6 integers, returns a u64 mask with a 1 in each bit having
+/// at least 2 values in the list with bits set in that position.
+pub fn bits_with_at_least_two_set_from_6<I: PrimInt>(a: I, b: I, c: I, d: I, e: I, f: I) -> I {
+  (a & b) | (c & d) | (e & f) | bits_with_at_least_two_set_from_3(a ^ b, c ^ d, e ^ f)
+}
+
 pub trait MM128Iter {
   /// Iterates over the epi16 lanes of the register.
   fn iter_epi16(self) -> impl Iterator<Item = i16>;
@@ -423,6 +435,7 @@ mod tests {
   use googletest::{gtest, prelude::*};
   #[cfg(target_feature = "sse4.1")]
   use itertools::Itertools;
+  use rand::RngCore;
   #[cfg(target_feature = "sse4.1")]
   use rand::{rngs::StdRng, Rng, SeedableRng};
   use rstest::rstest;
@@ -439,6 +452,34 @@ mod tests {
     },
     PackedIdx,
   };
+
+  use super::bits_with_at_least_two_set_from_6;
+
+  fn bits_with_at_least_two_set_from_6_slow(a: u64, b: u64, c: u64, d: u64, e: u64, f: u64) -> u64 {
+    [a, b, c, d, e, f]
+      .iter()
+      .tuple_combinations()
+      .map(|(a, b)| a & b)
+      .fold(0, |acc, v| acc | v)
+  }
+
+  #[gtest]
+  fn test_bits_with_at_least_two_set_from_6() {
+    let mut rng = StdRng::seed_from_u64(204351098394);
+
+    for _ in 0..1 {
+      let a = rng.next_u64();
+      let b = rng.next_u64();
+      let c = rng.next_u64();
+      let d = rng.next_u64();
+      let e = rng.next_u64();
+      let f = rng.next_u64();
+
+      let actual = bits_with_at_least_two_set_from_6(a, b, c, d, e, f);
+      let expected = bits_with_at_least_two_set_from_6_slow(a, b, c, d, e, f);
+      assert_eq!(actual, expected);
+    }
+  }
 
   #[cfg(target_feature = "sse4.1")]
   #[target_feature(enable = "sse4.1")]
