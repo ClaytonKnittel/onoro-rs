@@ -2,8 +2,8 @@ use num_traits::PrimInt;
 use onoro::hex_pos::HexPos;
 
 use crate::{
+  util::{bits_with_at_least_two_set_from_6, CoordLimits, MinAndMax},
   FilterNullPackedIdx, PackedIdx,
-  util::{CoordLimits, MinAndMax},
 };
 
 /// The choice of basis to use for the minimum bounding parallelogram of the
@@ -164,10 +164,10 @@ impl BoardVecIndexer {
     self.pos_from_coords((c1, c2))
   }
 
-  /// Builds both the board bitvec and neighbor candidates. The board bitvec
-  /// has a 1 in each index corresponding to an occupied tile, and the neighbor
-  /// candidates have a 1 in each index corresponding to an empty neighbor of
-  /// any pawn.
+  /// Builds both the board bitvec and eligible neighbors. The board bitvec has
+  /// a 1 in each index corresponding to an occupied tile, and the eligible
+  /// neighbors have a 1 in each index corresponding to an empty space with at
+  /// least 2 neighbors.
   pub fn build_bitvecs<I: PrimInt>(&self, pawn_poses: &[PackedIdx]) -> (I, I) {
     let width = self.width as u32;
 
@@ -183,14 +183,16 @@ impl BoardVecIndexer {
     // All neighbors are -(width+1), -width, -1, +1, +width, +(width+1) in
     // index space.
     let width = width as usize;
-    let neighbor_candidates = (board >> (width + 1))
-      | (board >> width)
-      | (board >> 1)
-      | (board << 1)
-      | (board << width)
-      | (board << (width + 1));
+    let eligible_neighbors = bits_with_at_least_two_set_from_6(
+      board >> 1,
+      board << 1,
+      board >> width,
+      board << width,
+      board >> (width + 1),
+      board << (width + 1),
+    );
 
-    (board, neighbor_candidates & !board)
+    (board, eligible_neighbors & !board)
   }
 
   /// Constructs a mask of the 6 neighbors of a tile at the given bitvector
@@ -210,9 +212,9 @@ impl BoardVecIndexer {
 mod tests {
   use std::fmt::Debug;
 
-  use onoro::{OnoroIndex, hex_pos::HexPosOffset};
+  use onoro::{hex_pos::HexPosOffset, OnoroIndex};
 
-  use crate::{PackedIdx, util::packed_positions_coord_limits};
+  use crate::{util::packed_positions_coord_limits, PackedIdx};
 
   use super::*;
 
