@@ -12,7 +12,7 @@ fn main() {
   let player1 = HumanTermPlayer::new("Player 1".to_owned(), OnoroPlayer::new());
 
   let solver = OnoroSolver::new(IterativeDeepening::new());
-  let player2 = BotPlayer::new("Player 2".to_owned(), solver, 5);
+  let player2 = BotPlayer::new("Player 2".to_owned(), solver, 8);
 
   let game = Onoro16::default_start();
 

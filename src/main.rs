@@ -1,7 +1,10 @@
 use std::time::SystemTime;
 
-use cooperate::{cooperate::solve_with_hasher, passthrough_hasher::BuildPassThroughHasher};
-use onoro::Onoro;
+use cooperate::{passthrough_hasher::BuildPassThroughHasher, solvers::ttable_solver::TTSolver};
+use onoro::{
+  abstract_game::{Game, Solver},
+  Onoro,
+};
 use onoro_impl::{Onoro16, OnoroView};
 
 fn main() {
@@ -12,12 +15,20 @@ fn main() {
   // let onoro = Onoro16::from_board_string(
   //   ". B . . . . . B W B W W W B
   //     W B B B W B W . . . . . W .").unwrap();
+  // let onoro = Onoro16::from_board_string(
+  //   ". . . W . .
+  //     . B B B W .
+  //      . W B B B W
+  //       B W W W B .
+  //        . W . . . .",
+  // )
+  // .unwrap();
   let onoro = Onoro16::from_board_string(
-    ". . . W . .
-      . B B B W .
-       . W B B B W
-        B W W W B .
-         . W . . . .",
+    ". . . . .
+      . . B W .
+       . B B B .
+        . W W . .
+         . . . . .",
   )
   .unwrap();
 
@@ -29,15 +40,21 @@ fn main() {
 
   println!("{}", onoro);
 
+  let mut solver = TTSolver::with_hasher(BuildPassThroughHasher);
+
   let start = SystemTime::now();
-  let options = cooperate::cooperate::Options {
-    num_threads: 16,
-    search_depth: 9,
-    unit_depth: 4,
-  };
-  let score = solve_with_hasher(&OnoroView::new(onoro), options, BuildPassThroughHasher);
+  let mut game = OnoroView::new(onoro);
+  for depth in (0..=8).rev() {
+    let (score, m) = solver.best_move(&game, depth);
+    println!("Making move {m:?} with score {score}");
+    game.make_move(m.unwrap());
+    println!("{game}");
+
+    if game.finished().is_finished() {
+      break;
+    }
+  }
   let end = SystemTime::now();
 
   println!("Done: {:?}", end.duration_since(start).unwrap());
-  println!("Score: {score}");
 }
