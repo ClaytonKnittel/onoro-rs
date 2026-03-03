@@ -435,9 +435,9 @@ mod tests {
   #[cfg(target_feature = "sse4.1")]
   use googletest::prelude::*;
   use itertools::Itertools;
-  use rand::RngCore;
   #[cfg(target_feature = "sse4.1")]
-  use rand::{rngs::StdRng, Rng, SeedableRng};
+  use rand::Rng;
+  use rand::{rngs::StdRng, RngCore, SeedableRng};
   use rstest::rstest;
   use rstest_reuse::{apply, template};
 
