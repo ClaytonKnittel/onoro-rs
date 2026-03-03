@@ -3,10 +3,10 @@ use num_traits::{PrimInt, Unsigned};
 use onoro::{abstract_game::GameMoveIterator, hex_pos::HexPos};
 
 use crate::{
-  Move, OnoroImpl, PackedIdx,
-  board_vec_indexer::{Basis, BoardVecIndexer, DetermineBasisOutput, determine_basis},
+  board_vec_indexer::{determine_basis, Basis, BoardVecIndexer, DetermineBasisOutput},
   num_iter::IterOnes,
   util::{likely, packed_positions_coord_limits},
+  Move, OnoroImpl, PackedIdx,
 };
 
 struct Impl<I> {
@@ -15,9 +15,9 @@ struct Impl<I> {
   /// empty tiles so that `board_vec` and `neighbor_candidates` can use the
   /// same indexer.
   board_vec: I,
-  /// A bitvector of all tiles with at least one pawn neighbor which are not
+  /// A bitvector of all tiles with at least two pawn neighbors which are not
   /// occupied by a pawn already.
-  neighbor_candidates: I,
+  eligible_neighbors: I,
   indexer: BoardVecIndexer,
 }
 
@@ -31,31 +31,27 @@ impl<I: Unsigned + PrimInt> Impl<I> {
     pawn_poses: &[PackedIdx; N],
   ) -> Self {
     let indexer = BoardVecIndexer::new(basis, corner, width);
-    let (board_vec, neighbor_candidates) = indexer.build_bitvecs(pawn_poses);
+    let (board_vec, eligible_neighbors) = indexer.build_bitvecs(pawn_poses);
     Self {
       board_vec,
-      neighbor_candidates,
+      eligible_neighbors,
       indexer,
     }
   }
 
   fn next_internal(&mut self) -> Option<(usize, I)> {
-    let mut neighbor_candidates = self.neighbor_candidates;
-    while neighbor_candidates != I::zero() {
-      let index = neighbor_candidates.trailing_zeros() as usize;
-      neighbor_candidates = neighbor_candidates & (neighbor_candidates - I::one());
-
-      let neighbors_mask: I = self.indexer.neighbors_mask(index);
-      let neighbors_mask = neighbors_mask & self.board_vec;
-      if neighbors_mask.count_ones() >= 2 {
-        self.neighbor_candidates = neighbor_candidates;
-        return Some((index, neighbors_mask));
-      }
+    let mut eligible_neighbors = self.eligible_neighbors;
+    if eligible_neighbors == I::zero() {
+      return None;
     }
 
-    // No need to store neighbor_candidates again, since we typically don't
-    // call next() again after None is returned.
-    None
+    let index = eligible_neighbors.trailing_zeros() as usize;
+    eligible_neighbors = eligible_neighbors & (eligible_neighbors - I::one());
+
+    let neighbors_mask: I = self.indexer.neighbors_mask(index);
+    let neighbors_mask = neighbors_mask & self.board_vec;
+    self.eligible_neighbors = eligible_neighbors;
+    Some((index, neighbors_mask))
   }
 
   /// Finds the position of the next move we can make, or `None` if all moves
@@ -230,15 +226,15 @@ impl<const N: usize> GameMoveIterator for P1MoveGenerator<N> {
 #[cfg(test)]
 mod tests {
   use onoro::{
-    Onoro, abstract_game::GameMoveIterator, error::OnoroResult, hex_pos::HexPos,
-    test_util::BOARD_POSITIONS,
+    abstract_game::GameMoveIterator, error::OnoroResult, hex_pos::HexPos,
+    test_util::BOARD_POSITIONS, Onoro,
   };
   use rstest::rstest;
   use rstest_reuse::{apply, template};
 
   use crate::{
-    FilterNullPackedIdx, Onoro16, PackedIdx,
     p1_move_gen::{BoardVecIndexer, ImplContainer, P1MoveGenerator},
+    FilterNullPackedIdx, Onoro16, PackedIdx,
   };
 
   fn get_board_vec<const N: usize>(move_gen: &P1MoveGenerator<N>) -> u128 {
@@ -248,10 +244,10 @@ mod tests {
     }
   }
 
-  fn get_neighbor_candidates<const N: usize>(move_gen: &P1MoveGenerator<N>) -> u128 {
+  fn get_eligible_neighbors<const N: usize>(move_gen: &P1MoveGenerator<N>) -> u128 {
     match &move_gen.impl_container {
-      ImplContainer::Small(impl_) => impl_.neighbor_candidates as u128,
-      ImplContainer::Large(impl_) => impl_.neighbor_candidates,
+      ImplContainer::Small(impl_) => impl_.eligible_neighbors as u128,
+      ImplContainer::Large(impl_) => impl_.eligible_neighbors,
     }
   }
 
@@ -273,10 +269,11 @@ mod tests {
     neighbors
   }
 
-  /// Returns a mask of all tiles that are empty and adjacent to a pawn on the
-  /// board.
-  fn all_possible_neighbors(board_vec: u128, indexer: &BoardVecIndexer) -> u128 {
+  /// Returns a mask of all tiles that are empty and next to at least two
+  /// pawns.
+  fn all_eligible_neighbors(board_vec: u128, indexer: &BoardVecIndexer) -> u128 {
     let mut neighbors = 0;
+    let mut neighbors2 = 0;
     let mut temp_board = board_vec;
     while temp_board != 0 {
       let index = temp_board.trailing_zeros();
@@ -284,10 +281,12 @@ mod tests {
 
       let pos = indexer.pos_from_index(index);
 
-      neighbors |= neighbors_mask(pos, indexer);
+      let mask = neighbors_mask(pos, indexer);
+      neighbors2 |= neighbors & mask;
+      neighbors |= mask;
     }
 
-    neighbors & !board_vec
+    neighbors2 & !board_vec
   }
 
   #[template]
@@ -318,13 +317,13 @@ mod tests {
     let indexer = &move_gen.indexer();
 
     let board_vec = build_board_vec(onoro.pawn_poses(), indexer);
-    let neighbor_candidates = all_possible_neighbors(board_vec, indexer);
+    let neighbor_candidates = all_eligible_neighbors(board_vec, indexer);
 
     assert_eq!(
-      get_neighbor_candidates(&move_gen),
+      get_eligible_neighbors(&move_gen),
       neighbor_candidates,
       "{:#016x} vs. {:#016x}",
-      get_neighbor_candidates(&move_gen),
+      get_eligible_neighbors(&move_gen),
       neighbor_candidates
     );
   }
