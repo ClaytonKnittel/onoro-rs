@@ -467,7 +467,7 @@ mod tests {
   fn test_bits_with_at_least_two_set_from_6() {
     let mut rng = StdRng::seed_from_u64(204351098394);
 
-    for _ in 0..1 {
+    for _ in 0..100 {
       let a = rng.next_u64();
       let b = rng.next_u64();
       let c = rng.next_u64();
